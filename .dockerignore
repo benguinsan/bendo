@@ -1,0 +1,64 @@
+# Dependencies (installed inside Docker)
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js / build outputs
+.next/
+out/
+dist/
+build/
+.vercel/
+
+# Git / editor
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.log
+
+# Environment / secrets — never copy into the image
+.env
+.env.*
+!.env.example
+
+# Docker (not needed in build context)
+Dockerfile*
+.dockerignore
+compose.yaml
+compose.yml
+docker-compose*.yaml
+docker-compose*.yml
+
+# Docs / CI
+*.md
+docs/
+.github/
+.gitlab-ci.yml
+
+# Caches / temp
+.cache/
+.parcel-cache/
+.eslintcache
+.swc/
+.turbo/
+.tmp/
+.temp/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent / IDE metadata
+.cursor/
+.agents/
+AGENTS.md
+CLAUDE.md

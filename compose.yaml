@@ -1,0 +1,17 @@
+services:
+  web-app:
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Docker Desktop bind mounts often miss inotify; polling keeps `next dev` reloading
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      # Bind-mount source for live reload
+      - .:/app
+      # Keep deps and Next cache inside the container so the `node` user
+      # can write (host-owned .next causes Turbopack EACCES / panics)
+      - /app/node_modules
+      - /app/.next
