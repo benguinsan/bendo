@@ -9,5 +9,7 @@ export default defineConfig({
     "**/*.md",
     "package.json",
     "package-lock.json",
+    ".agents/**",
+    ".claude/**",
   ],
 });

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Profile portrait">
+  <rect width="96" height="96" rx="48" fill="#f4c7a8"/>
+  <circle cx="48" cy="38" r="16" fill="#6b3f2a"/>
+  <ellipse cx="48" cy="82" rx="28" ry="22" fill="#2c3d5a"/>
+  <circle cx="48" cy="40" r="12" fill="#f4c7a8"/>
+</svg>

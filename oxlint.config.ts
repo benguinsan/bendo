@@ -5,10 +5,14 @@ import react from "ultracite/oxlint/react";
 
 export default defineConfig({
   extends: [core, react, next],
-  ignorePatterns: core.ignorePatterns,
+  ignorePatterns: [...(core.ignorePatterns ?? []), ".agents/**", ".claude/**"],
   rules: {
-    // CNA + Clerk overlays use `function` components and unsorted object keys.
+    // CNA + Clerk overlays and shadcn CLI output use `function` components,
+    // `type` aliases, and inline `import { type X }`.
     "eslint/sort-keys": "off",
+    "eslint/func-style": "off",
     "react/function-component-definition": "off",
+    "typescript/consistent-type-definitions": "off",
+    "import/consistent-type-specifier-style": "off",
   },
 });
