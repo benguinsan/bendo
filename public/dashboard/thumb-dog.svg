@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 88" role="img" aria-label="Dog">
+  <rect width="118" height="88" rx="8" fill="#eef8ee"/>
+  <ellipse cx="58" cy="58" rx="28" ry="16" fill="#c48a4a"/>
+  <circle cx="78" cy="40" r="14" fill="#c48a4a"/>
+  <circle cx="84" cy="36" r="2.5" fill="#212427"/>
+  <ellipse cx="92" cy="42" rx="6" ry="4" fill="#b07238"/>
+  <rect x="44" y="70" width="8" height="10" rx="2" fill="#8a5a2b"/>
+  <rect x="64" y="70" width="8" height="10" rx="2" fill="#8a5a2b"/>
+</svg>
