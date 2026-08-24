@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 
-import { StubPage } from "@/components/app-shell/stub-page";
+import { MyTaskView } from "@/components/my-task/my-task-view";
+import { getMyTasks, toTaskView } from "@/lib/dashboard/mock-data";
 
 export const metadata: Metadata = {
   title: "My Task · bendo",
 };
 
 export default function MyTaskPage() {
-  return <StubPage title="My Task" />;
+  const now = new Date();
+  const tasks = getMyTasks(now).map((task) => toTaskView(task, now));
+
+  return <MyTaskView tasks={tasks} />;
 }

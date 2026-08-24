@@ -1,7 +1,7 @@
 import { formatRelativeCompleted } from "@/lib/dashboard/dates";
 
 export type TaskStatus = "not_started" | "in_progress" | "completed";
-export type TaskPriority = "low" | "moderate" | "high";
+export type TaskPriority = "low" | "moderate" | "extreme";
 
 export type DashboardProfile = {
   firstName: string;
@@ -15,6 +15,10 @@ export type DashboardTask = {
   id: string;
   title: string;
   description: string;
+  contentTitle?: string;
+  objective?: string;
+  additionalNotes?: string[];
+  deadlineLabel?: string;
   status: TaskStatus;
   priority: TaskPriority;
   createdAt: string;
@@ -131,6 +135,71 @@ export function getMockTasks(now: Date): DashboardTask[] {
   ];
 }
 
+export function getMyTasks(now: Date): DashboardTask[] {
+  return [
+    {
+      id: "task-documents",
+      title: "Submit Documents",
+      contentTitle: "Document Submission",
+      objective: "To submit required documents for completion or review.",
+      description:
+        "Review the listed documents, confirm they are complete and accurate, then submit them through the designated channel before the deadline. Gather any missing paperwork first.",
+      additionalNotes: [
+        "Ensure all documents are signed and dated.",
+        "If submitting in person, bring a copy of each original.",
+        "Double-check names and identification numbers.",
+      ],
+      deadlineLabel: "End of Day",
+      status: "not_started",
+      priority: "extreme",
+      createdAt: createdOn,
+      scheduledAt: daysFrom(now, 1),
+      completedAt: null,
+      thumbnailSrc: "/dashboard/thumb-documents.svg",
+      thumbnailAlt: "Stack of documents ready for submission",
+    },
+    {
+      id: "task-monthly-report",
+      title: "Complete monthly report",
+      description:
+        "Compile this month's numbers and finish the performance summary for the team.....",
+      status: "in_progress",
+      priority: "extreme",
+      createdAt: createdOn,
+      scheduledAt: daysFrom(now, 2),
+      completedAt: null,
+      thumbnailSrc: "/dashboard/thumb-report.svg",
+      thumbnailAlt: "Monthly report charts on a desk",
+    },
+    {
+      id: "task-grocery",
+      title: "Grocery shopping",
+      description:
+        "Buy vegetables, fruit, dairy, and household items for the week.....",
+      status: "in_progress",
+      priority: "extreme",
+      createdAt: createdOn,
+      scheduledAt: daysFrom(now, 3),
+      completedAt: null,
+      thumbnailSrc: "/dashboard/thumb-grocery.svg",
+      thumbnailAlt: "Grocery bag with produce",
+    },
+    {
+      id: "task-birthday",
+      title: "Attend Nischal's Birthday Party",
+      description:
+        "Buy gifts on the way and pick up the cake from the bakery. (6 PM | Fresh Elements).....",
+      status: "not_started",
+      priority: "moderate",
+      createdAt: createdOn,
+      scheduledAt: daysFrom(now, 1),
+      completedAt: null,
+      thumbnailSrc: "/dashboard/thumb-party.svg",
+      thumbnailAlt: "Birthday party table with balloons and a cake",
+    },
+  ];
+}
+
 export function getOpenTasks(tasks: DashboardTaskView[]): DashboardTaskView[] {
   return tasks.filter((task) => task.status !== "completed");
 }
@@ -178,7 +247,13 @@ export const statusLabels: Record<TaskStatus, string> = {
 export const priorityLabels: Record<TaskPriority, string> = {
   low: "Low",
   moderate: "Moderate",
-  high: "High",
+  extreme: "Extreme",
+};
+
+export const priorityTextClass: Record<TaskPriority, string> = {
+  low: "text-muted-foreground",
+  moderate: "text-priority-moderate",
+  extreme: "text-priority-extreme",
 };
 
 export const statusTextClass: Record<TaskStatus, string> = {

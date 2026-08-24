@@ -21,6 +21,7 @@ import {
 import { formatNumericDate } from "@/lib/dashboard/dates";
 import {
   priorityLabels,
+  priorityTextClass,
   statusFillClass,
   statusLabels,
   statusTextClass,
@@ -30,12 +31,32 @@ import { cn } from "@/lib/utils";
 
 type TaskCardProps = {
   task: DashboardTaskView;
+  selected?: boolean;
+  onSelect?: () => void;
 };
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
+  const selectable = Boolean(onSelect);
+
   return (
-    <Card className="rounded-card border-border/50 border py-5 ring-0">
-      <CardHeader>
+    <Card
+      className={cn(
+        "rounded-card relative border py-5 ring-0",
+        selected ? "border-primary" : "border-border/50"
+      )}
+    >
+      {onSelect ? (
+        <button
+          type="button"
+          className="rounded-card absolute inset-0 z-0"
+          aria-current={selected ? "true" : undefined}
+          aria-label={`View ${task.title}`}
+          onClick={onSelect}
+        />
+      ) : null}
+      <CardHeader
+        className={cn(selectable && "pointer-events-none relative z-10")}
+      >
         <CardTitle className="text-foreground flex items-center gap-2 font-sans text-base font-semibold">
           <span
             className={cn(
@@ -45,7 +66,7 @@ export function TaskCard({ task }: TaskCardProps) {
           />
           {task.title}
         </CardTitle>
-        <CardAction>
+        <CardAction className={cn(selectable && "pointer-events-auto")}>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -69,8 +90,15 @@ export function TaskCard({ task }: TaskCardProps) {
           </DropdownMenu>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex gap-4">
-        <p className="text-body min-w-0 flex-1 text-sm">{task.description}</p>
+      <CardContent
+        className={cn(
+          "flex gap-4",
+          selectable && "pointer-events-none relative z-10"
+        )}
+      >
+        <p className="text-body line-clamp-3 min-w-0 flex-1 text-sm">
+          {task.description}
+        </p>
         <div className="relative h-[72px] w-[90px] shrink-0 overflow-hidden rounded-lg sm:h-[88px] sm:w-[118px]">
           <Image
             src={task.thumbnailSrc}
@@ -82,10 +110,15 @@ export function TaskCard({ task }: TaskCardProps) {
           />
         </div>
       </CardContent>
-      <CardContent className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-[10px]">
+      <CardContent
+        className={cn(
+          "text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-[10px]",
+          selectable && "pointer-events-none relative z-10"
+        )}
+      >
         <p>
           Priority:{" "}
-          <span className="text-priority-moderate">
+          <span className={priorityTextClass[task.priority]}>
             {priorityLabels[task.priority]}
           </span>
         </p>
