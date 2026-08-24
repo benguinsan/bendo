@@ -251,7 +251,7 @@ export const priorityLabels: Record<TaskPriority, string> = {
 };
 
 export const priorityTextClass: Record<TaskPriority, string> = {
-  low: "text-muted-foreground",
+  low: "text-priority-low",
   moderate: "text-priority-moderate",
   extreme: "text-priority-extreme",
 };

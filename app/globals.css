@@ -44,6 +44,7 @@
   --color-status-completed: var(--status-completed);
   --color-priority-moderate: var(--priority-moderate);
   --color-priority-extreme: var(--priority-extreme);
+  --color-priority-low: var(--priority-low);
   --color-date-accent: var(--date-accent);
   --color-body: var(--text-body);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -98,6 +99,7 @@
   --status-completed: oklch(0.62 0.21 142.4);
   --priority-moderate: oklch(0.709 0.123 234.1);
   --priority-extreme: oklch(0.613 0.239 28.1);
+  --priority-low: oklch(0.62 0.21 142.4);
   --date-accent: oklch(0.76 0.144 235.3);
   --text-body: oklch(0.559 0 0);
 }
@@ -139,6 +141,7 @@
   --status-completed: oklch(0.68 0.2 142.4);
   --priority-moderate: oklch(0.74 0.12 234.1);
   --priority-extreme: oklch(0.704 0.191 22.2);
+  --priority-low: oklch(0.68 0.2 142.4);
   --date-accent: oklch(0.78 0.13 235.3);
   --text-body: oklch(0.72 0 0);
 }
