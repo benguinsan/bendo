@@ -35,6 +35,31 @@ type TaskCardProps = {
   onSelect?: () => void;
 };
 
+function isObjectThumbnail(src: string) {
+  return src.startsWith("blob:") || src.startsWith("data:");
+}
+
+function TaskThumbnail({ src, alt }: { src: string; alt: string }) {
+  if (isObjectThumbnail(src)) {
+    return (
+      // Blob/data URLs are client previews; next/image does not accept them.
+      // oxlint-disable-next-line next/no-img-element
+      <img src={src} alt={alt} className="size-full object-cover" />
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      unoptimized
+      sizes="118px"
+      className="object-cover"
+    />
+  );
+}
+
 export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
   const selectable = Boolean(onSelect);
 
@@ -100,14 +125,7 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
           {task.description}
         </p>
         <div className="relative h-[72px] w-[90px] shrink-0 overflow-hidden rounded-lg sm:h-[88px] sm:w-[118px]">
-          <Image
-            src={task.thumbnailSrc}
-            alt={task.thumbnailAlt}
-            fill
-            unoptimized
-            sizes="118px"
-            className="object-cover"
-          />
+          <TaskThumbnail src={task.thumbnailSrc} alt={task.thumbnailAlt} />
         </div>
       </CardContent>
       <CardContent
