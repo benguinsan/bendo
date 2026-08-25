@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import type { DashboardTask, TaskPriority } from "@/lib/dashboard/mock-data";
+import type {
+  DashboardTask,
+  TaskPriority,
+  TaskStatus,
+} from "@/lib/dashboard/mock-data";
 
 export const TASK_TITLE_MAX = 120;
 export const TASK_DESCRIPTION_MAX = 2000;
@@ -69,12 +73,18 @@ export function isPastCalendarDate(dateStr: string, now: Date): boolean {
   return selected < today;
 }
 
+export function isObjectThumbnailSrc(src: string): boolean {
+  return src.startsWith("blob:") || src.startsWith("data:");
+}
+
 export function countOpenTasksOnDate(
   tasks: DashboardTask[],
-  dateKey: string
+  dateKey: string,
+  excludeTaskId?: string
 ): number {
   return tasks.filter(
     (task) =>
+      task.id !== excludeTaskId &&
       task.status !== "completed" &&
       toLocalDateKey(new Date(task.scheduledAt)) === dateKey
   ).length;
@@ -83,11 +93,13 @@ export function countOpenTasksOnDate(
 export function hasDuplicateTask(
   tasks: DashboardTask[],
   title: string,
-  dateKey: string
+  dateKey: string,
+  excludeTaskId?: string
 ): boolean {
   const normalized = normalizeTaskTitle(title);
   return tasks.some(
     (task) =>
+      task.id !== excludeTaskId &&
       toLocalDateKey(new Date(task.scheduledAt)) === dateKey &&
       normalizeTaskTitle(task.title) === normalized
   );
@@ -161,6 +173,60 @@ export function validateNewTask(input: {
 
   if (
     hasDuplicateTask(input.existingTasks, parsed.data.title, parsed.data.date)
+  ) {
+    errors.title = "A task with this title already exists on this date.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
+  return { success: true, data: parsed.data };
+}
+
+export function validateUpdatedTask(input: {
+  title: string;
+  date: string;
+  priority: string;
+  description: string;
+  now: Date;
+  existingTasks: DashboardTask[];
+  taskId: string;
+  status: TaskStatus;
+}):
+  | { success: true; data: TaskFormValues }
+  | { success: false; errors: TaskFormFieldErrors } {
+  const parsed = taskFormSchema.safeParse({
+    title: input.title,
+    date: input.date,
+    priority: input.priority,
+    description: input.description,
+  });
+
+  if (!parsed.success) {
+    return { success: false, errors: fieldErrorsFromZod(parsed.error) };
+  }
+
+  const errors: TaskFormFieldErrors = {};
+  const isCompleted = input.status === "completed";
+
+  if (!isCompleted && isPastCalendarDate(parsed.data.date, input.now)) {
+    errors.date = "Choose today or a future date.";
+  } else if (
+    !isCompleted &&
+    countOpenTasksOnDate(input.existingTasks, parsed.data.date, input.taskId) >=
+      TASKS_PER_DATE_MAX
+  ) {
+    errors.date = "You already have 5 tasks on this date.";
+  }
+
+  if (
+    hasDuplicateTask(
+      input.existingTasks,
+      parsed.data.title,
+      parsed.data.date,
+      input.taskId
+    )
   ) {
     errors.title = "A task with this title already exists on this date.";
   }

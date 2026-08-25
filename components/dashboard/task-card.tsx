@@ -1,8 +1,9 @@
 "use client";
 
 import { MoreHorizontalIcon } from "lucide-react";
-import Image from "next/image";
+import Link from "next/link";
 
+import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,36 +33,21 @@ import { cn } from "@/lib/utils";
 type TaskCardProps = {
   task: DashboardTaskView;
   selected?: boolean;
+  href?: string;
   onSelect?: () => void;
+  onEdit?: () => void;
 };
 
-function isObjectThumbnail(src: string) {
-  return src.startsWith("blob:") || src.startsWith("data:");
-}
-
-function TaskThumbnail({ src, alt }: { src: string; alt: string }) {
-  if (isObjectThumbnail(src)) {
-    return (
-      // Blob/data URLs are client previews; next/image does not accept them.
-      // oxlint-disable-next-line next/no-img-element
-      <img src={src} alt={alt} className="size-full object-cover" />
-    );
-  }
-
-  return (
-    <Image
-      src={src}
-      alt={alt}
-      fill
-      unoptimized
-      sizes="118px"
-      className="object-cover"
-    />
-  );
-}
-
-export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
+export function TaskCard({
+  task,
+  selected = false,
+  href,
+  onSelect,
+  onEdit,
+}: TaskCardProps) {
   const selectable = Boolean(onSelect);
+  const linked = Boolean(href) && !onSelect;
+  const hasOverlay = selectable || linked;
 
   return (
     <Card
@@ -79,8 +65,15 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
           onClick={onSelect}
         />
       ) : null}
+      {linked && href ? (
+        <Link
+          href={href}
+          className="rounded-card absolute inset-0 z-0"
+          aria-label={`View ${task.title}`}
+        />
+      ) : null}
       <CardHeader
-        className={cn(selectable && "pointer-events-none relative z-10")}
+        className={cn(hasOverlay && "pointer-events-none relative z-10")}
       >
         <CardTitle className="text-foreground flex items-center gap-2 font-sans text-base font-semibold">
           <span
@@ -91,7 +84,7 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
           />
           {task.title}
         </CardTitle>
-        <CardAction className={cn(selectable && "pointer-events-auto")}>
+        <CardAction className={cn(hasOverlay && "pointer-events-auto")}>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -106,7 +99,15 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-32">
               <DropdownMenuGroup>
-                <DropdownMenuItem>Edit</DropdownMenuItem>
+                {href ? (
+                  <DropdownMenuItem
+                    nativeButton={false}
+                    render={<Link href={href} />}
+                  >
+                    View
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
                 <DropdownMenuItem variant="destructive">
                   Delete
                 </DropdownMenuItem>
@@ -118,20 +119,24 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
       <CardContent
         className={cn(
           "flex gap-4",
-          selectable && "pointer-events-none relative z-10"
+          hasOverlay && "pointer-events-none relative z-10"
         )}
       >
         <p className="text-body line-clamp-3 min-w-0 flex-1 text-sm">
           {task.description}
         </p>
         <div className="relative h-[72px] w-[90px] shrink-0 overflow-hidden rounded-lg sm:h-[88px] sm:w-[118px]">
-          <TaskThumbnail src={task.thumbnailSrc} alt={task.thumbnailAlt} />
+          <TaskThumbnail
+            src={task.thumbnailSrc}
+            alt={task.thumbnailAlt}
+            sizes="118px"
+          />
         </div>
       </CardContent>
       <CardContent
         className={cn(
           "text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-[10px]",
-          selectable && "pointer-events-none relative z-10"
+          hasOverlay && "pointer-events-none relative z-10"
         )}
       >
         <p>

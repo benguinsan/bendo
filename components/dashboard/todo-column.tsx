@@ -9,12 +9,14 @@ type TodoColumnProps = {
   dateLine: string;
   tasks: DashboardTaskView[];
   addTaskTrigger: ReactNode;
+  onEditTask: (taskId: string) => void;
 };
 
 export function TodoColumn({
   dateLine,
   tasks,
   addTaskTrigger,
+  onEditTask,
 }: TodoColumnProps) {
   return (
     <section className="flex min-w-0 flex-col gap-4">
@@ -29,7 +31,12 @@ export function TodoColumn({
       <p className="text-muted-foreground text-sm">{dateLine}</p>
       <div className="flex flex-col gap-3">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            href={`/my-task/${task.id}`}
+            onEdit={() => onEditTask(task.id)}
+          />
         ))}
       </div>
     </section>

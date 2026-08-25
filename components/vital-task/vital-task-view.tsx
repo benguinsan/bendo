@@ -1,10 +1,9 @@
 "use client";
 
-import { ListTodoIcon } from "lucide-react";
+import { CircleAlertIcon } from "lucide-react";
 import { useState } from "react";
 
 import { TaskCard } from "@/components/dashboard/task-card";
-import { TaskDetailPanel } from "@/components/my-task/task-detail-panel";
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -14,14 +13,15 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { VitalTaskDetailPanel } from "@/components/vital-task/vital-task-detail-panel";
 import { toTaskView, type DashboardTask } from "@/lib/dashboard/mock-data";
 
-type MyTaskViewProps = {
+type VitalTaskViewProps = {
   initialTasks: DashboardTask[];
   nowIso: string;
 };
 
-export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
+export function VitalTaskView({ initialTasks, nowIso }: VitalTaskViewProps) {
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialTasks[0]?.id ?? null
@@ -34,11 +34,12 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
 
   return (
     <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
-      <div className="grid grid-cols-1 gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:grid-rows-[minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,423fr)_minmax(0,511fr)] lg:grid-rows-[minmax(0,1fr)]">
         <Card className="rounded-card shadow-panel flex min-h-0 flex-col py-5 ring-0 lg:h-full">
           <CardHeader>
             <h1 className="text-foreground font-sans text-[15px] font-medium">
-              <span className="border-primary border-b-2 pb-0.5">My</span> Tasks
+              <span className="border-primary border-b-2 pb-0.5">Vital</span>{" "}
+              Tasks
             </h1>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -59,18 +60,18 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
               <Empty className="border-0">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <ListTodoIcon />
+                    <CircleAlertIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No tasks yet</EmptyTitle>
+                  <EmptyTitle>No vital tasks yet</EmptyTitle>
                   <EmptyDescription>
-                    Tasks you create will show up here.
+                    Tasks you mark as vital will show up here.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
             )}
           </CardContent>
         </Card>
-        <TaskDetailPanel
+        <VitalTaskDetailPanel
           task={selectedTask}
           onEdit={selectedId ? () => setEditingTaskId(selectedId) : undefined}
         />
