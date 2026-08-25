@@ -2,6 +2,7 @@
 
 import { MoreHorizontalIcon } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 type TaskCardProps = {
   task: DashboardTaskView;
   selected?: boolean;
+  href?: string;
   onSelect?: () => void;
 };
 
@@ -60,8 +62,15 @@ function TaskThumbnail({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
+export function TaskCard({
+  task,
+  selected = false,
+  href,
+  onSelect,
+}: TaskCardProps) {
   const selectable = Boolean(onSelect);
+  const linked = Boolean(href) && !onSelect;
+  const hasOverlay = selectable || linked;
 
   return (
     <Card
@@ -79,8 +88,15 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
           onClick={onSelect}
         />
       ) : null}
+      {linked && href ? (
+        <Link
+          href={href}
+          className="rounded-card absolute inset-0 z-0"
+          aria-label={`View ${task.title}`}
+        />
+      ) : null}
       <CardHeader
-        className={cn(selectable && "pointer-events-none relative z-10")}
+        className={cn(hasOverlay && "pointer-events-none relative z-10")}
       >
         <CardTitle className="text-foreground flex items-center gap-2 font-sans text-base font-semibold">
           <span
@@ -91,7 +107,7 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
           />
           {task.title}
         </CardTitle>
-        <CardAction className={cn(selectable && "pointer-events-auto")}>
+        <CardAction className={cn(hasOverlay && "pointer-events-auto")}>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -106,6 +122,14 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-32">
               <DropdownMenuGroup>
+                {href ? (
+                  <DropdownMenuItem
+                    nativeButton={false}
+                    render={<Link href={href} />}
+                  >
+                    View
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem>Edit</DropdownMenuItem>
                 <DropdownMenuItem variant="destructive">
                   Delete
@@ -118,7 +142,7 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
       <CardContent
         className={cn(
           "flex gap-4",
-          selectable && "pointer-events-none relative z-10"
+          hasOverlay && "pointer-events-none relative z-10"
         )}
       >
         <p className="text-body line-clamp-3 min-w-0 flex-1 text-sm">
@@ -131,7 +155,7 @@ export function TaskCard({ task, selected = false, onSelect }: TaskCardProps) {
       <CardContent
         className={cn(
           "text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-[10px]",
-          selectable && "pointer-events-none relative z-10"
+          hasOverlay && "pointer-events-none relative z-10"
         )}
       >
         <p>

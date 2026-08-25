@@ -29,7 +29,7 @@ export function TodoColumn({
       <p className="text-muted-foreground text-sm">{dateLine}</p>
       <div className="flex flex-col gap-3">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard key={task.id} task={task} href={`/my-task/${task.id}`} />
         ))}
       </div>
     </section>

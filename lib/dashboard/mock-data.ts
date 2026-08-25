@@ -19,6 +19,8 @@ export type DashboardTask = {
   objective?: string;
   additionalNotes?: string[];
   deadlineLabel?: string;
+  checklist?: string[];
+  optionalItems?: string[];
   status: TaskStatus;
   priority: TaskPriority;
   createdAt: string;
@@ -65,21 +67,35 @@ function daysFrom(now: Date, days: number): string {
   return next.toISOString();
 }
 
+function getBirthdayTask(now: Date): DashboardTask {
+  return {
+    id: "task-birthday",
+    title: "Attend Nischal's Birthday Party",
+    description:
+      "Buy gifts on the way and pick up cake from the bakery. (6 PM | Fresh Elements)",
+    checklist: [
+      "A cake, with candles to blow out. (Layer cake, cupcake, flat sheet cake)",
+      "The birthday song.",
+      "A place to collect gifts.",
+    ],
+    optionalItems: [
+      "Paper cone-shaped party hats, paper whistles that unroll.",
+      "Games, activities (carry an object with your knees, then drop it into a milk bottle.)",
+      "Lunch: sandwich halves, or pizza slices, juice, pretzels, potato chips...THEN cake & candles and the song.",
+    ],
+    status: "not_started",
+    priority: "moderate",
+    createdAt: createdOn,
+    scheduledAt: daysFrom(now, 1),
+    completedAt: null,
+    thumbnailSrc: "/dashboard/thumb-party.svg",
+    thumbnailAlt: "Birthday party table with balloons and a cake",
+  };
+}
+
 export function getMockTasks(now: Date): DashboardTask[] {
   return [
-    {
-      id: "task-birthday",
-      title: "Attend Nischal's Birthday Party",
-      description:
-        "Buy gifts on the way and pick up the cake from the bakery. (6 PM | Fresh Elements).....",
-      status: "not_started",
-      priority: "moderate",
-      createdAt: createdOn,
-      scheduledAt: daysFrom(now, 1),
-      completedAt: null,
-      thumbnailSrc: "/dashboard/thumb-party.svg",
-      thumbnailAlt: "Birthday party table with balloons and a cake",
-    },
+    getBirthdayTask(now),
     {
       id: "task-landing",
       title: "Landing Page Design for Travel Booking Website",
@@ -184,20 +200,14 @@ export function getMyTasks(now: Date): DashboardTask[] {
       thumbnailSrc: "/dashboard/thumb-grocery.svg",
       thumbnailAlt: "Grocery bag with produce",
     },
-    {
-      id: "task-birthday",
-      title: "Attend Nischal's Birthday Party",
-      description:
-        "Buy gifts on the way and pick up the cake from the bakery. (6 PM | Fresh Elements).....",
-      status: "not_started",
-      priority: "moderate",
-      createdAt: createdOn,
-      scheduledAt: daysFrom(now, 1),
-      completedAt: null,
-      thumbnailSrc: "/dashboard/thumb-party.svg",
-      thumbnailAlt: "Birthday party table with balloons and a cake",
-    },
+    getBirthdayTask(now),
   ];
+}
+
+export function getTaskById(id: string, now: Date): DashboardTask | undefined {
+  return [...getMockTasks(now), ...getMyTasks(now)].find(
+    (task) => task.id === id
+  );
 }
 
 export function getOpenTasks(tasks: DashboardTaskView[]): DashboardTaskView[] {

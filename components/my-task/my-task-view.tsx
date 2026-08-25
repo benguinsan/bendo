@@ -42,6 +42,7 @@ export function MyTaskView({ tasks }: MyTaskViewProps) {
                     key={task.id}
                     task={task}
                     selected={task.id === selectedId}
+                    href={`/my-task/${task.id}`}
                     onSelect={() => setSelectedId(task.id)}
                   />
                 ))}
