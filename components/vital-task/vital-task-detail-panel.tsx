@@ -1,4 +1,4 @@
-import { ListTodoIcon, SquarePenIcon, Trash2Icon } from "lucide-react";
+import { CircleAlertIcon, SquarePenIcon, Trash2Icon } from "lucide-react";
 
 import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -19,21 +19,17 @@ import {
   type DashboardTaskView,
 } from "@/lib/dashboard/mock-data";
 
-type TaskDetailPanelProps = {
+type VitalTaskDetailPanelProps = {
   task: DashboardTaskView | null;
   onEdit?: () => void;
 };
 
-function DetailLine({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="text-sm">
-      <span className="text-foreground font-semibold">{label}:</span>{" "}
-      <span className="text-body">{value}</span>
-    </p>
-  );
-}
+export function VitalTaskDetailPanel({
+  task,
+  onEdit,
+}: VitalTaskDetailPanelProps) {
+  const checklist = task?.checklist ?? [];
 
-export function TaskDetailPanel({ task, onEdit }: TaskDetailPanelProps) {
   return (
     <Card className="rounded-card shadow-panel flex min-h-0 flex-col py-5 ring-0 lg:h-full">
       {task ? (
@@ -69,36 +65,17 @@ export function TaskDetailPanel({ task, onEdit }: TaskDetailPanelProps) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-            {task.contentTitle ? (
-              <DetailLine label="Task Title" value={task.contentTitle} />
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
+            <p className="text-body text-sm">{task.description}</p>
+            {task.detailDescription ? (
+              <p className="text-body text-sm">{task.detailDescription}</p>
             ) : null}
-            {task.objective ? (
-              <DetailLine label="Objective" value={task.objective} />
-            ) : null}
-            <div className="flex flex-col gap-1">
-              <p className="text-foreground text-sm font-semibold">
-                Task Description:
-              </p>
-              <p className="text-body text-sm">{task.description}</p>
-            </div>
-            {task.additionalNotes && task.additionalNotes.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-foreground text-sm font-semibold">
-                  Additional Notes:
-                </p>
-                <ul className="text-body flex list-disc flex-col gap-1 pl-5 text-sm">
-                  {task.additionalNotes.map((note) => (
-                    <li key={note}>{note}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {task.deadlineLabel ? (
-              <DetailLine
-                label="Deadline for Submission"
-                value={task.deadlineLabel}
-              />
+            {checklist.length > 0 ? (
+              <ol className="text-body flex list-decimal flex-col gap-1 pl-5 text-sm">
+                {checklist.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ol>
             ) : null}
           </CardContent>
           <CardContent className="mt-auto flex justify-end gap-2">
@@ -120,11 +97,11 @@ export function TaskDetailPanel({ task, onEdit }: TaskDetailPanelProps) {
           <Empty className="border-0">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <ListTodoIcon />
+                <CircleAlertIcon />
               </EmptyMedia>
               <EmptyTitle>No task selected</EmptyTitle>
               <EmptyDescription>
-                Choose a task from the list to see its details.
+                Choose a vital task from the list to see its details.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

@@ -21,6 +21,7 @@ export type DashboardTask = {
   deadlineLabel?: string;
   checklist?: string[];
   optionalItems?: string[];
+  detailDescription?: string;
   status: TaskStatus;
   priority: TaskPriority;
   createdAt: string;
@@ -204,8 +205,47 @@ export function getMyTasks(now: Date): DashboardTask[] {
   ];
 }
 
+export function getVitalTasks(now: Date): DashboardTask[] {
+  return [
+    {
+      id: "task-walk-dog",
+      title: "Walk the dog",
+      description: "Take the dog to the park and bring treats as well.",
+      detailDescription:
+        "Take Luffy and Jiro for a leisurely stroll around the neighborhood. Enjoy the fresh air and give them the exercise and mental stimulation they need for a happy and healthy day. Don't forget to bring along squeaky and fluffy for some extra fun along the way!",
+      checklist: [
+        "Listen to a podcast or audiobook",
+        "Practice mindfulness or meditation",
+        "Take photos of interesting sights along the way",
+        "Practice obedience training with your dog",
+        "Chat with neighbors or other dog walkers",
+        "Listen to music or an upbeat playlist",
+      ],
+      status: "not_started",
+      priority: "extreme",
+      createdAt: createdOn,
+      scheduledAt: daysFrom(now, 1),
+      completedAt: null,
+      thumbnailSrc: "/dashboard/thumb-dog.svg",
+      thumbnailAlt: "Dog on a leash at the park",
+    },
+    {
+      id: "task-grandma",
+      title: "Take grandma to hospital",
+      description: "Go back home and take grandma to the hospital.",
+      status: "in_progress",
+      priority: "moderate",
+      createdAt: createdOn,
+      scheduledAt: daysFrom(now, 2),
+      completedAt: null,
+      thumbnailSrc: "/dashboard/thumb-hospital.svg",
+      thumbnailAlt: "Hospital building with an entrance canopy",
+    },
+  ];
+}
+
 export function getTaskById(id: string, now: Date): DashboardTask | undefined {
-  return [...getMockTasks(now), ...getMyTasks(now)].find(
+  return [...getMockTasks(now), ...getMyTasks(now), ...getVitalTasks(now)].find(
     (task) => task.id === id
   );
 }

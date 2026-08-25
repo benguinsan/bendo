@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ViewTaskView } from "@/components/my-task/view-task-view";
-import { getTaskById, toTaskView } from "@/lib/dashboard/mock-data";
+import { getTaskById } from "@/lib/dashboard/mock-data";
 
 type ViewTaskPageProps = {
   params: Promise<{ taskId: string }>;
@@ -28,5 +28,5 @@ export default async function ViewTaskPage({ params }: ViewTaskPageProps) {
     notFound();
   }
 
-  return <ViewTaskView task={toTaskView(task, now)} />;
+  return <ViewTaskView initialTask={task} nowIso={now.toISOString()} />;
 }

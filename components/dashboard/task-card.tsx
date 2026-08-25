@@ -1,9 +1,9 @@
 "use client";
 
 import { MoreHorizontalIcon } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 
+import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -35,38 +35,15 @@ type TaskCardProps = {
   selected?: boolean;
   href?: string;
   onSelect?: () => void;
+  onEdit?: () => void;
 };
-
-function isObjectThumbnail(src: string) {
-  return src.startsWith("blob:") || src.startsWith("data:");
-}
-
-function TaskThumbnail({ src, alt }: { src: string; alt: string }) {
-  if (isObjectThumbnail(src)) {
-    return (
-      // Blob/data URLs are client previews; next/image does not accept them.
-      // oxlint-disable-next-line next/no-img-element
-      <img src={src} alt={alt} className="size-full object-cover" />
-    );
-  }
-
-  return (
-    <Image
-      src={src}
-      alt={alt}
-      fill
-      unoptimized
-      sizes="118px"
-      className="object-cover"
-    />
-  );
-}
 
 export function TaskCard({
   task,
   selected = false,
   href,
   onSelect,
+  onEdit,
 }: TaskCardProps) {
   const selectable = Boolean(onSelect);
   const linked = Boolean(href) && !onSelect;
@@ -130,7 +107,7 @@ export function TaskCard({
                     View
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem>Edit</DropdownMenuItem>
+                <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
                 <DropdownMenuItem variant="destructive">
                   Delete
                 </DropdownMenuItem>
@@ -149,7 +126,11 @@ export function TaskCard({
           {task.description}
         </p>
         <div className="relative h-[72px] w-[90px] shrink-0 overflow-hidden rounded-lg sm:h-[88px] sm:w-[118px]">
-          <TaskThumbnail src={task.thumbnailSrc} alt={task.thumbnailAlt} />
+          <TaskThumbnail
+            src={task.thumbnailSrc}
+            alt={task.thumbnailAlt}
+            sizes="118px"
+          />
         </div>
       </CardContent>
       <CardContent
