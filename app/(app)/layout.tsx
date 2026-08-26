@@ -1,21 +1,23 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell/app-shell";
+import { requireUser } from "@/lib/auth/require-user";
+import { toDashboardProfile } from "@/lib/auth/to-dashboard-profile";
 import { formatNumericDate, formatWeekday } from "@/lib/dashboard/dates";
-import { mockProfile } from "@/lib/dashboard/mock-data";
 
 export const dynamic = "force-dynamic";
 
-export default function AppGroupLayout({
+export default async function AppGroupLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const user = await requireUser();
   const now = new Date();
 
   return (
     <AppShell
-      profile={mockProfile}
+      profile={toDashboardProfile(user)}
       weekday={formatWeekday(now)}
       numericDate={formatNumericDate(now)}
     >

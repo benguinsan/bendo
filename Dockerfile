@@ -2,9 +2,12 @@
 # Usage: docker compose up --build   →  http://localhost:3000
 # Host `npm run dev` still works without Docker.
 
-ARG NODE_VERSION=24
+ARG NODE_VERSION=22
 
 FROM node:${NODE_VERSION}-alpine
+
+# Pin npm so `npm ci` matches the lockfile generated on the host.
+RUN npm install -g npm@12.0.2
 
 RUN apk add --no-cache libc6-compat su-exec
 

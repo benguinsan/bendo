@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import type { Metadata } from "next";
 import { Geist_Mono, Inter, Montserrat } from "next/font/google";
 import type { ReactNode } from "react";
@@ -37,7 +39,11 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${montserrat.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <ClerkProvider appearance={{ theme: shadcn }} dynamic>
+          {children}
+        </ClerkProvider>
+      </body>
     </html>
   );
 }

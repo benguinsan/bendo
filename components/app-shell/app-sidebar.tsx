@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { LogOutIcon } from "lucide-react";
 
 import { AppNav } from "@/components/app-shell/app-nav";
@@ -14,6 +15,8 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({ profile, open, onClose }: AppSidebarProps) {
+  const { signOut } = useClerk();
+
   return (
     <>
       {open ? (
@@ -33,7 +36,9 @@ export function AppSidebar({ profile, open, onClose }: AppSidebarProps) {
       >
         <div className="mb-8 flex flex-col items-center gap-3">
           <Avatar className="after:border-background/40 size-[86px]">
-            <AvatarImage src={profile.avatarSrc} alt="" />
+            {profile.avatarSrc ? (
+              <AvatarImage src={profile.avatarSrc} alt="" />
+            ) : null}
             <AvatarFallback>{profile.initials}</AvatarFallback>
           </Avatar>
           <div className="flex w-full flex-col items-center gap-1 text-center">
@@ -48,6 +53,9 @@ export function AppSidebar({ profile, open, onClose }: AppSidebarProps) {
           <button
             type="button"
             className="rounded-card text-sidebar-foreground flex h-[59px] max-w-[288px] items-center gap-3 px-6 text-left text-base font-medium"
+            onClick={() => {
+              void signOut({ redirectUrl: "/sign-in" });
+            }}
           >
             <LogOutIcon />
             Logout
