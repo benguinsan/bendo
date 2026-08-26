@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { EditTaxonomyDialog } from "@/components/task-categories/edit-taxonomy-dialog";
+import { TaxonomyLabelDialog } from "@/components/task-categories/edit-taxonomy-dialog";
 import { TaxonomyTable } from "@/components/task-categories/taxonomy-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,32 +15,42 @@ import {
 import {
   priorityTaxonomyRows,
   statusTaxonomyRows,
-  type PriorityTaxonomyRow,
   type StatusTaxonomyRow,
 } from "@/lib/task-categories/taxonomy";
 import type { TaxonomyKind } from "@/lib/task-categories/taxonomy-input";
 
-type TaxonomyEditTarget =
-  | { kind: "status"; row: StatusTaxonomyRow }
-  | { kind: "priority"; row: PriorityTaxonomyRow };
+type PriorityTableRow = {
+  id: string;
+  label: string;
+};
+
+type TaxonomyDialogState =
+  | { mode: "edit"; kind: "status"; row: StatusTaxonomyRow }
+  | { mode: "edit"; kind: "priority"; row: PriorityTableRow }
+  | { mode: "create"; kind: "priority" };
 
 type TaxonomySectionProps = {
   headingId: string;
   titleRest: string;
   addLabel: string;
   nameColumn: string;
-  rows: readonly StatusTaxonomyRow[] | readonly PriorityTaxonomyRow[];
+  rows: readonly { id: string; label: string }[];
   emptyTitle: string;
   emptyDescription: string;
   onEdit: (row: { id: string; label: string }) => void;
+  onAdd?: () => void;
 };
 
 function cloneStatusRows(): StatusTaxonomyRow[] {
   return statusTaxonomyRows.map((row) => ({ ...row }));
 }
 
-function clonePriorityRows(): PriorityTaxonomyRow[] {
+function clonePriorityRows(): PriorityTableRow[] {
   return priorityTaxonomyRows.map((row) => ({ ...row }));
+}
+
+function createPriorityRowId(): string {
+  return `priority-${crypto.randomUUID()}`;
 }
 
 function TaxonomySection({
@@ -52,6 +62,7 @@ function TaxonomySection({
   emptyTitle,
   emptyDescription,
   onEdit,
+  onAdd,
 }: TaxonomySectionProps) {
   return (
     <section className="flex flex-col gap-4" aria-labelledby={headingId}>
@@ -63,7 +74,7 @@ function TaxonomySection({
           <span className="border-primary border-b-2 pb-0.5">Task</span>{" "}
           {titleRest}
         </h2>
-        <Button type="button" variant="link">
+        <Button type="button" variant="link" onClick={onAdd}>
           {addLabel}
         </Button>
       </div>
@@ -82,9 +93,10 @@ function TaxonomySection({
 export function TaskCategoriesView() {
   const [statusRows, setStatusRows] = useState(cloneStatusRows);
   const [priorityRows, setPriorityRows] = useState(clonePriorityRows);
-  const [target, setTarget] = useState<TaxonomyEditTarget | null>(null);
+  const [dialog, setDialog] = useState<TaxonomyDialogState | null>(null);
 
-  const kind: TaxonomyKind = target?.kind ?? "status";
+  const kind: TaxonomyKind = dialog?.kind ?? "status";
+  const mode = dialog?.mode ?? "edit";
   const existingLabels =
     kind === "status"
       ? statusRows.map((row) => row.label)
@@ -92,19 +104,27 @@ export function TaskCategoriesView() {
 
   function handleOpenChange(open: boolean) {
     if (!open) {
-      setTarget(null);
+      setDialog(null);
     }
   }
 
-  function handleUpdate(name: string) {
-    if (!target) {
+  function handleSubmitLabel(name: string) {
+    if (!dialog) {
       return;
     }
 
-    if (target.kind === "status") {
+    if (dialog.mode === "create") {
+      setPriorityRows((rows) => [
+        ...rows,
+        { id: createPriorityRowId(), label: name },
+      ]);
+      return;
+    }
+
+    if (dialog.kind === "status") {
       setStatusRows((rows) =>
         rows.map((row) =>
-          row.id === target.row.id ? { ...row, label: name } : row
+          row.id === dialog.row.id ? { ...row, label: name } : row
         )
       );
       return;
@@ -112,7 +132,7 @@ export function TaskCategoriesView() {
 
     setPriorityRows((rows) =>
       rows.map((row) =>
-        row.id === target.row.id ? { ...row, label: name } : row
+        row.id === dialog.row.id ? { ...row, label: name } : row
       )
     );
   }
@@ -155,7 +175,7 @@ export function TaskCategoriesView() {
             onEdit={(row) => {
               const statusRow = statusRows.find((item) => item.id === row.id);
               if (statusRow) {
-                setTarget({ kind: "status", row: statusRow });
+                setDialog({ mode: "edit", kind: "status", row: statusRow });
               }
             }}
           />
@@ -167,24 +187,32 @@ export function TaskCategoriesView() {
             rows={priorityRows}
             emptyTitle="No task priorities yet"
             emptyDescription="Priorities you add will show up here."
+            onAdd={() => {
+              setDialog({ mode: "create", kind: "priority" });
+            }}
             onEdit={(row) => {
               const priorityRow = priorityRows.find(
                 (item) => item.id === row.id
               );
               if (priorityRow) {
-                setTarget({ kind: "priority", row: priorityRow });
+                setDialog({
+                  mode: "edit",
+                  kind: "priority",
+                  row: priorityRow,
+                });
               }
             }}
           />
         </CardContent>
       </Card>
-      <EditTaxonomyDialog
-        open={target !== null}
+      <TaxonomyLabelDialog
+        open={dialog !== null}
+        mode={mode}
         kind={kind}
-        row={target?.row ?? null}
+        row={dialog?.mode === "edit" ? dialog.row : null}
         existingLabels={existingLabels}
         onOpenChange={handleOpenChange}
-        onUpdate={handleUpdate}
+        onSubmitLabel={handleSubmitLabel}
       />
     </div>
   );

@@ -27,46 +27,69 @@ type TaxonomyRow = {
   label: string;
 };
 
-type EditTaxonomyDialogProps = {
+export type TaxonomyLabelDialogMode = "create" | "edit";
+
+type TaxonomyLabelDialogProps = {
   open: boolean;
+  mode: TaxonomyLabelDialogMode;
   kind: TaxonomyKind;
   row: TaxonomyRow | null;
   existingLabels: readonly string[];
   onOpenChange: (open: boolean) => void;
-  onUpdate: (name: string) => void;
+  onSubmitLabel: (name: string) => void;
 };
 
-const dialogCopy = {
+const kindCopy = {
   status: {
     rest: "Task Status",
     fieldLabel: "Task Status Name",
-    description: "Edit this task status name.",
   },
   priority: {
     rest: "Task Priority",
     fieldLabel: "Task Priority Title",
-    description: "Edit this task priority title.",
   },
 } as const;
 
-type EditTaxonomyFormProps = {
+const modeCopy = {
+  edit: {
+    firstWord: "Edit",
+    submit: "Update",
+    description: {
+      status: "Edit this task status name.",
+      priority: "Edit this task priority title.",
+    },
+  },
+  create: {
+    firstWord: "Add",
+    submit: "Create",
+    description: {
+      status: "Add a new task status name.",
+      priority: "Add a new task priority title.",
+    },
+  },
+} as const;
+
+type TaxonomyLabelFormProps = {
+  mode: TaxonomyLabelDialogMode;
   kind: TaxonomyKind;
-  row: TaxonomyRow;
+  initialName: string;
   existingLabels: readonly string[];
   onOpenChange: (open: boolean) => void;
-  onUpdate: (name: string) => void;
+  onSubmitLabel: (name: string) => void;
 };
 
-function EditTaxonomyForm({
+function TaxonomyLabelForm({
+  mode,
   kind,
-  row,
+  initialName,
   existingLabels,
   onOpenChange,
-  onUpdate,
-}: EditTaxonomyFormProps) {
+  onSubmitLabel,
+}: TaxonomyLabelFormProps) {
   const nameId = useId();
-  const copy = dialogCopy[kind];
-  const [name, setName] = useState(row.label);
+  const copy = kindCopy[kind];
+  const actions = modeCopy[mode];
+  const [name, setName] = useState(initialName);
   const [error, setError] = useState<string | undefined>();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -75,7 +98,7 @@ function EditTaxonomyForm({
       name,
       kind,
       existingLabels,
-      currentLabel: row.label,
+      currentLabel: mode === "edit" ? initialName : "",
     });
 
     if (!result.success) {
@@ -83,7 +106,7 @@ function EditTaxonomyForm({
       return;
     }
 
-    onUpdate(result.data.name);
+    onSubmitLabel(result.data.name);
     onOpenChange(false);
   }
 
@@ -95,11 +118,13 @@ function EditTaxonomyForm({
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <DialogTitle className="font-sans text-base font-medium">
-            <span className="border-primary border-b-2 pb-0.5">Edit</span>{" "}
+            <span className="border-primary border-b-2 pb-0.5">
+              {actions.firstWord}
+            </span>{" "}
             {copy.rest}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {copy.description}
+            {actions.description[kind]}
           </DialogDescription>
         </div>
         <DialogClose
@@ -131,7 +156,7 @@ function EditTaxonomyForm({
           </FieldGroup>
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" size="lg" className="min-w-24 px-8">
-              Update
+              {actions.submit}
             </Button>
             <Button
               type="button"
@@ -148,23 +173,27 @@ function EditTaxonomyForm({
   );
 }
 
-export function EditTaxonomyDialog({
+export function TaxonomyLabelDialog({
   open,
+  mode,
   kind,
   row,
   existingLabels,
   onOpenChange,
-  onUpdate,
-}: EditTaxonomyDialogProps) {
+  onSubmitLabel,
+}: TaxonomyLabelDialogProps) {
+  const canRender = mode === "create" || row !== null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && row ? (
-        <EditTaxonomyForm
+      {open && canRender ? (
+        <TaxonomyLabelForm
+          mode={mode}
           kind={kind}
-          row={row}
+          initialName={mode === "edit" ? (row?.label ?? "") : ""}
           existingLabels={existingLabels}
           onOpenChange={onOpenChange}
-          onUpdate={onUpdate}
+          onSubmitLabel={onSubmitLabel}
         />
       ) : null}
     </Dialog>
