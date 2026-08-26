@@ -13,7 +13,9 @@ export default function AuthLayout({
           href="/"
           className="text-[28px] leading-normal font-semibold sm:text-[32px]"
         >
-          <span className="text-primary">Ben<span className="text-foreground">do</span></span>
+          <span className="text-primary">
+            Ben<span className="text-foreground">do</span>
+          </span>
         </Link>
         {children}
       </div>
