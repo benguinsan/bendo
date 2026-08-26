@@ -41,14 +41,6 @@ export type StatusPercents = {
   notStarted: number;
 };
 
-export const mockProfile: DashboardProfile = {
-  firstName: "Sundar",
-  fullName: "Sundar Gurung",
-  email: "sundargurung360@gmail.com",
-  avatarSrc: "/dashboard/avatar-sundar.svg",
-  initials: "SG",
-};
-
 const createdOn = "2023-06-20T09:00:00.000Z";
 
 export function isTaskOverdue(task: DashboardTask, now: Date): boolean {

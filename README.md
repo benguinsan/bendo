@@ -1,10 +1,10 @@
 # bendo
 
-A project created with create-benguin-app
+A personal-first todo and project-management web app with Clerk authentication.
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with
 [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app)
-via **create-ben-app**, with **Clerk** authentication plumbing.
+via **create-ben-app**.
 
 ## Getting Started
 
@@ -14,6 +14,9 @@ via **create-ben-app**, with **Clerk** authentication plumbing.
 cp .env.example .env.local
 ```
 
+Required: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`. Sign-in and
+sign-up URLs default to `/sign-in` and `/sign-up`; after auth, users land on `/`.
+
 2. Install and run:
 
 ```bash
@@ -21,20 +24,16 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). This starter includes Clerk
-**plumbing** (`@clerk/nextjs`, `proxy.ts`, env keys) but does **not** add Sign in /
-Sign up pages or wrap the app in `ClerkProvider`. Official Clerk Skills are already
-in `.agents/skills/` (Claude Code also has `.claude/skills/`). Start with `/clerk`
-and follow the [Next.js quickstart](https://clerk.com/docs/nextjs/getting-started/quickstart)
-to implement auth UI.
+Open [http://localhost:3000](http://localhost:3000). Unsigned visitors are sent
+to `/sign-in`. Create an account or sign in to open the dashboard.
 
 ## Authentication (Clerk)
 
 - Publishable key: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (client + server)
 - Secret key: `CLERK_SECRET_KEY` (**server only** — never expose to the browser)
-- Boundary: `proxy.ts` (`clerkMiddleware`) for Next.js 16+
-- Auth UI / protected pages: implement via official Clerk Skills — this starter
-  does not ship `/sign-in`, `/sign-up`, or `/dashboard`
+- Session handshake: `proxy.ts` (`clerkMiddleware`) for Next.js 16+
+- Pages: `/sign-in`, `/sign-up` (prebuilt Clerk components, shadcn theme)
+- Product routes under `app/(app)/` call `auth.protect()` via `requireUser()`
 
 Magic Links, MFA, Social Auth, Passkeys, User Impersonation, Organizations, and
 Billing are configured in the [Clerk Dashboard](https://dashboard.clerk.com) and

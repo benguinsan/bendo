@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ViewTaskView } from "@/components/my-task/view-task-view";
+import { requireUser } from "@/lib/auth/require-user";
 import { getTaskById } from "@/lib/dashboard/mock-data";
 
 type ViewTaskPageProps = {
@@ -20,6 +21,7 @@ export async function generateMetadata({
 }
 
 export default async function ViewTaskPage({ params }: ViewTaskPageProps) {
+  await requireUser();
   const { taskId } = await params;
   const now = new Date();
   const task = getTaskById(taskId, now);
