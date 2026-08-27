@@ -23,6 +23,10 @@ export const categoryNameSchema = z
       )
   );
 
+export const categoryWriteSchema = z.object({
+  name: categoryNameSchema,
+});
+
 export function validateNewCategory(
   name: string
 ):
