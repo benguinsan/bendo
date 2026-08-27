@@ -40,16 +40,36 @@ export const resourceIdSchema = z.uuid();
 const thumbnailSrcSchema = z.string().max(2048).nullable();
 const thumbnailAltSchema = z.string().max(200).nullable();
 
+const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+
+export function isValidCalendarDate(dateStr: string): boolean {
+  if (!CALENDAR_DATE_PATTERN.test(dateStr)) {
+    return false;
+  }
+
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+
+  return (
+    parsed.getFullYear() === year &&
+    parsed.getMonth() === month - 1 &&
+    parsed.getDate() === day
+  );
+}
+
+export const calendarDateSchema = z
+  .string()
+  .min(1, "Date is required")
+  .regex(CALENDAR_DATE_PATTERN, "Enter a valid date")
+  .refine(isValidCalendarDate, "Enter a valid date");
+
 export const createTaskApiSchema = z.object({
   title: z
     .string()
     .trim()
     .min(1, "Title is required")
     .max(TASK_TITLE_MAX, `Title must be ${TASK_TITLE_MAX} characters or fewer`),
-  date: z
-    .string()
-    .min(1, "Date is required")
-    .regex(/^\d{4}-\d{2}-\d{2}$/u, "Enter a valid date"),
+  date: calendarDateSchema,
   priority: taskPrioritySchema,
   description: z
     .string()
@@ -60,7 +80,6 @@ export const createTaskApiSchema = z.object({
     .optional()
     .transform((value) => (value ?? "").trim()),
   categoryId: resourceIdSchema.nullable().optional(),
-  scheduledAt: z.string().optional(),
   thumbnailSrc: thumbnailSrcSchema.optional(),
   thumbnailAlt: thumbnailAltSchema.optional(),
 });
@@ -76,10 +95,7 @@ export const updateTaskApiSchema = z
         `Title must be ${TASK_TITLE_MAX} characters or fewer`
       )
       .optional(),
-    date: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/u, "Enter a valid date")
-      .optional(),
+    date: calendarDateSchema.optional(),
     priority: taskPrioritySchema.optional(),
     description: z
       .string()
@@ -91,7 +107,6 @@ export const updateTaskApiSchema = z
       .optional(),
     status: taskStatusSchema.optional(),
     categoryId: resourceIdSchema.nullable().optional(),
-    scheduledAt: z.string().optional(),
     thumbnailSrc: thumbnailSrcSchema.optional(),
     thumbnailAlt: thumbnailAltSchema.optional(),
   })
@@ -109,10 +124,7 @@ export const taskFormSchema = z.object({
     .trim()
     .min(1, "Title is required")
     .max(TASK_TITLE_MAX, `Title must be ${TASK_TITLE_MAX} characters or fewer`),
-  date: z
-    .string()
-    .min(1, "Date is required")
-    .regex(/^\d{4}-\d{2}-\d{2}$/u, "Enter a valid date"),
+  date: calendarDateSchema,
   priority: z.string().min(1, "Select a priority").pipe(taskPrioritySchema),
   description: z
     .string()

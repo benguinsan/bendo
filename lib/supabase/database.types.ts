@@ -177,7 +177,73 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      create_category_with_activity: {
+        Args: {
+          p_actor_clerk_user_id: string;
+          p_clerk_user_id: string;
+          p_name: string;
+        };
+        Returns: Database["public"]["Tables"]["categories"]["Row"];
+      };
+      create_task_with_activity: {
+        Args: {
+          p_actor_clerk_user_id: string;
+          p_category_id?: string | null;
+          p_clerk_user_id: string;
+          p_content: string;
+          p_description: string;
+          p_priority: string;
+          p_scheduled_at: string;
+          p_scheduled_date: string;
+          p_thumbnail_alt?: string | null;
+          p_thumbnail_src?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["tasks"]["Row"];
+      };
+      delete_category_with_activity: {
+        Args: {
+          p_actor_clerk_user_id: string;
+          p_category_id: string;
+          p_clerk_user_id: string;
+        };
+        Returns: string | null;
+      };
+      delete_task_with_activity: {
+        Args: {
+          p_actor_clerk_user_id: string;
+          p_clerk_user_id: string;
+          p_task_id: string;
+        };
+        Returns: string | null;
+      };
+      insert_success_activity: {
+        Args: {
+          p_action: string;
+          p_actor_clerk_user_id: string;
+          p_clerk_user_id: string;
+          p_entity_id: string;
+          p_entity_type: string;
+        };
+        Returns: undefined;
+      };
+      update_category_with_activity: {
+        Args: {
+          p_actor_clerk_user_id: string;
+          p_category_id: string;
+          p_clerk_user_id: string;
+          p_name: string;
+        };
+        Returns: Database["public"]["Tables"]["categories"]["Row"] | null;
+      };
+      update_task_with_activity: {
+        Args: {
+          p_actor_clerk_user_id: string;
+          p_clerk_user_id: string;
+          p_patch: Json;
+          p_task_id: string;
+        };
+        Returns: Database["public"]["Tables"]["tasks"]["Row"] | null;
+      };
     };
     Enums: {
       [_ in never]: never;

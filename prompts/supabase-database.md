@@ -10,17 +10,6 @@ This pass is **database + data access only**. Do **not** replace Dashboard / My 
 
 - `AGENTS.md` (Supabase source of truth, task/category/activity rules, API method conventions, env table, server/client boundaries, Ultracite checks, no overbuild)
 - `.agents/skills/supabase/SKILL.md` (verify docs/changelog; RLS + grants; never expose `service_role`; `auth.role()` deprecated; UPDATE needs SELECT + `USING`/`WITH CHECK`; `SECURITY DEFINER` pitfalls; imperative migrations via `supabase migration new`; generate types from the schema; Data API exposure / explicit `GRANT`)
-- `.agents/skills/supabase-postgres-best-practices/SKILL.md` plus:
-  - `references/schema-data-types.md` (`text`, `timestamptz`, check constraints for enums)
-  - `references/schema-lowercase-identifiers.md` (snake_case, unquoted)
-  - `references/schema-primary-keys.md` (prefer identity; uuid only if needed)
-  - `references/schema-foreign-key-indexes.md`
-  - `references/schema-constraints.md` (no `ADD CONSTRAINT IF NOT EXISTS`)
-  - `references/query-missing-indexes.md`
-  - `references/query-partial-indexes.md` (soft-delete filters)
-  - `references/query-composite-indexes.md` (`clerk_user_id` leftmost)
-  - `references/security-rls-basics.md` / `security-rls-performance.md` (enable RLS; wrap claim lookups in `(select …)`)
-  - `references/data-n-plus-one.md` (no per-row loops to Supabase)
 - `.agents/skills/clerk/SKILL.md` → `clerk-nextjs-patterns` + `references/api-routes.md` (`await auth()`; 401 vs 403; do not mix server/client Clerk imports)
 - Next.js 16 docs (read from `node_modules/next/dist/docs/` at implement time if present, otherwise the published guides): App Router Route Handlers (`route.ts`), `params` is a **Promise**, Server vs Client Components, `server-only`
 - Supabase docs fetched for this prompt:
@@ -39,7 +28,7 @@ AI SDK is **not** needed.
 - `env.ts` / `.env.example` — Clerk vars only. Host `.env` already has `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (do **not** print, log, or commit values)
 - No `supabase/` directory; `supabase` CLI is not on PATH
 - `lib/auth/require-user.ts` — `auth.protect()` + `currentUser()` for pages. API routes must use `auth()` and return **401**, not redirect
-- `lib/tasks/task-input.ts` — Zod 4 `taskFormSchema`; `TASK_TITLE_MAX` 120; `TASK_DESCRIPTION_MAX` 2000; `TASKS_PER_DATE_MAX` 5; `normalizeTaskTitle`; frontend 5-per-date counts **incomplete** tasks (DB must follow AGENTS.md: **5 non-deleted** per calendar date)
+- `lib/tasks/task-input.ts` — Zod 4 `taskFormSchema`; `TASK_TITLE_MAX` 120; `TASK_DESCRIPTION_MAX` 2000; `TASKS_PER_DATE_MAX` 5; `normalizeTaskTitle`; 5-per-date counts **incomplete**, non-deleted tasks (frontend and DB)
 - `lib/task-categories/category-input.ts` — `CATEGORY_NAME_MAX` 50; trim/collapse whitespace
 - `lib/dashboard/mock-data.ts` — `TaskStatus` / `TaskPriority`; `DashboardTask`; overdue is derived (`status !== "completed"` and `scheduledAt < now`). Keep mock helpers for UI this pass
 - `lib/tasks/create-mock-task.ts` — local-noon `scheduledAt`; IDs are UUIDs
@@ -56,7 +45,7 @@ AI SDK is **not** needed.
 3. **RLS is deny-by-default for Data API roles.** Enable RLS on every public table. **Revoke** table privileges from `anon` and `authenticated`. **Grant** `SELECT, INSERT, UPDATE, DELETE` only to `service_role` (and `SELECT, INSERT` only on `task_activities`). No `TO authenticated` policies that would imply browser access. This is defense in depth if the anon key is used against PostgREST: RLS + no grants ⇒ no rows.
 4. **Application scoping is the real authorization.** Every service method takes the Clerk `userId` and filters/writes `clerk_user_id`. Never trust a client-supplied owner id. Never query without that filter.
 5. **No `users` / profiles table and no Clerk webhooks.** Store `clerk_user_id text not null` on owned rows (Clerk ids are `user_…`, not UUIDs).
-6. **Manual SQL Editor apply (no migration push).** Author the schema in `supabase/schema.sql`. The operator pastes it into the Supabase Dashboard SQL Editor and runs it. Do **not** use `supabase db push` or `supabase/migrations/` for this schema. The file must be re-runnable (`drop … if exists` then create).
+6. **Manual SQL Editor apply (no migration push).** Author the schema in `supabase/schema.sql`. The operator pastes it into the Supabase Dashboard SQL Editor and runs it. Do **not** use `supabase db push` or `supabase/migrations/` for this schema. The file must be idempotent (`CREATE TABLE/INDEX IF NOT EXISTS`, `CREATE OR REPLACE` for functions/triggers). It must **not** `DROP TABLE` or delete existing rows. Do not treat it as a production reset. New columns and constraints need explicit `ALTER`.
 7. **Hosted project already has keys.** Types live in `lib/supabase/database.types.ts` and must stay aligned with `supabase/schema.sql`. Do not add a `scripts/` helper or `npm run db:types` wrapper.
 8. **Do not pin the Supabase CLI** for this pass (no local start, no migration push, no type-gen script).
 9. **Primary keys:** `uuid primary key default gen_random_uuid()` so task ids match existing `crypto.randomUUID()` URL usage without a new extension. Accept the uuid-v4 locality tradeoff for this personal-scale app (do not add `pg_uuidv7`).
@@ -69,13 +58,13 @@ AI SDK is **not** needed.
     - `content` non-empty after trim; length ≤ `TASK_TITLE_MAX`; description length ≤ `TASK_DESCRIPTION_MAX`
     - `status in ('not_started','in_progress','completed')`, `priority in ('low','moderate','extreme')`
     - incomplete insert/update cannot use `scheduled_at` in the past; completed rows may keep a past `scheduled_at`
-    - max 5 non-deleted tasks per `(clerk_user_id, scheduled_date)`
+    - max 5 non-deleted incomplete tasks per `(clerk_user_id, scheduled_date)`; enforce this cap only when the resulting row is incomplete (same predicate as `tasks_before_write` in `supabase/schema.sql`)
     - unique `(clerk_user_id, content_normalized, scheduled_at)` where `deleted_at is null`
     - completing sets `completed_at`; leaving `completed` clears `completed_at`
     - `content_normalized` is a `generated always … stored` column using the same normalize rules as `normalizeTaskTitle`
 16. **Overdue is not a column.** Derive in the mapper (`status !== 'completed' && scheduled_at < now`).
 17. **No statistics tables.** Counts/percentages stay derived from `tasks` in JS.
-18. **`task_activities` are append-only.** Services insert after successful (or explicitly failed, if you record failures) mutations. **No** PATCH/DELETE activity routes. **No** GET activity route in this pass. Grant `SELECT, INSERT` only; revoke `UPDATE, DELETE` even from `service_role` if Postgres allows (otherwise block with a trigger that `raise exception` on update/delete).
+18. **`task_activities` are append-only.** Services write them in the same transaction as the mutation via `*_with_activity` RPCs (`prompts/shared-transactions.md`). **No** PATCH/DELETE activity routes. **No** GET activity route in this pass. Grant `SELECT, INSERT` only; revoke `UPDATE, DELETE` even from `service_role` if Postgres allows (otherwise block with a trigger that `raise exception` on update/delete).
 19. **Notifications** exist as a table + list/create/mark-read access. Do **not** auto-insert a notification on every task mutation (that would spam the unused bell). POST is available for explicit creates; GET lists the current user’s rows; PATCH marks `read_at`.
 20. **Thin API routes** per AGENTS.md. Handlers: `auth()` → 401 if unsigned → parse/Zod → call one service function → map domain errors to HTTP. No Supabase calls inside `route.ts`.
 21. **Do not wire the UI.** Mock fixtures stay. Client forms stay local. This prompt must not edit dashboard/my-task/vital-task/category view components except if a shared type import path moves (avoid that).
@@ -92,7 +81,6 @@ AI SDK is **not** needed.
 - `lib/supabase/errors.ts` — **new** typed domain error codes (optional if folded into services)
 - `lib/tasks/task-service.ts` (name flexible) — **new**
 - `lib/task-categories/category-service.ts` — **new**
-- `lib/activities/activity-service.ts` — **new** (internal insert helper)
 - `lib/notifications/notification-service.ts` — **new**
 - `lib/tasks/task-input.ts` — reuse; add **server** Zod schemas for create/patch (status, category_id, scheduled_at, etc.) without breaking the existing form schema
 - `app/api/tasks/route.ts` — GET, POST
@@ -186,7 +174,7 @@ Lowercase snake_case unquoted identifiers. `text` not `varchar`. `timestamptz` n
 
 - `updated_at` bump on `tasks` and `categories`
 - Task insert/update: reject past `scheduled_at` when the resulting status is not `completed`
-- Task insert/update: if the row is not deleted, count other non-deleted rows with the same `(clerk_user_id, scheduled_date)` and reject at 5
+- Task insert/update: if the resulting row is not deleted and not `completed`, count other non-deleted incomplete rows with the same `(clerk_user_id, scheduled_date)` and reject at 5
 - Sync `completed_at` with `status`
 - Optional: reject `task_activities` update/delete
 
@@ -242,7 +230,7 @@ type ServiceResult<T> =
 
 **Activities**
 
-- `recordActivity(...)` used only by other services. Not exported to routes.
+- Written inside `*_with_activity` RPCs (same transaction as the mutation). See `prompts/shared-transactions.md`. No activity HTTP routes.
 
 **Notifications**
 
@@ -297,12 +285,12 @@ Keep `route.ts` short. Shared `jsonError` helper is fine.
 
 ## Acceptance criteria
 
-- [ ] `supabase/schema.sql` is a single SQL Editor script with tables, indexes, checks, triggers, RLS enabled, and explicit grants/revokes; it is safe to re-run
+- [ ] `supabase/schema.sql` is a single SQL Editor script with tables, indexes, checks, triggers, RLS enabled, and explicit grants/revokes; it is idempotent and does not drop tables or delete rows
 - [ ] Types in `lib/supabase/database.types.ts` are CLI-generated and compile
 - [ ] Server client is service-role + `server-only`; no browser Supabase client
 - [ ] Task, category, activity, and notification services scope every query by Clerk user id
 - [ ] Creating two tasks with the same normalized content and `scheduled_at` for one user fails
-- [ ] A sixth non-deleted task on the same `scheduled_date` fails
+- [ ] A sixth non-deleted incomplete task on the same `scheduled_date` fails
 - [ ] Incomplete task with past `scheduled_at` fails; completed task may keep a past `scheduled_at`
 - [ ] Completing sets `completed_at`; reopening clears it and writes activities
 - [ ] Category names are unique per user case-insensitively; delete sets `tasks.category_id` to null
@@ -316,7 +304,7 @@ Keep `route.ts` short. Shared `jsonError` helper is fine.
 
 From the repo root:
 
-1. Paste `supabase/schema.sql` into the hosted project's SQL Editor and run it
+1. Paste `supabase/schema.sql` into the hosted project's SQL Editor and run it (creates missing objects; does not wipe existing data)
 2. Confirm `lib/supabase/database.types.ts` matches the applied schema
 4. A **test query** via authenticated `curl` to `/api/tasks` proving insert + user-scoped select work
 5. `npm run typecheck`

@@ -1,5 +1,4 @@
 import "server-only";
-import { recordActivity } from "@/lib/activities/activity-service";
 import type { Tables } from "@/lib/supabase/database.types";
 import {
   fail,
@@ -30,29 +29,6 @@ function toPersistedCategory(row: CategoryRow): PersistedCategory {
   };
 }
 
-async function getOwnedCategoryRow(
-  userId: string,
-  categoryId: string
-): Promise<ServiceResult<CategoryRow>> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("id", categoryId)
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    return mapSupabaseError(error);
-  }
-
-  if (!data) {
-    return fail("CATEGORY_NOT_FOUND", "Category not found.");
-  }
-
-  return ok(data);
-}
-
 export async function listCategories(
   userId: string
 ): Promise<ServiceResult<PersistedCategory[]>> {
@@ -80,31 +56,16 @@ export async function createCategory(
   }
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("categories")
-    .insert({
-      clerk_user_id: userId,
-      name: parsed.data.name,
-    })
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("create_category_with_activity", {
+    p_clerk_user_id: userId,
+    p_actor_clerk_user_id: userId,
+    p_name: parsed.data.name,
+  });
 
   if (error || !data) {
     return error
       ? mapSupabaseError(error)
       : fail("INTERNAL", "Could not create category.");
-  }
-
-  const activity = await recordActivity({
-    userId,
-    actorUserId: userId,
-    action: "category_created",
-    entityType: "category",
-    entityId: data.id,
-  });
-
-  if (!activity.ok) {
-    return activity;
   }
 
   return ok(toPersistedCategory(data));
@@ -125,19 +86,13 @@ export async function updateCategory(
     return fromZodError(parsed.error);
   }
 
-  const existing = await getOwnedCategoryRow(userId, parsedId.data);
-  if (!existing.ok) {
-    return existing;
-  }
-
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("categories")
-    .update({ name: parsed.data.name })
-    .eq("id", parsedId.data)
-    .eq("clerk_user_id", userId)
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("update_category_with_activity", {
+    p_clerk_user_id: userId,
+    p_actor_clerk_user_id: userId,
+    p_category_id: parsedId.data,
+    p_name: parsed.data.name,
+  });
 
   if (error) {
     return mapSupabaseError(error);
@@ -145,18 +100,6 @@ export async function updateCategory(
 
   if (!data) {
     return fail("CATEGORY_NOT_FOUND", "Category not found.");
-  }
-
-  const activity = await recordActivity({
-    userId,
-    actorUserId: userId,
-    action: "category_updated",
-    entityType: "category",
-    entityId: data.id,
-  });
-
-  if (!activity.ok) {
-    return activity;
   }
 
   return ok(toPersistedCategory(data));
@@ -171,19 +114,12 @@ export async function deleteCategory(
     return fail("VALIDATION", "Enter a valid category id.");
   }
 
-  const existing = await getOwnedCategoryRow(userId, parsedId.data);
-  if (!existing.ok) {
-    return existing;
-  }
-
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("categories")
-    .delete()
-    .eq("id", parsedId.data)
-    .eq("clerk_user_id", userId)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("delete_category_with_activity", {
+    p_clerk_user_id: userId,
+    p_actor_clerk_user_id: userId,
+    p_category_id: parsedId.data,
+  });
 
   if (error) {
     return mapSupabaseError(error);
@@ -193,17 +129,5 @@ export async function deleteCategory(
     return fail("CATEGORY_NOT_FOUND", "Category not found.");
   }
 
-  const activity = await recordActivity({
-    userId,
-    actorUserId: userId,
-    action: "category_deleted",
-    entityType: "category",
-    entityId: data.id,
-  });
-
-  if (!activity.ok) {
-    return activity;
-  }
-
-  return ok({ id: data.id });
+  return ok({ id: data });
 }

@@ -45,6 +45,14 @@ export function mapSupabaseError(error: PostgrestError): ServiceResult<never> {
     );
   }
 
+  if (blob.includes("CATEGORY_NOT_FOUND")) {
+    return fail("CATEGORY_NOT_FOUND", "Category not found.");
+  }
+
+  if (blob.includes("TASK_NOT_FOUND")) {
+    return fail("TASK_NOT_FOUND", "Task not found.");
+  }
+
   if (error.code === "23505") {
     if (blob.includes("categories_clerk_user_id_lower_name")) {
       return fail(
