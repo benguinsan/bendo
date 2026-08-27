@@ -144,6 +144,8 @@ Rules:
 
 - All user-owned records must be scoped to the authenticated Clerk user.
 - Protected Supabase access stays server-side.
+- Enable RLS on every public table. Revoke table privileges from `anon` and `authenticated`. Grant table access only to `service_role`. Do not add `auth.uid()` policies (Clerk is the only auth).
+- Task and category mutations that must also write `task_activities` use a server-only RPC so both writes share one Postgres transaction. See `prompts/shared-transactions.md`.
 - Use `supabase/schema.sql` as the schema source of truth. Apply it (and later `ALTER`s) in the Supabase Dashboard SQL Editor. Do not use `supabase db push` or `supabase/migrations/`.
 - Keep `lib/supabase/database.types.ts` aligned with `supabase/schema.sql` after schema changes.
 - Dashboard statistics such as completion percentages, overdue counts, and status counts are derived from `tasks`.
@@ -156,7 +158,7 @@ When any of these fields are added or changed, update `supabase/schema.sql` and 
 # 8. Task storage rules
 
 - Each task belongs to one authenticated user.
-- A user may have a maximum of 5 non-deleted tasks scheduled for the same calendar date.
+- A user may have a maximum of 5 non-deleted incomplete tasks scheduled for the same calendar date. Completed tasks do not count toward this cap.
 - A task must not be duplicated for the same user when its normalized content and scheduled time are identical.
 - New or updated incomplete tasks must not use a scheduled time in the past.
 - Completed tasks may retain a past scheduled time.
@@ -200,7 +202,7 @@ Task input requirements:
 # 10. Task activity rules
 
 - Task activities are append-only records.
-- Application services create activity records internally after task or category mutations.
+- Application services create activity records by calling the matching `*_with_activity` RPC (mutation + activity in one transaction). Do not insert the activity in a second PostgREST call.
 - Do not expose general-purpose PATCH or DELETE routes for task activities.
 - Add activity read routes only when a feature requires them.
 - Every activity query must be scoped to the authenticated Clerk user.

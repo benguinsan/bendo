@@ -37,13 +37,17 @@ key to the browser).
 
 Apply the schema by pasting `supabase/schema.sql` into the [Supabase SQL
 Editor](https://supabase.com/dashboard/project/_/sql/new) and running it. The
-script is safe to re-run. Do not use `supabase db push` for this schema.
+script is idempotent and does not drop tables or delete rows. Do not use it to
+reset a production database. Do not use `supabase db push` for this schema.
 
 Table types live in `lib/supabase/database.types.ts`. Update that file if
 `schema.sql` changes.
 
 Product pages still use mock task data. Authenticated JSON APIs live under
-`/api/tasks`, `/api/categories`, and `/api/notifications`.
+`/api/tasks`, `/api/categories`, and `/api/notifications`. Task and category
+mutations that also write an activity log use one RPC per operation (one
+Postgres transaction). See `prompts/shared-transactions.md`. RLS is enabled on
+public tables; `anon` / `authenticated` have no table grants.
 
 ## Authentication (Clerk)
 

@@ -1,10 +1,6 @@
 import "server-only";
-import {
-  recordActivity,
-  type ActivityAction,
-} from "@/lib/activities/activity-service";
 import type { TaskPriority, TaskStatus } from "@/lib/dashboard/mock-data";
-import type { Tables } from "@/lib/supabase/database.types";
+import type { Json, Tables } from "@/lib/supabase/database.types";
 import {
   fail,
   fromZodError,
@@ -50,14 +46,9 @@ function buildTaskUpdateFields(
   existing: TaskRow,
   now: Date
 ) {
-  const nextDate = patch.date ?? existing.scheduled_date;
-  let nextScheduledAt = existing.scheduled_at;
-
-  if (patch.scheduledAt) {
-    nextScheduledAt = patch.scheduledAt;
-  } else if (patch.date && patch.date !== existing.scheduled_date) {
-    nextScheduledAt = scheduledAtFromDateInput(patch.date, now);
-  }
+  const nextDate = patch.date;
+  const dateChanged =
+    nextDate !== undefined && nextDate !== existing.scheduled_date;
 
   return {
     ...(patch.title === undefined ? {} : { content: patch.title }),
@@ -75,8 +66,12 @@ function buildTaskUpdateFields(
     ...(patch.thumbnailAlt === undefined
       ? {}
       : { thumbnail_alt: patch.thumbnailAlt }),
-    scheduled_at: nextScheduledAt,
-    scheduled_date: nextDate,
+    ...(dateChanged
+      ? {
+          scheduled_date: nextDate,
+          scheduled_at: scheduledAtFromDateInput(nextDate, now),
+        }
+      : {}),
   };
 }
 
@@ -149,21 +144,6 @@ async function getLiveTaskRow(
   return ok(data);
 }
 
-function activityForTaskUpdate(
-  previous: TaskRow,
-  next: TaskRow
-): ActivityAction {
-  if (previous.status !== "completed" && next.status === "completed") {
-    return "task_completed";
-  }
-
-  if (previous.status === "completed" && next.status !== "completed") {
-    return "task_reopened";
-  }
-
-  return "task_updated";
-}
-
 export async function listTasks(
   userId: string
 ): Promise<ServiceResult<PersistedTask[]>> {
@@ -219,42 +199,25 @@ export async function createTask(
     }
   }
 
-  const scheduledAt =
-    body.scheduledAt ?? scheduledAtFromDateInput(body.date, now);
+  const scheduledAt = scheduledAtFromDateInput(body.date, now);
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("tasks")
-    .insert({
-      clerk_user_id: userId,
-      content: body.title,
-      description: body.description,
-      priority: body.priority,
-      scheduled_at: scheduledAt,
-      scheduled_date: body.date,
-      category_id: body.categoryId ?? null,
-      thumbnail_src: body.thumbnailSrc ?? null,
-      thumbnail_alt: body.thumbnailAlt ?? null,
-      status: "not_started",
-    })
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("create_task_with_activity", {
+    p_clerk_user_id: userId,
+    p_actor_clerk_user_id: userId,
+    p_content: body.title,
+    p_description: body.description,
+    p_priority: body.priority,
+    p_scheduled_at: scheduledAt,
+    p_scheduled_date: body.date,
+    p_category_id: body.categoryId ?? null,
+    p_thumbnail_src: body.thumbnailSrc ?? null,
+    p_thumbnail_alt: body.thumbnailAlt ?? null,
+  });
 
   if (error || !data) {
     return error
       ? mapSupabaseError(error)
       : fail("INTERNAL", "Could not create task.");
-  }
-
-  const activity = await recordActivity({
-    userId,
-    actorUserId: userId,
-    action: "task_created",
-    entityType: "task",
-    entityId: data.id,
-  });
-
-  if (!activity.ok) {
-    return activity;
   }
 
   return ok(toPersistedTask(data, now));
@@ -290,14 +253,12 @@ export async function updateTask(
   }
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("tasks")
-    .update(buildTaskUpdateFields(patch, existing.data, now))
-    .eq("id", parsedId.data)
-    .eq("clerk_user_id", userId)
-    .is("deleted_at", null)
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("update_task_with_activity", {
+    p_clerk_user_id: userId,
+    p_actor_clerk_user_id: userId,
+    p_task_id: parsedId.data,
+    p_patch: buildTaskUpdateFields(patch, existing.data, now) as Json,
+  });
 
   if (error) {
     return mapSupabaseError(error);
@@ -305,18 +266,6 @@ export async function updateTask(
 
   if (!data) {
     return fail("TASK_NOT_FOUND", "Task not found.");
-  }
-
-  const activity = await recordActivity({
-    userId,
-    actorUserId: userId,
-    action: activityForTaskUpdate(existing.data, data),
-    entityType: "task",
-    entityId: data.id,
-  });
-
-  if (!activity.ok) {
-    return activity;
   }
 
   return ok(toPersistedTask(data, now));
@@ -331,20 +280,12 @@ export async function deleteTask(
     return fail("VALIDATION", "Enter a valid task id.");
   }
 
-  const existing = await getLiveTaskRow(userId, parsedId.data);
-  if (!existing.ok) {
-    return existing;
-  }
-
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("tasks")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", parsedId.data)
-    .eq("clerk_user_id", userId)
-    .is("deleted_at", null)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("delete_task_with_activity", {
+    p_clerk_user_id: userId,
+    p_actor_clerk_user_id: userId,
+    p_task_id: parsedId.data,
+  });
 
   if (error) {
     return mapSupabaseError(error);
@@ -354,17 +295,5 @@ export async function deleteTask(
     return fail("TASK_NOT_FOUND", "Task not found.");
   }
 
-  const activity = await recordActivity({
-    userId,
-    actorUserId: userId,
-    action: "task_deleted",
-    entityType: "task",
-    entityId: data.id,
-  });
-
-  if (!activity.ok) {
-    return activity;
-  }
-
-  return ok({ id: data.id });
+  return ok({ id: data });
 }
