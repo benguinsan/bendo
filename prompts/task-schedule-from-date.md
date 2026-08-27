@@ -22,7 +22,7 @@ Stop accepting client `scheduledAt` on task create/update. Persist `scheduled_at
 
 1. **Option A.** Remove `scheduledAt` from create and update API schemas. Extra JSON keys are stripped by Zod (do not add `.strict()`).
 2. **Create** always sets `scheduled_at` via `scheduledAtFromDateInput(date, now)` and `scheduled_date` to that same `date`.
-3. **Update** only writes schedule columns when `patch.date` is present and different from `existing.scheduled_date`. Then set both `scheduled_date` and derived `scheduled_at` together. Same-date or omitted `date` leaves both columns untouched (do not re-derive noon on every title patch).
+3. **Update** writes schedule columns when `patch.date` is present: always set `scheduled_date` to that date and `scheduled_at` via `scheduledAtFromDateInput`. Same calendar day still re-derives the instant. Omitted `date` leaves both columns untouched (title-only PATCH without `date`).
 4. **Strict calendar date.** Shared schema: `YYYY-MM-DD` **and** the civil date must exist in local time (reject `2026-02-31`). Reuse it on create, update (optional), and `taskFormSchema`.
 5. Do not move `scheduledAtFromDateInput` in this pass. Do not change DB schema, mock DTO `scheduledAt`, or add a time picker.
 6. Responses may still include `scheduledAt` (persisted instant). That is output, not input.
@@ -51,8 +51,8 @@ Stop accepting client `scheduledAt` on task create/update. Persist `scheduled_at
 - `POST`/`PATCH` with `scheduledAt` in the body does not persist that timestamp; create ignores it; a PATCH that is only `{ scheduledAt }` fails “at least one field is required”.
 - `2026-02-31` (and similar impossible dates) is a validation error on form and API.
 - `PATCH` with a new `date` updates both columns together.
-- `PATCH` with the same `date` or without `date` does not change `scheduled_at`.
-- Title-only PATCH does not rewrite schedule columns.
+- `PATCH` with the same `date` still re-derives `scheduled_at` via `scheduledAtFromDateInput`.
+- Title-only PATCH (no `date`) does not rewrite schedule columns.
 
 ## Checks to run
 

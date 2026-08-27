@@ -58,7 +58,7 @@ AI SDK is **not** needed.
     - `content` non-empty after trim; length ≤ `TASK_TITLE_MAX`; description length ≤ `TASK_DESCRIPTION_MAX`
     - `status in ('not_started','in_progress','completed')`, `priority in ('low','moderate','extreme')`
     - incomplete insert/update cannot use `scheduled_at` in the past; completed rows may keep a past `scheduled_at`
-    - max 5 non-deleted incomplete tasks per `(clerk_user_id, scheduled_date)`
+    - max 5 non-deleted incomplete tasks per `(clerk_user_id, scheduled_date)`; enforce this cap only when the resulting row is incomplete (same predicate as `tasks_before_write` in `supabase/schema.sql`)
     - unique `(clerk_user_id, content_normalized, scheduled_at)` where `deleted_at is null`
     - completing sets `completed_at`; leaving `completed` clears `completed_at`
     - `content_normalized` is a `generated always … stored` column using the same normalize rules as `normalizeTaskTitle`
@@ -174,7 +174,7 @@ Lowercase snake_case unquoted identifiers. `text` not `varchar`. `timestamptz` n
 
 - `updated_at` bump on `tasks` and `categories`
 - Task insert/update: reject past `scheduled_at` when the resulting status is not `completed`
-- Task insert/update: if the row is not deleted, count other non-deleted rows with the same `(clerk_user_id, scheduled_date)` and reject at 5
+- Task insert/update: if the resulting row is not deleted and not `completed`, count other non-deleted incomplete rows with the same `(clerk_user_id, scheduled_date)` and reject at 5
 - Sync `completed_at` with `status`
 - Optional: reject `task_activities` update/delete
 

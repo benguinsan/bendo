@@ -41,14 +41,8 @@ function toIso(value: string): string {
   return new Date(value).toISOString();
 }
 
-function buildTaskUpdateFields(
-  patch: UpdateTaskApiInput,
-  existing: TaskRow,
-  now: Date
-) {
+function buildTaskUpdateFields(patch: UpdateTaskApiInput, now: Date) {
   const nextDate = patch.date;
-  const dateChanged =
-    nextDate !== undefined && nextDate !== existing.scheduled_date;
 
   return {
     ...(patch.title === undefined ? {} : { content: patch.title }),
@@ -66,12 +60,12 @@ function buildTaskUpdateFields(
     ...(patch.thumbnailAlt === undefined
       ? {}
       : { thumbnail_alt: patch.thumbnailAlt }),
-    ...(dateChanged
-      ? {
+    ...(nextDate === undefined
+      ? {}
+      : {
           scheduled_date: nextDate,
           scheduled_at: scheduledAtFromDateInput(nextDate, now),
-        }
-      : {}),
+        }),
   };
 }
 
@@ -257,7 +251,7 @@ export async function updateTask(
     p_clerk_user_id: userId,
     p_actor_clerk_user_id: userId,
     p_task_id: parsedId.data,
-    p_patch: buildTaskUpdateFields(patch, existing.data, now) as Json,
+    p_patch: buildTaskUpdateFields(patch, now) as Json,
   });
 
   if (error) {
