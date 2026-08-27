@@ -40,6 +40,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Supabase CLI cache (schema is applied via SQL Editor, not local start)
-supabase/.temp

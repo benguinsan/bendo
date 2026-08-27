@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add Bendo’s **Supabase source of truth** and **server-side data access**: migrations for `tasks`, `categories`, `task_activities`, and `notifications`; generated TypeScript types; a server-only service-role client; application services that enforce task/category/activity rules; and thin Clerk-authenticated App Router handlers.
+Add Bendo’s **Supabase source of truth** and **server-side data access**: `supabase/schema.sql` for `tasks`, `categories`, `task_activities`, and `notifications` (applied in the SQL Editor); TypeScript database types; a server-only service-role client; application services that enforce task/category/activity rules; and thin Clerk-authenticated App Router handlers.
 
 This pass is **database + data access only**. Do **not** replace Dashboard / My Task / Vital Task / Categories mock UI with live data. Do **not** add Supabase Auth, Clerk third-party JWT / `auth.uid()` RLS, Storage uploads, pgvector, webhooks, a `users` table, or Agent code.
 
@@ -103,7 +103,7 @@ AI SDK is **not** needed.
 - `app/api/notifications/[notification_id]/route.ts` — PATCH (mark read)
 - `env.ts` / `.env.example` — required Supabase URL, anon key, service role key
 - `package.json` / `package-lock.json` — `server-only`
-- `README.md` — how to apply migrations / env vars
+- `README.md` — how to apply `schema.sql` / env vars
 - `.gitignore` — keep `supabase/.temp` / local CLI junk out; **commit** `supabase/schema.sql`
 
 Do **not** commit `.env` / `.env.local`. Do not edit `AGENTS.md` unless a new env **name** is required (it is not). Do not change `proxy.ts` auth strategy. Do not restyle UI.
@@ -194,7 +194,7 @@ Map Postgres unique/check/raise messages to stable domain codes in the service (
 
 ### Grants and RLS
 
-In the same migration:
+In the same `schema.sql` script:
 
 ```sql
 alter table public.tasks enable row level security;
@@ -211,9 +211,7 @@ grant select, insert on table public.task_activities to service_role;
 grant select, insert, update, delete on table public.notifications to service_role;
 ```
 
-Do **not** add `TO anon` or `TO authenticated` policies. Do **not** use `auth.role()`. Do **not** add `SECURITY DEFINER` functions in `public`.
-
-After apply, run `npx supabase db advisors` (or skip with a documented CLI-version miss) and fix advisor issues that this schema introduced.
+Do **not** add `TO anon` or `TO authenticated` policies. Do **not** use `auth.role()`. Do **not** add `SECURITY DEFINER` functions in `public`. Do **not** run Supabase CLI advisors/`db push` for this schema.
 
 ### Generated types
 
@@ -319,8 +317,7 @@ Keep `route.ts` short. Shared `jsonError` helper is fine.
 From the repo root:
 
 1. Paste `supabase/schema.sql` into the hosted project's SQL Editor and run it
-2. `npx supabase --version` (discover further commands via `--help`; do not guess)
-3. Confirm `lib/supabase/database.types.ts` matches the applied schema
+2. Confirm `lib/supabase/database.types.ts` matches the applied schema
 4. A **test query** via authenticated `curl` to `/api/tasks` proving insert + user-scoped select work
 5. `npm run typecheck`
 6. `npm run lint`
@@ -331,7 +328,7 @@ Report exact command output. Do not claim a check passed without running it.
 
 ## Exact manual test steps expected after implementation
 
-Prereqs: signed-in Clerk session cookie (browser) **or** a request that includes the Clerk session; `.env` / `.env.local` already has Clerk + Supabase keys; migration applied to that project.
+Prereqs: signed-in Clerk session cookie (browser) **or** a request that includes the Clerk session; `.env` / `.env.local` already has Clerk + Supabase keys; `supabase/schema.sql` has been run in the SQL Editor.
 
 1. `npm run dev`
 2. With **no** `Authorization`/session, `curl -i http://localhost:3000/api/tasks` → **401**

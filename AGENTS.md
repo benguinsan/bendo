@@ -67,7 +67,7 @@ Use them for:
 
 - `node_modules/next/dist/docs/`: Next.js, routing, server/client boundaries, API routes, UI patterns
 - `clerk`: authentication and protected routes
-- `supabase`: schema, migrations, queries, service role usage, dedupe, logs, pgvector
+- `supabase`: schema, queries, service role usage, dedupe, logs, pgvector
 - `ai-sdk`: Vercel AI SDK and OpenRouter provider usage, model calls, AI analysis output handling
 
 Do not invent new skills.
@@ -144,12 +144,12 @@ Rules:
 
 - All user-owned records must be scoped to the authenticated Clerk user.
 - Protected Supabase access stays server-side.
-- Use Supabase migrations as the schema source of truth.
-- Generate TypeScript database types after schema changes; do not hand-write generated types.
+- Use `supabase/schema.sql` as the schema source of truth. Apply it (and later `ALTER`s) in the Supabase Dashboard SQL Editor. Do not use `supabase db push` or `supabase/migrations/`.
+- Keep `lib/supabase/database.types.ts` aligned with `supabase/schema.sql` after schema changes.
 - Dashboard statistics such as completion percentages, overdue counts, and status counts are derived from `tasks`.
 - Do not create separate statistics tables.
 
-When any of these fields are added or changed, update supabase/schema.sql, lib/supabase/types.ts, and run the corresponding ALTER SQL in Supabase Dashboard → SQL Editor before testing.
+When any of these fields are added or changed, update `supabase/schema.sql` and `lib/supabase/database.types.ts`, then run the corresponding SQL in Supabase Dashboard → SQL Editor before testing.
 
 ---
 
