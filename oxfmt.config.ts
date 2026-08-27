@@ -11,5 +11,6 @@ export default defineConfig({
     "package-lock.json",
     ".agents/**",
     ".claude/**",
+    "lib/supabase/database.types.ts",
   ],
 });

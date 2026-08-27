@@ -27,7 +27,81 @@ export type TaskFormFieldErrors = {
   image?: string;
 };
 
-const taskPrioritySchema = z.enum(["low", "moderate", "extreme"]);
+export const taskStatusSchema = z.enum([
+  "not_started",
+  "in_progress",
+  "completed",
+]);
+
+export const taskPrioritySchema = z.enum(["low", "moderate", "extreme"]);
+
+export const resourceIdSchema = z.uuid();
+
+const thumbnailSrcSchema = z.string().max(2048).nullable();
+const thumbnailAltSchema = z.string().max(200).nullable();
+
+export const createTaskApiSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(TASK_TITLE_MAX, `Title must be ${TASK_TITLE_MAX} characters or fewer`),
+  date: z
+    .string()
+    .min(1, "Date is required")
+    .regex(/^\d{4}-\d{2}-\d{2}$/u, "Enter a valid date"),
+  priority: taskPrioritySchema,
+  description: z
+    .string()
+    .max(
+      TASK_DESCRIPTION_MAX,
+      `Description must be ${TASK_DESCRIPTION_MAX} characters or fewer`
+    )
+    .optional()
+    .transform((value) => (value ?? "").trim()),
+  categoryId: resourceIdSchema.nullable().optional(),
+  scheduledAt: z.string().optional(),
+  thumbnailSrc: thumbnailSrcSchema.optional(),
+  thumbnailAlt: thumbnailAltSchema.optional(),
+});
+
+export const updateTaskApiSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      .min(1, "Title is required")
+      .max(
+        TASK_TITLE_MAX,
+        `Title must be ${TASK_TITLE_MAX} characters or fewer`
+      )
+      .optional(),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/u, "Enter a valid date")
+      .optional(),
+    priority: taskPrioritySchema.optional(),
+    description: z
+      .string()
+      .max(
+        TASK_DESCRIPTION_MAX,
+        `Description must be ${TASK_DESCRIPTION_MAX} characters or fewer`
+      )
+      .transform((value) => value.trim())
+      .optional(),
+    status: taskStatusSchema.optional(),
+    categoryId: resourceIdSchema.nullable().optional(),
+    scheduledAt: z.string().optional(),
+    thumbnailSrc: thumbnailSrcSchema.optional(),
+    thumbnailAlt: thumbnailAltSchema.optional(),
+  })
+  .refine(
+    (value) => Object.values(value).some((field) => field !== undefined),
+    { message: "At least one field is required" }
+  );
+
+export type CreateTaskApiInput = z.infer<typeof createTaskApiSchema>;
+export type UpdateTaskApiInput = z.infer<typeof updateTaskApiSchema>;
 
 export const taskFormSchema = z.object({
   title: z

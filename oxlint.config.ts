@@ -5,7 +5,12 @@ import react from "ultracite/oxlint/react";
 
 export default defineConfig({
   extends: [core, react, next],
-  ignorePatterns: [...(core.ignorePatterns ?? []), ".agents/**", ".claude/**"],
+  ignorePatterns: [
+    ...(core.ignorePatterns ?? []),
+    ".agents/**",
+    ".claude/**",
+    "lib/supabase/database.types.ts",
+  ],
   rules: {
     // CNA + Clerk overlays and shadcn CLI output use `function` components,
     // `type` aliases, and inline `import { type X }`.

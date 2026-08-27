@@ -149,6 +149,8 @@ Rules:
 - Dashboard statistics such as completion percentages, overdue counts, and status counts are derived from `tasks`.
 - Do not create separate statistics tables.
 
+When any of these fields are added or changed, update supabase/schema.sql, lib/supabase/types.ts, and run the corresponding ALTER SQL in Supabase Dashboard → SQL Editor before testing.
+
 ---
 
 # 8. Task storage rules

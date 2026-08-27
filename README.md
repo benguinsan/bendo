@@ -14,8 +14,10 @@ via **create-ben-app**.
 cp .env.example .env.local
 ```
 
-Required: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`. Sign-in and
-sign-up URLs default to `/sign-in` and `/sign-up`; after auth, users land on `/`.
+Required: Clerk keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`)
+and Supabase keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`). Sign-in and sign-up URLs default to `/sign-in`
+and `/sign-up`; after auth, users land on `/`.
 
 2. Install and run:
 
@@ -26,6 +28,22 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Unsigned visitors are sent
 to `/sign-in`. Create an account or sign in to open the dashboard.
+
+## Persistence (Supabase)
+
+Required env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+and `SUPABASE_SERVICE_ROLE_KEY` (**server only** — never expose the service role
+key to the browser).
+
+Apply the schema by pasting `supabase/schema.sql` into the [Supabase SQL
+Editor](https://supabase.com/dashboard/project/_/sql/new) and running it. The
+script is safe to re-run. Do not use `supabase db push` for this schema.
+
+Table types live in `lib/supabase/database.types.ts`. Update that file if
+`schema.sql` changes.
+
+Product pages still use mock task data. Authenticated JSON APIs live under
+`/api/tasks`, `/api/categories`, and `/api/notifications`.
 
 ## Authentication (Clerk)
 
