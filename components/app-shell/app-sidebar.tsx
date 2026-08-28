@@ -5,7 +5,7 @@ import { LogOutIcon } from "lucide-react";
 
 import { AppNav } from "@/components/app-shell/app-nav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { DashboardProfile } from "@/lib/dashboard/mock-data";
+import type { DashboardProfile } from "@/lib/dashboard/task-types";
 import { cn } from "@/lib/utils";
 
 type AppSidebarProps = {

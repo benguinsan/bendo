@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import { AppHeader } from "@/components/app-shell/app-header";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
-import type { DashboardProfile } from "@/lib/dashboard/mock-data";
+import type { DashboardProfile } from "@/lib/dashboard/task-types";
 
 type AppShellProps = {
   children: ReactNode;

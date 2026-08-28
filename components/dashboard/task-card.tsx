@@ -27,7 +27,7 @@ import {
   statusLabels,
   statusTextClass,
   type DashboardTaskView,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 import { cn } from "@/lib/utils";
 
 type TaskCardProps = {
@@ -145,6 +145,12 @@ export function TaskCard({
             {priorityLabels[task.priority]}
           </span>
         </p>
+        {task.categoryName ? (
+          <p>
+            Category:{" "}
+            <span className="text-foreground">{task.categoryName}</span>
+          </p>
+        ) : null}
         <p>
           Status:{" "}
           <span className={statusTextClass[task.status]}>

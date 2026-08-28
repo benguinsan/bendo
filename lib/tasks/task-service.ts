@@ -1,5 +1,5 @@
 import "server-only";
-import type { TaskPriority, TaskStatus } from "@/lib/dashboard/mock-data";
+import type { TaskPriority, TaskStatus } from "@/lib/dashboard/task-types";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import {
   fail,
@@ -9,36 +9,52 @@ import {
   type ServiceResult,
 } from "@/lib/supabase/errors";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { scheduledAtFromDateInput } from "@/lib/tasks/create-mock-task";
+import type { PersistedTask } from "@/lib/tasks/persisted-task";
 import {
   createTaskApiSchema,
   resourceIdSchema,
+  scheduledAtFromDateInput,
   updateTaskApiSchema,
   type CreateTaskApiInput,
   type UpdateTaskApiInput,
 } from "@/lib/tasks/task-input";
 
-export type PersistedTask = {
-  id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  categoryId: string | null;
-  scheduledAt: string;
-  scheduledDate: string;
-  completedAt: string | null;
-  thumbnailSrc: string | null;
-  thumbnailAlt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  isOverdue: boolean;
-};
+export type { PersistedTask } from "@/lib/tasks/persisted-task";
 
 type TaskRow = Tables<"tasks">;
+type TaskRowWithCategory = TaskRow & {
+  categories: { name: string } | null;
+};
 
 function toIso(value: string): string {
   return new Date(value).toISOString();
+}
+
+function categoryNameFromJoin(row: TaskRowWithCategory): string | null {
+  return row.categories?.name ?? null;
+}
+
+async function resolveCategoryName(
+  userId: string,
+  categoryId: string | null
+): Promise<string | null> {
+  if (!categoryId) {
+    return null;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("categories")
+    .select("name")
+    .eq("id", categoryId)
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.name;
 }
 
 function buildTaskUpdateFields(patch: UpdateTaskApiInput, now: Date) {
@@ -69,7 +85,11 @@ function buildTaskUpdateFields(patch: UpdateTaskApiInput, now: Date) {
   };
 }
 
-function toPersistedTask(row: TaskRow, now = new Date()): PersistedTask {
+function toPersistedTask(
+  row: TaskRow,
+  categoryName: string | null = null,
+  now = new Date()
+): PersistedTask {
   const status = row.status as TaskStatus;
   const scheduledAt = toIso(row.scheduled_at);
 
@@ -80,6 +100,7 @@ function toPersistedTask(row: TaskRow, now = new Date()): PersistedTask {
     status,
     priority: row.priority as TaskPriority,
     categoryId: row.category_id,
+    categoryName,
     scheduledAt,
     scheduledDate: row.scheduled_date,
     completedAt: row.completed_at ? toIso(row.completed_at) : null,
@@ -117,11 +138,11 @@ async function getOwnedCategory(
 async function getLiveTaskRow(
   userId: string,
   taskId: string
-): Promise<ServiceResult<TaskRow>> {
+): Promise<ServiceResult<TaskRowWithCategory>> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("tasks")
-    .select("*")
+    .select("*, categories(name)")
     .eq("id", taskId)
     .eq("clerk_user_id", userId)
     .is("deleted_at", null)
@@ -135,7 +156,7 @@ async function getLiveTaskRow(
     return fail("TASK_NOT_FOUND", "Task not found.");
   }
 
-  return ok(data);
+  return ok(data as TaskRowWithCategory);
 }
 
 export async function listTasks(
@@ -144,7 +165,7 @@ export async function listTasks(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("tasks")
-    .select("*")
+    .select("*, categories(name)")
     .eq("clerk_user_id", userId)
     .is("deleted_at", null)
     .order("scheduled_at", { ascending: true })
@@ -154,7 +175,11 @@ export async function listTasks(
     return mapSupabaseError(error);
   }
 
-  return ok((data ?? []).map((row) => toPersistedTask(row)));
+  return ok(
+    (data ?? []).map((row) =>
+      toPersistedTask(row, categoryNameFromJoin(row as TaskRowWithCategory))
+    )
+  );
 }
 
 export async function getTask(
@@ -171,7 +196,7 @@ export async function getTask(
     return row;
   }
 
-  return ok(toPersistedTask(row.data));
+  return ok(toPersistedTask(row.data, categoryNameFromJoin(row.data)));
 }
 
 export async function createTask(
@@ -214,7 +239,13 @@ export async function createTask(
       : fail("INTERNAL", "Could not create task.");
   }
 
-  return ok(toPersistedTask(data, now));
+  return ok(
+    toPersistedTask(
+      data,
+      await resolveCategoryName(userId, data.category_id),
+      now
+    )
+  );
 }
 
 export async function updateTask(
@@ -262,7 +293,13 @@ export async function updateTask(
     return fail("TASK_NOT_FOUND", "Task not found.");
   }
 
-  return ok(toPersistedTask(data, now));
+  return ok(
+    toPersistedTask(
+      data,
+      await resolveCategoryName(userId, data.category_id),
+      now
+    )
+  );
 }
 
 export async function deleteTask(

@@ -4,7 +4,7 @@ import { DashboardView } from "@/components/dashboard/dashboard-view";
 import { requireUser } from "@/lib/auth/require-user";
 import { toDashboardProfile } from "@/lib/auth/to-dashboard-profile";
 import { formatTodoDateLine } from "@/lib/dashboard/dates";
-import { getMockTasks } from "@/lib/dashboard/mock-data";
+import { loadUserTasks } from "@/lib/tasks/load-tasks";
 
 export const metadata: Metadata = {
   title: "Dashboard · Bendo",
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const { firstName } = toDashboardProfile(user);
   const now = new Date();
-  const tasks = getMockTasks(now);
+  const tasks = await loadUserTasks(user.id);
 
   return (
     <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">

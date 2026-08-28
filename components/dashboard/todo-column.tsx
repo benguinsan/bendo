@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { TaskCard } from "@/components/dashboard/task-card";
 import { Separator } from "@/components/ui/separator";
-import type { DashboardTaskView } from "@/lib/dashboard/mock-data";
+import type { DashboardTaskView } from "@/lib/dashboard/task-types";
 
 type TodoColumnProps = {
   dateLine: string;

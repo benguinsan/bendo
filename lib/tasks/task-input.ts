@@ -4,7 +4,7 @@ import type {
   DashboardTask,
   TaskPriority,
   TaskStatus,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 
 export const TASK_TITLE_MAX = 120;
 export const TASK_DESCRIPTION_MAX = 2000;
@@ -23,6 +23,7 @@ export type TaskFormFieldErrors = {
   title?: string;
   date?: string;
   priority?: string;
+  category?: string;
   description?: string;
   image?: string;
 };
@@ -151,6 +152,38 @@ export function toLocalDateKey(date: Date): string {
 export function parseLocalDateInput(dateStr: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+export function scheduledAtFromDateInput(dateStr: string, now: Date): string {
+  const date = parseLocalDateInput(dateStr);
+  const noon = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    12,
+    0,
+    0
+  );
+  const isToday = toLocalDateKey(date) === toLocalDateKey(now);
+
+  if (isToday && noon <= now) {
+    const later = new Date(now.getTime() + 60 * 60 * 1000);
+    if (toLocalDateKey(later) === toLocalDateKey(now)) {
+      return later.toISOString();
+    }
+
+    return new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      23,
+      59,
+      59,
+      999
+    ).toISOString();
+  }
+
+  return noon.toISOString();
 }
 
 export function isPastCalendarDate(dateStr: string, now: Date): boolean {

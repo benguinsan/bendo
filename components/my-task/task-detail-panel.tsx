@@ -17,7 +17,7 @@ import {
   statusLabels,
   statusTextClass,
   type DashboardTaskView,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 
 type TaskDetailPanelProps = {
   task: DashboardTaskView | null;
@@ -63,6 +63,12 @@ export function TaskDetailPanel({ task, onEdit }: TaskDetailPanelProps) {
                     {statusLabels[task.status]}
                   </span>
                 </p>
+                {task.categoryName ? (
+                  <p className="text-sm">
+                    Category:{" "}
+                    <span className="text-foreground">{task.categoryName}</span>
+                  </p>
+                ) : null}
                 <p className="text-muted-foreground text-xs">
                   Created on: {formatNumericDate(new Date(task.createdAt))}
                 </p>

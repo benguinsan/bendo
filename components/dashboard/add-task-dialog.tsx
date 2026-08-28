@@ -6,8 +6,8 @@ import { useState } from "react";
 import { TaskFormDialog } from "@/components/tasks/task-form-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogTrigger } from "@/components/ui/dialog";
-import type { DashboardTask } from "@/lib/dashboard/mock-data";
-import { createMockTask } from "@/lib/tasks/create-mock-task";
+import type { DashboardTask } from "@/lib/dashboard/task-types";
+import { createTaskViaApi } from "@/lib/tasks/task-api-client";
 import { validateNewTask } from "@/lib/tasks/task-input";
 
 type AddTaskDialogProps = {
@@ -27,14 +27,14 @@ export function AddTaskDialog({ existingTasks, onCreate }: AddTaskDialogProps) {
           <span className="border-primary border-b-2 pb-0.5">Add</span> New Task
         </>
       }
-      description="Create a new task with a title, date, priority, and optional description or image."
+      description="Create a new task with a title, date, priority, optional category, description, or image."
       trigger={
         <DialogTrigger render={<Button type="button" variant="link" />}>
           <PlusIcon data-icon="inline-start" />
           Add task
         </DialogTrigger>
       }
-      onSubmit={(values) => {
+      onSubmit={async (values) => {
         const now = new Date();
         const result = validateNewTask({
           title: values.title,
@@ -49,16 +49,20 @@ export function AddTaskDialog({ existingTasks, onCreate }: AddTaskDialogProps) {
           return result.errors;
         }
 
-        onCreate(
-          createMockTask({
-            title: result.data.title,
-            description: result.data.description,
-            date: result.data.date,
-            priority: result.data.priority,
-            thumbnailSrc: values.previewUrl,
-            now,
-          })
-        );
+        const created = await createTaskViaApi({
+          title: result.data.title,
+          description: result.data.description,
+          date: result.data.date,
+          priority: result.data.priority,
+          categoryId: values.categoryId,
+          thumbnailSrc: values.previewUrl,
+        });
+
+        if (!created.ok) {
+          return created.errors;
+        }
+
+        onCreate(created.task);
         return null;
       }}
     />

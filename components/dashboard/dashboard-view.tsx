@@ -14,7 +14,7 @@ import {
   getTaskStatusPercents,
   toTaskView,
   type DashboardTask,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 
 type DashboardViewProps = {
   dateLine: string;

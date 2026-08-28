@@ -43,3 +43,42 @@ export function validateNewCategory(
 
   return { success: true, data: { name: parsed.data } };
 }
+
+function isSameCategoryName(left: string, right: string): boolean {
+  return (
+    normalizeCategoryName(left).toLowerCase() ===
+    normalizeCategoryName(right).toLowerCase()
+  );
+}
+
+export function validateUpdatedCategory(input: {
+  name: string;
+  existingNames: readonly string[];
+  currentName: string;
+}):
+  | { success: true; data: CategoryFormValues }
+  | { success: false; error: string } {
+  const parsed = categoryNameSchema.safeParse(input.name);
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Category name is required",
+    };
+  }
+
+  const hasDuplicate = input.existingNames.some(
+    (name) =>
+      !isSameCategoryName(name, input.currentName) &&
+      isSameCategoryName(name, parsed.data)
+  );
+
+  if (hasDuplicate) {
+    return {
+      success: false,
+      error: "A category with this name already exists.",
+    };
+  }
+
+  return { success: true, data: { name: parsed.data } };
+}

@@ -3,7 +3,7 @@ import { ActivityIcon } from "lucide-react";
 import { StatusDonut } from "@/components/dashboard/status-donut";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import type { StatusPercents } from "@/lib/dashboard/mock-data";
+import type { StatusPercents } from "@/lib/dashboard/task-types";
 
 type TaskStatusPanelProps = {
   percents: StatusPercents;

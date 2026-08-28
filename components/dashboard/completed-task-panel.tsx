@@ -8,7 +8,7 @@ import {
   statusLabels,
   statusTextClass,
   type DashboardTaskView,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 import { cn } from "@/lib/utils";
 
 type CompletedTaskPanelProps = {
