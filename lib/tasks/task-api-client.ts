@@ -165,3 +165,29 @@ export async function updateTaskViaApi(
     return { ok: false, errors: { title: "Could not update task." } };
   }
 }
+
+export async function deleteTaskViaApi(
+  taskId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      return { ok: true };
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not delete task." };
+    }
+
+    const body = payload as ApiErrorBody;
+    return { ok: false, error: body.error ?? "Could not delete task." };
+  } catch {
+    return { ok: false, error: "Could not delete task." };
+  }
+}

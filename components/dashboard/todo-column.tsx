@@ -10,6 +10,8 @@ type TodoColumnProps = {
   tasks: DashboardTaskView[];
   addTaskTrigger: ReactNode;
   onEditTask: (taskId: string) => void;
+  onDeleteTask: (taskId: string) => void;
+  deletingTaskId: string | null;
 };
 
 export function TodoColumn({
@@ -17,6 +19,8 @@ export function TodoColumn({
   tasks,
   addTaskTrigger,
   onEditTask,
+  onDeleteTask,
+  deletingTaskId,
 }: TodoColumnProps) {
   return (
     <section className="flex min-w-0 flex-col gap-4">
@@ -36,6 +40,8 @@ export function TodoColumn({
             task={task}
             href={`/my-task/${task.id}`}
             onEdit={() => onEditTask(task.id)}
+            onDelete={() => onDeleteTask(task.id)}
+            deleting={deletingTaskId === task.id}
           />
         ))}
       </div>

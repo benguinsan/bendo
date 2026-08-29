@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { TaskCard } from "@/components/dashboard/task-card";
 import { TaskDetailPanel } from "@/components/my-task/task-detail-panel";
+import { ConfirmDeleteTaskDialog } from "@/components/tasks/confirm-delete-task-dialog";
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -15,6 +16,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { toTaskView, type DashboardTask } from "@/lib/dashboard/task-types";
+import { deleteTaskViaApi } from "@/lib/tasks/task-api-client";
 
 type MyTaskViewProps = {
   initialTasks: DashboardTask[];
@@ -27,13 +29,61 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
     initialTasks[0]?.id ?? null
   );
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(
+    null
+  );
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const now = new Date(nowIso);
   const views = tasks.map((task) => toTaskView(task, now));
   const selectedTask = views.find((task) => task.id === selectedId) ?? null;
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
+  const pendingDeleteTask =
+    tasks.find((task) => task.id === pendingDeleteTaskId) ?? null;
+
+  async function handleDeleteTask(taskId: string) {
+    if (deletingTaskId !== null) {
+      return;
+    }
+
+    setDeletingTaskId(taskId);
+    setDeleteError(null);
+
+    try {
+      const result = await deleteTaskViaApi(taskId);
+
+      if (!result.ok) {
+        setDeleteError(result.error);
+        setDeletingTaskId(null);
+        setPendingDeleteTaskId(null);
+        return;
+      }
+
+      setTasks((current) => current.filter((task) => task.id !== taskId));
+      setSelectedId((currentSelected) =>
+        currentSelected === taskId
+          ? (tasks.find((task) => task.id !== taskId)?.id ?? null)
+          : currentSelected
+      );
+      if (editingTaskId === taskId) {
+        setEditingTaskId(null);
+      }
+      setPendingDeleteTaskId(null);
+    } catch {
+      setDeleteError("Could not delete task.");
+      setPendingDeleteTaskId(null);
+    }
+
+    setDeletingTaskId(null);
+  }
 
   return (
     <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
+      {deleteError ? (
+        <p className="text-destructive mb-4 text-sm" role="alert">
+          {deleteError}
+        </p>
+      ) : null}
       <div className="grid grid-cols-1 gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:grid-rows-[minmax(0,1fr)]">
         <Card className="rounded-card shadow-panel flex min-h-0 flex-col py-5 ring-0 lg:h-full">
           <CardHeader>
@@ -52,6 +102,8 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
                     href={`/my-task/${task.id}`}
                     onSelect={() => setSelectedId(task.id)}
                     onEdit={() => setEditingTaskId(task.id)}
+                    onDelete={() => setPendingDeleteTaskId(task.id)}
+                    deleting={deletingTaskId === task.id}
                   />
                 ))}
               </div>
@@ -73,6 +125,10 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
         <TaskDetailPanel
           task={selectedTask}
           onEdit={selectedId ? () => setEditingTaskId(selectedId) : undefined}
+          onDelete={
+            selectedId ? () => setPendingDeleteTaskId(selectedId) : undefined
+          }
+          deleting={selectedId !== null && deletingTaskId === selectedId}
         />
       </div>
       <EditTaskDialog
@@ -88,6 +144,23 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
           setTasks((current) =>
             current.map((task) => (task.id === updated.id ? updated : task))
           );
+        }}
+      />
+      <ConfirmDeleteTaskDialog
+        open={pendingDeleteTaskId !== null}
+        taskTitle={pendingDeleteTask?.title}
+        isDeleting={
+          pendingDeleteTaskId !== null && deletingTaskId === pendingDeleteTaskId
+        }
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDeleteTaskId(null);
+          }
+        }}
+        onConfirm={() => {
+          if (pendingDeleteTaskId) {
+            void handleDeleteTask(pendingDeleteTaskId);
+          }
         }}
       />
     </div>

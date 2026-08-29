@@ -36,6 +36,8 @@ type TaskCardProps = {
   href?: string;
   onSelect?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
+  deleting?: boolean;
 };
 
 export function TaskCard({
@@ -44,6 +46,8 @@ export function TaskCard({
   href,
   onSelect,
   onEdit,
+  onDelete,
+  deleting = false,
 }: TaskCardProps) {
   const selectable = Boolean(onSelect);
   const linked = Boolean(href) && !onSelect;
@@ -108,8 +112,12 @@ export function TaskCard({
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
-                <DropdownMenuItem variant="destructive">
-                  Delete
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={deleting || !onDelete}
+                  onClick={onDelete}
+                >
+                  {deleting ? "Deleting…" : "Delete"}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
