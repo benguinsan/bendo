@@ -1,4 +1,4 @@
-import type { DashboardProfile } from "@/lib/dashboard/mock-data";
+import type { DashboardProfile } from "@/lib/dashboard/task-types";
 
 export type ClerkProfileSource = {
   firstName: string | null;

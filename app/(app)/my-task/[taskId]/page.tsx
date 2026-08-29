@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ViewTaskView } from "@/components/my-task/view-task-view";
 import { requireUser } from "@/lib/auth/require-user";
-import { getTaskById } from "@/lib/dashboard/mock-data";
+import { loadUserTask } from "@/lib/tasks/load-tasks";
 
 type ViewTaskPageProps = {
   params: Promise<{ taskId: string }>;
@@ -12,8 +12,9 @@ type ViewTaskPageProps = {
 export async function generateMetadata({
   params,
 }: ViewTaskPageProps): Promise<Metadata> {
+  const user = await requireUser();
   const { taskId } = await params;
-  const task = getTaskById(taskId, new Date());
+  const task = await loadUserTask(user.id, taskId);
 
   return {
     title: task ? `${task.title} · bendo` : "Task · bendo",
@@ -21,10 +22,10 @@ export async function generateMetadata({
 }
 
 export default async function ViewTaskPage({ params }: ViewTaskPageProps) {
-  await requireUser();
+  const user = await requireUser();
   const { taskId } = await params;
   const now = new Date();
-  const task = getTaskById(taskId, now);
+  const task = await loadUserTask(user.id, taskId);
 
   if (!task) {
     notFound();

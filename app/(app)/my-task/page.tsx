@@ -2,17 +2,16 @@ import type { Metadata } from "next";
 
 import { MyTaskView } from "@/components/my-task/my-task-view";
 import { requireUser } from "@/lib/auth/require-user";
-import { getMyTasks } from "@/lib/dashboard/mock-data";
+import { loadUserTasks } from "@/lib/tasks/load-tasks";
 
 export const metadata: Metadata = {
   title: "My Task · bendo",
 };
 
 export default async function MyTaskPage() {
-  await requireUser();
+  const user = await requireUser();
   const now = new Date();
+  const tasks = await loadUserTasks(user.id);
 
-  return (
-    <MyTaskView initialTasks={getMyTasks(now)} nowIso={now.toISOString()} />
-  );
+  return <MyTaskView initialTasks={tasks} nowIso={now.toISOString()} />;
 }

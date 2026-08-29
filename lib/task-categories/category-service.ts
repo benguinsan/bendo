@@ -9,14 +9,10 @@ import {
 } from "@/lib/supabase/errors";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { categoryWriteSchema } from "@/lib/task-categories/category-input";
+import type { PersistedCategory } from "@/lib/task-categories/persisted-category";
 import { resourceIdSchema } from "@/lib/tasks/task-input";
 
-export type PersistedCategory = {
-  id: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-};
+export type { PersistedCategory } from "@/lib/task-categories/persisted-category";
 
 type CategoryRow = Tables<"categories">;
 

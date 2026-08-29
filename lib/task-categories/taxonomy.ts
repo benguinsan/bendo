@@ -3,7 +3,7 @@ import {
   statusLabels,
   type TaskPriority,
   type TaskStatus,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 
 export type StatusTaxonomyRow = {
   id: TaskStatus;

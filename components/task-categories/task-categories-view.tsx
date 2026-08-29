@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { EditCategoryDialog } from "@/components/task-categories/edit-category-dialog";
 import { TaxonomyLabelDialog } from "@/components/task-categories/edit-taxonomy-dialog";
 import { TaxonomyTable } from "@/components/task-categories/taxonomy-table";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import {
   CardContent,
   CardHeader,
 } from "@/components/ui/card";
+import { deleteCategoryViaApi } from "@/lib/task-categories/category-api-client";
+import type { PersistedCategory } from "@/lib/task-categories/persisted-category";
 import {
   priorityTaxonomyRows,
   statusTaxonomyRows,
@@ -29,6 +32,10 @@ type TaxonomyDialogState =
   | { mode: "edit"; kind: "priority"; row: PriorityTableRow }
   | { mode: "create"; kind: "priority" };
 
+type TaskCategoriesViewProps = {
+  initialCategories: PersistedCategory[];
+};
+
 type TaxonomySectionProps = {
   headingId: string;
   titleRest: string;
@@ -38,7 +45,9 @@ type TaxonomySectionProps = {
   emptyTitle: string;
   emptyDescription: string;
   onEdit: (row: { id: string; label: string }) => void;
+  onDelete?: (row: { id: string; label: string }) => void;
   onAdd?: () => void;
+  hideTaskPrefix?: boolean;
 };
 
 function cloneStatusRows(): StatusTaxonomyRow[] {
@@ -53,6 +62,13 @@ function createPriorityRowId(): string {
   return `priority-${crypto.randomUUID()}`;
 }
 
+function toCategoryRows(categories: PersistedCategory[]) {
+  return categories.map((category) => ({
+    id: category.id,
+    label: category.name,
+  }));
+}
+
 function TaxonomySection({
   headingId,
   titleRest,
@@ -62,7 +78,9 @@ function TaxonomySection({
   emptyTitle,
   emptyDescription,
   onEdit,
+  onDelete,
   onAdd,
+  hideTaskPrefix = false,
 }: TaxonomySectionProps) {
   return (
     <section className="flex flex-col gap-4" aria-labelledby={headingId}>
@@ -71,12 +89,22 @@ function TaxonomySection({
           id={headingId}
           className="text-foreground font-sans text-[15px] font-medium"
         >
-          <span className="border-primary border-b-2 pb-0.5">Task</span>{" "}
-          {titleRest}
+          {hideTaskPrefix ? (
+            <span className="border-primary border-b-2 pb-0.5">
+              {titleRest}
+            </span>
+          ) : (
+            <>
+              <span className="border-primary border-b-2 pb-0.5">Task</span>{" "}
+              {titleRest}
+            </>
+          )}
         </h2>
-        <Button type="button" variant="link" onClick={onAdd}>
-          {addLabel}
-        </Button>
+        {onAdd ? (
+          <Button type="button" variant="link" onClick={onAdd}>
+            {addLabel}
+          </Button>
+        ) : null}
       </div>
       <TaxonomyTable
         labelledBy={headingId}
@@ -85,35 +113,50 @@ function TaxonomySection({
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
         onEdit={onEdit}
+        onDelete={onDelete}
       />
     </section>
   );
 }
 
-export function TaskCategoriesView() {
+export function TaskCategoriesView({
+  initialCategories,
+}: TaskCategoriesViewProps) {
+  const [categories, setCategories] = useState(initialCategories);
   const [statusRows, setStatusRows] = useState(cloneStatusRows);
   const [priorityRows, setPriorityRows] = useState(clonePriorityRows);
-  const [dialog, setDialog] = useState<TaxonomyDialogState | null>(null);
+  const [taxonomyDialog, setTaxonomyDialog] =
+    useState<TaxonomyDialogState | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+    null
+  );
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(
+    null
+  );
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const kind: TaxonomyKind = dialog?.kind ?? "status";
-  const mode = dialog?.mode ?? "edit";
-  const existingLabels =
-    kind === "status"
+  const categoryRows = toCategoryRows(categories);
+  const editingCategory =
+    categories.find((category) => category.id === editingCategoryId) ?? null;
+  const taxonomyKind: TaxonomyKind = taxonomyDialog?.kind ?? "status";
+  const taxonomyMode = taxonomyDialog?.mode ?? "edit";
+  const taxonomyExistingLabels =
+    taxonomyKind === "status"
       ? statusRows.map((row) => row.label)
       : priorityRows.map((row) => row.label);
 
-  function handleOpenChange(open: boolean) {
+  function handleTaxonomyOpenChange(open: boolean) {
     if (!open) {
-      setDialog(null);
+      setTaxonomyDialog(null);
     }
   }
 
-  function handleSubmitLabel(name: string) {
-    if (!dialog) {
+  function handleTaxonomySubmitLabel(name: string) {
+    if (!taxonomyDialog) {
       return;
     }
 
-    if (dialog.mode === "create") {
+    if (taxonomyDialog.mode === "create") {
       setPriorityRows((rows) => [
         ...rows,
         { id: createPriorityRowId(), label: name },
@@ -121,10 +164,10 @@ export function TaskCategoriesView() {
       return;
     }
 
-    if (dialog.kind === "status") {
+    if (taxonomyDialog.kind === "status") {
       setStatusRows((rows) =>
         rows.map((row) =>
-          row.id === dialog.row.id ? { ...row, label: name } : row
+          row.id === taxonomyDialog.row.id ? { ...row, label: name } : row
         )
       );
       return;
@@ -132,9 +175,32 @@ export function TaskCategoriesView() {
 
     setPriorityRows((rows) =>
       rows.map((row) =>
-        row.id === dialog.row.id ? { ...row, label: name } : row
+        row.id === taxonomyDialog.row.id ? { ...row, label: name } : row
       )
     );
+  }
+
+  async function handleDeleteCategory(categoryId: string) {
+    setDeletingCategoryId(categoryId);
+    setDeleteError(null);
+
+    try {
+      const result = await deleteCategoryViaApi(categoryId);
+
+      if (!result.ok) {
+        setDeleteError(result.error);
+        setDeletingCategoryId(null);
+        return;
+      }
+
+      setCategories((current) =>
+        current.filter((category) => category.id !== categoryId)
+      );
+    } catch {
+      setDeleteError("Could not delete category.");
+    }
+
+    setDeletingCategoryId(null);
   }
 
   return (
@@ -155,6 +221,11 @@ export function TaskCategoriesView() {
           </CardAction>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto">
+          {deleteError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
           <div>
             <Button
               nativeButton={false}
@@ -164,6 +235,22 @@ export function TaskCategoriesView() {
               Add Category
             </Button>
           </div>
+          <TaxonomySection
+            headingId="user-categories-heading"
+            titleRest="Categories"
+            hideTaskPrefix
+            addLabel=""
+            nameColumn="Category Name"
+            rows={categoryRows}
+            emptyTitle="No categories yet"
+            emptyDescription="Categories you create will show up here."
+            onEdit={(row) => setEditingCategoryId(row.id)}
+            onDelete={(row) => {
+              if (deletingCategoryId === null) {
+                void handleDeleteCategory(row.id);
+              }
+            }}
+          />
           <TaxonomySection
             headingId="task-status-heading"
             titleRest="Status"
@@ -175,7 +262,11 @@ export function TaskCategoriesView() {
             onEdit={(row) => {
               const statusRow = statusRows.find((item) => item.id === row.id);
               if (statusRow) {
-                setDialog({ mode: "edit", kind: "status", row: statusRow });
+                setTaxonomyDialog({
+                  mode: "edit",
+                  kind: "status",
+                  row: statusRow,
+                });
               }
             }}
           />
@@ -188,14 +279,14 @@ export function TaskCategoriesView() {
             emptyTitle="No task priorities yet"
             emptyDescription="Priorities you add will show up here."
             onAdd={() => {
-              setDialog({ mode: "create", kind: "priority" });
+              setTaxonomyDialog({ mode: "create", kind: "priority" });
             }}
             onEdit={(row) => {
               const priorityRow = priorityRows.find(
                 (item) => item.id === row.id
               );
               if (priorityRow) {
-                setDialog({
+                setTaxonomyDialog({
                   mode: "edit",
                   kind: "priority",
                   row: priorityRow,
@@ -205,14 +296,33 @@ export function TaskCategoriesView() {
           />
         </CardContent>
       </Card>
+      <EditCategoryDialog
+        category={editingCategory}
+        existingNames={categories.map((category) => category.name)}
+        open={editingCategory !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCategoryId(null);
+          }
+        }}
+        onUpdate={(updated) => {
+          setCategories((current) =>
+            current
+              .map((category) =>
+                category.id === updated.id ? updated : category
+              )
+              .toSorted((left, right) => left.name.localeCompare(right.name))
+          );
+        }}
+      />
       <TaxonomyLabelDialog
-        open={dialog !== null}
-        mode={mode}
-        kind={kind}
-        row={dialog?.mode === "edit" ? dialog.row : null}
-        existingLabels={existingLabels}
-        onOpenChange={handleOpenChange}
-        onSubmitLabel={handleSubmitLabel}
+        open={taxonomyDialog !== null}
+        mode={taxonomyMode}
+        kind={taxonomyKind}
+        row={taxonomyDialog?.mode === "edit" ? taxonomyDialog.row : null}
+        existingLabels={taxonomyExistingLabels}
+        onOpenChange={handleTaxonomyOpenChange}
+        onSubmitLabel={handleTaxonomySubmitLabel}
       />
     </div>
   );

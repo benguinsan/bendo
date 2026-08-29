@@ -14,7 +14,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { VitalTaskDetailPanel } from "@/components/vital-task/vital-task-detail-panel";
-import { toTaskView, type DashboardTask } from "@/lib/dashboard/mock-data";
+import { toTaskView, type DashboardTask } from "@/lib/dashboard/task-types";
 
 type VitalTaskViewProps = {
   initialTasks: DashboardTask[];

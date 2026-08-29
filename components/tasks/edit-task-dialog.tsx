@@ -1,8 +1,8 @@
 "use client";
 
 import { TaskFormDialog } from "@/components/tasks/task-form-dialog";
-import type { DashboardTask } from "@/lib/dashboard/mock-data";
-import { updateMockTask } from "@/lib/tasks/create-mock-task";
+import type { DashboardTask } from "@/lib/dashboard/task-types";
+import { updateTaskViaApi } from "@/lib/tasks/task-api-client";
 import { toLocalDateKey, validateUpdatedTask } from "@/lib/tasks/task-input";
 
 type EditTaskDialogProps = {
@@ -30,6 +30,7 @@ export function EditTaskDialog({
               title: task.title,
               date: toLocalDateKey(new Date(task.scheduledAt)),
               priority: task.priority,
+              categoryId: task.categoryId,
               description: task.description,
               previewUrl: task.thumbnailSrc,
             }
@@ -40,8 +41,8 @@ export function EditTaskDialog({
           <span className="border-primary border-b-2 pb-0.5">Edit</span> Task
         </>
       }
-      description="Edit this task title, date, priority, description, or image."
-      onSubmit={(values) => {
+      description="Edit this task title, date, priority, category, description, or image."
+      onSubmit={async (values) => {
         if (!task) {
           return {};
         }
@@ -62,17 +63,21 @@ export function EditTaskDialog({
           return result.errors;
         }
 
-        onUpdate(
-          updateMockTask({
-            task,
-            title: result.data.title,
-            description: result.data.description,
-            date: result.data.date,
-            priority: result.data.priority,
-            thumbnailSrc: values.previewUrl,
-            now,
-          })
-        );
+        const updated = await updateTaskViaApi({
+          taskId: task.id,
+          title: result.data.title,
+          description: result.data.description,
+          date: result.data.date,
+          priority: result.data.priority,
+          categoryId: values.categoryId,
+          thumbnailSrc: values.previewUrl,
+        });
+
+        if (!updated.ok) {
+          return updated.errors;
+        }
+
+        onUpdate(updated.task);
         return null;
       }}
     />

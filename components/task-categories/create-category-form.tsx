@@ -12,6 +12,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { createCategoryViaApi } from "@/lib/task-categories/category-api-client";
 import { validateNewCategory } from "@/lib/task-categories/category-input";
 
 export function CreateCategoryForm() {
@@ -19,13 +20,23 @@ export function CreateCategoryForm() {
   const nameId = useId();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = validateNewCategory(name);
 
     if (!result.success) {
       setError(result.error);
+      return;
+    }
+
+    setIsSubmitting(true);
+    const created = await createCategoryViaApi(result.data.name);
+    setIsSubmitting(false);
+
+    if (!created.ok) {
+      setError(created.error);
       return;
     }
 
@@ -55,8 +66,13 @@ export function CreateCategoryForm() {
         </Field>
       </FieldGroup>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="lg" className="min-w-24 px-8">
-          Create
+        <Button
+          type="submit"
+          size="lg"
+          className="min-w-24 px-8"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Creating…" : "Create"}
         </Button>
         <Button
           nativeButton={false}

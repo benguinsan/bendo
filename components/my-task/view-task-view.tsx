@@ -21,7 +21,7 @@ import {
   statusTextClass,
   toTaskView,
   type DashboardTask,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 
 type ViewTaskViewProps = {
   initialTask: DashboardTask;

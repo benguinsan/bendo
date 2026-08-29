@@ -29,6 +29,7 @@ type TaxonomyTableProps = {
   emptyTitle: string;
   emptyDescription: string;
   onEdit: (row: TaxonomyRow) => void;
+  onDelete?: (row: TaxonomyRow) => void;
 };
 
 export function TaxonomyTable({
@@ -38,6 +39,7 @@ export function TaxonomyTable({
   emptyTitle,
   emptyDescription,
   onEdit,
+  onDelete,
 }: TaxonomyTableProps) {
   if (rows.length === 0) {
     return (
@@ -83,6 +85,8 @@ export function TaxonomyTable({
                     type="button"
                     size="sm"
                     aria-label={`Delete ${row.label}`}
+                    onClick={() => onDelete?.(row)}
+                    disabled={!onDelete}
                   >
                     <Trash2Icon data-icon="inline-start" />
                     Delete

@@ -17,7 +17,7 @@ import {
   statusLabels,
   statusTextClass,
   type DashboardTaskView,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/dashboard/task-types";
 
 type VitalTaskDetailPanelProps = {
   task: DashboardTaskView | null;

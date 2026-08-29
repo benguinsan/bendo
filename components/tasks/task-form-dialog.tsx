@@ -1,15 +1,10 @@
 "use client";
 
-import { CalendarIcon, ImageUpIcon } from "lucide-react";
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { CalendarIcon } from "lucide-react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 
+import { TaskFormCategoryField } from "@/components/tasks/task-form-category-field";
+import { TaskFormImageField } from "@/components/tasks/task-form-image-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,7 +33,6 @@ import { formatNumericDate } from "@/lib/dashboard/dates";
 import {
   parseLocalDateInput,
   priorityOptions,
-  validateTaskImage,
   type TaskFormFieldErrors,
 } from "@/lib/tasks/task-input";
 import { cn } from "@/lib/utils";
@@ -47,6 +41,7 @@ export type TaskFormSubmitValues = {
   title: string;
   date: string;
   priority: string;
+  categoryId: string | null;
   description: string;
   previewUrl: string | null;
 };
@@ -55,6 +50,7 @@ export type TaskFormInitialValues = {
   title: string;
   date: string;
   priority: string;
+  categoryId: string | null;
   description: string;
   previewUrl: string | null;
 };
@@ -66,14 +62,18 @@ type TaskFormDialogProps = {
   heading: ReactNode;
   description: string;
   initialValues?: TaskFormInitialValues;
-  onSubmit: (values: TaskFormSubmitValues) => TaskFormFieldErrors | null;
+  onSubmit: (
+    values: TaskFormSubmitValues
+  ) => TaskFormFieldErrors | null | Promise<TaskFormFieldErrors | null>;
 };
 
 type TaskFormContentProps = {
   heading: ReactNode;
   description: string;
   initialValues?: TaskFormInitialValues;
-  onSubmit: (values: TaskFormSubmitValues) => TaskFormFieldErrors | null;
+  onSubmit: (
+    values: TaskFormSubmitValues
+  ) => TaskFormFieldErrors | null | Promise<TaskFormFieldErrors | null>;
   onOpenChange: (open: boolean) => void;
 };
 
@@ -87,64 +87,48 @@ function TaskFormContent({
   const titleId = useId();
   const dateId = useId();
   const descriptionId = useId();
-  const imageId = useId();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const sessionPreviewRef = useRef<string | null>(null);
 
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [date, setDate] = useState(initialValues?.date ?? "");
   const [priority, setPriority] = useState(initialValues?.priority ?? "");
+  const [selectedCategoryId, setSelectedCategoryId] = useState(
+    initialValues?.categoryId ?? ""
+  );
   const [descriptionValue, setDescriptionValue] = useState(
     initialValues?.description ?? ""
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     initialValues?.previewUrl ?? null
   );
-  const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<TaskFormFieldErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(
-    () => () => {
-      if (sessionPreviewRef.current) {
-        URL.revokeObjectURL(sessionPreviewRef.current);
-      }
-    },
-    []
-  );
-
-  function applyImageFile(file: File) {
-    const imageError = validateTaskImage(file);
-    if (imageError) {
-      setErrors((current) => ({ ...current, image: imageError }));
-      return;
-    }
-
-    const nextUrl = URL.createObjectURL(file);
-    if (sessionPreviewRef.current) {
-      URL.revokeObjectURL(sessionPreviewRef.current);
-    }
-    sessionPreviewRef.current = nextUrl;
-    setPreviewUrl(nextUrl);
-    setErrors((current) => ({ ...current, image: undefined }));
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors = onSubmit({
-      title,
-      date,
-      priority,
-      description: descriptionValue,
-      previewUrl,
-    });
+    setIsSubmitting(true);
 
-    if (nextErrors) {
-      setErrors(nextErrors);
-      return;
+    try {
+      const nextErrors = await onSubmit({
+        title,
+        date,
+        priority,
+        categoryId: selectedCategoryId || null,
+        description: descriptionValue,
+        previewUrl,
+      });
+
+      if (nextErrors) {
+        setErrors(nextErrors);
+        setIsSubmitting(false);
+        return;
+      }
+
+      onOpenChange(false);
+    } catch {
+      setErrors({ title: "Could not save task." });
     }
 
-    sessionPreviewRef.current = null;
-    onOpenChange(false);
+    setIsSubmitting(false);
   }
 
   const dateDisplay = date ? formatNumericDate(parseLocalDateInput(date)) : "";
@@ -246,6 +230,11 @@ function TaskFormContent({
               </RadioGroup>
               <FieldError>{errors.priority}</FieldError>
             </FieldSet>
+            <TaskFormCategoryField
+              value={selectedCategoryId}
+              error={errors.category}
+              onChange={setSelectedCategoryId}
+            />
             <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(200px,280px)]">
               <Field data-invalid={errors.description ? true : undefined}>
                 <FieldLabel htmlFor={descriptionId}>
@@ -262,71 +251,24 @@ function TaskFormContent({
                 />
                 <FieldError>{errors.description}</FieldError>
               </Field>
-              <Field data-invalid={errors.image ? true : undefined}>
-                <FieldLabel htmlFor={imageId}>Upload Image</FieldLabel>
-                <div
-                  className={cn(
-                    "border-input flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border px-3 py-4 md:min-h-48",
-                    isDragging && "border-primary"
-                  )}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setIsDragging(false);
-                    const [file] = event.dataTransfer.files;
-                    if (file) {
-                      applyImageFile(file);
-                    }
-                  }}
-                >
-                  {previewUrl ? (
-                    /* oxlint-disable-next-line next/no-img-element */
-                    <img
-                      src={previewUrl}
-                      alt="Selected task preview"
-                      className="max-h-28 w-full object-cover"
-                    />
-                  ) : (
-                    <>
-                      <ImageUpIcon className="text-muted-foreground size-10" />
-                      <p className="text-muted-foreground text-center text-xs">
-                        Drag&Drop files here
-                      </p>
-                    </>
-                  )}
-                  <p className="text-muted-foreground text-xs">or</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Browse
-                  </Button>
-                  <input
-                    id={imageId}
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="sr-only"
-                    onChange={(event) => {
-                      const [file] = event.target.files ?? [];
-                      if (file) {
-                        applyImageFile(file);
-                      }
-                    }}
-                  />
-                </div>
-                <FieldError>{errors.image}</FieldError>
-              </Field>
+              <TaskFormImageField
+                previewUrl={previewUrl}
+                error={errors.image}
+                onPreviewChange={setPreviewUrl}
+                onError={(message) =>
+                  setErrors((current) => ({ ...current, image: message }))
+                }
+              />
             </FieldGroup>
           </FieldGroup>
         </div>
-        <Button type="submit" size="lg" className="w-fit min-w-24 px-8">
-          Done
+        <Button
+          type="submit"
+          size="lg"
+          className="w-fit min-w-24 px-8"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Saving…" : "Done"}
         </Button>
       </form>
     </DialogContent>
