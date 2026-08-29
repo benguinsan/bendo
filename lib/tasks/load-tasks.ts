@@ -7,7 +7,7 @@ export async function loadUserTasks(userId: string): Promise<DashboardTask[]> {
   const result = await listTasks(userId);
 
   if (!result.ok) {
-    return [];
+    throw new Error(result.message);
   }
 
   return result.data.map((task) => persistedTaskToDashboard(task));
@@ -20,7 +20,11 @@ export async function loadUserTask(
   const result = await getTask(userId, taskId);
 
   if (!result.ok) {
-    return null;
+    if (result.code === "TASK_NOT_FOUND") {
+      return null;
+    }
+
+    throw new Error(result.message);
   }
 
   return persistedTaskToDashboard(result.data);

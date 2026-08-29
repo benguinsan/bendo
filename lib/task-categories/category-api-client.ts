@@ -20,26 +20,30 @@ export async function createCategoryViaApi(
 ): Promise<
   { ok: true; category: PersistedCategory } | { ok: false; error: string }
 > {
-  const response = await fetch("/api/categories", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-
-  let payload: unknown;
   try {
-    payload = await response.json();
+    const response = await fetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not create category." };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return { ok: false, error: body.error ?? "Could not create category." };
+    }
+
+    const body = payload as ApiSuccessBody;
+    return { ok: true, category: body.data };
   } catch {
     return { ok: false, error: "Could not create category." };
   }
-
-  if (!response.ok) {
-    const body = payload as ApiErrorBody;
-    return { ok: false, error: body.error ?? "Could not create category." };
-  }
-
-  const body = payload as ApiSuccessBody;
-  return { ok: true, category: body.data };
 }
 
 export async function updateCategoryViaApi(input: {
@@ -48,64 +52,86 @@ export async function updateCategoryViaApi(input: {
 }): Promise<
   { ok: true; category: PersistedCategory } | { ok: false; error: string }
 > {
-  const response = await fetch(`/api/categories/${input.categoryId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: input.name }),
-  });
-
-  let payload: unknown;
   try {
-    payload = await response.json();
+    const response = await fetch(`/api/categories/${input.categoryId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: input.name }),
+    });
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not update category." };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return { ok: false, error: body.error ?? "Could not update category." };
+    }
+
+    const body = payload as ApiSuccessBody;
+    return { ok: true, category: body.data };
   } catch {
     return { ok: false, error: "Could not update category." };
   }
-
-  if (!response.ok) {
-    const body = payload as ApiErrorBody;
-    return { ok: false, error: body.error ?? "Could not update category." };
-  }
-
-  const body = payload as ApiSuccessBody;
-  return { ok: true, category: body.data };
 }
 
 export async function deleteCategoryViaApi(
   categoryId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const response = await fetch(`/api/categories/${categoryId}`, {
-    method: "DELETE",
-  });
-
-  if (response.ok) {
-    return { ok: true };
-  }
-
-  let payload: unknown;
   try {
-    payload = await response.json();
+    const response = await fetch(`/api/categories/${categoryId}`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      return { ok: true };
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not delete category." };
+    }
+
+    const body = payload as ApiErrorBody;
+    return { ok: false, error: body.error ?? "Could not delete category." };
   } catch {
     return { ok: false, error: "Could not delete category." };
   }
-
-  const body = payload as ApiErrorBody;
-  return { ok: false, error: body.error ?? "Could not delete category." };
 }
 
-export async function listCategoriesViaApi(): Promise<PersistedCategory[]> {
-  const response = await fetch("/api/categories");
-
-  if (!response.ok) {
-    return [];
-  }
-
-  let payload: unknown;
+export async function listCategoriesViaApi(): Promise<
+  { ok: true; categories: PersistedCategory[] } | { ok: false; error: string }
+> {
   try {
-    payload = await response.json();
-  } catch {
-    return [];
-  }
+    const response = await fetch("/api/categories");
 
-  const body = payload as { data?: PersistedCategory[] };
-  return body.data ?? [];
+    if (!response.ok) {
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        return { ok: false, error: "Could not load categories." };
+      }
+
+      const body = payload as ApiErrorBody;
+      return { ok: false, error: body.error ?? "Could not load categories." };
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not load categories." };
+    }
+
+    const body = payload as { data?: PersistedCategory[] };
+    return { ok: true, categories: body.data ?? [] };
+  } catch {
+    return { ok: false, error: "Could not load categories." };
+  }
 }

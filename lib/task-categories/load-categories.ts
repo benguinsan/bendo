@@ -10,7 +10,7 @@ export async function loadUserCategories(
   const result = await listCategories(userId);
 
   if (!result.ok) {
-    return [];
+    throw new Error(result.message);
   }
 
   return result.data;

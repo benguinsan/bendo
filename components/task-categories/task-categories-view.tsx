@@ -133,6 +133,7 @@ export function TaskCategoriesView({
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(
     null
   );
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const categoryRows = toCategoryRows(categories);
   const editingCategory =
@@ -181,14 +182,25 @@ export function TaskCategoriesView({
 
   async function handleDeleteCategory(categoryId: string) {
     setDeletingCategoryId(categoryId);
-    const result = await deleteCategoryViaApi(categoryId);
-    setDeletingCategoryId(null);
+    setDeleteError(null);
 
-    if (result.ok) {
+    try {
+      const result = await deleteCategoryViaApi(categoryId);
+
+      if (!result.ok) {
+        setDeleteError(result.error);
+        setDeletingCategoryId(null);
+        return;
+      }
+
       setCategories((current) =>
         current.filter((category) => category.id !== categoryId)
       );
+    } catch {
+      setDeleteError("Could not delete category.");
     }
+
+    setDeletingCategoryId(null);
   }
 
   return (
@@ -209,6 +221,11 @@ export function TaskCategoriesView({
           </CardAction>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto">
+          {deleteError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
           <div>
             <Button
               nativeButton={false}

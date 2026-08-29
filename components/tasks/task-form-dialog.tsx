@@ -107,22 +107,28 @@ function TaskFormContent({
     event.preventDefault();
     setIsSubmitting(true);
 
-    const nextErrors = await onSubmit({
-      title,
-      date,
-      priority,
-      categoryId: selectedCategoryId || null,
-      description: descriptionValue,
-      previewUrl,
-    });
-    setIsSubmitting(false);
+    try {
+      const nextErrors = await onSubmit({
+        title,
+        date,
+        priority,
+        categoryId: selectedCategoryId || null,
+        description: descriptionValue,
+        previewUrl,
+      });
 
-    if (nextErrors) {
-      setErrors(nextErrors);
-      return;
+      if (nextErrors) {
+        setErrors(nextErrors);
+        setIsSubmitting(false);
+        return;
+      }
+
+      onOpenChange(false);
+    } catch {
+      setErrors({ title: "Could not save task." });
     }
 
-    onOpenChange(false);
+    setIsSubmitting(false);
   }
 
   const dateDisplay = date ? formatNumericDate(parseLocalDateInput(date)) : "";

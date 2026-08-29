@@ -73,41 +73,45 @@ export async function createTaskViaApi(
       ? input.thumbnailSrc
       : undefined;
 
-  const response = await fetch("/api/tasks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: input.title,
-      description: input.description,
-      date: input.date,
-      priority: input.priority,
-      categoryId: input.categoryId,
-      ...(thumbnailSrc
-        ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
-        : {}),
-    }),
-  });
-
-  let payload: unknown;
   try {
-    payload = await response.json();
+    const response = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        date: input.date,
+        priority: input.priority,
+        categoryId: input.categoryId,
+        ...(thumbnailSrc
+          ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
+          : {}),
+      }),
+    });
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, errors: { title: "Could not create task." } };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return {
+        ok: false,
+        errors: mapApiErrorToFields({
+          error: body.error ?? "Could not create task.",
+          code: body.code,
+        }),
+      };
+    }
+
+    const body = payload as ApiSuccessBody;
+    return { ok: true, task: persistedTaskToDashboard(body.data) };
   } catch {
     return { ok: false, errors: { title: "Could not create task." } };
   }
-
-  if (!response.ok) {
-    const body = payload as ApiErrorBody;
-    return {
-      ok: false,
-      errors: mapApiErrorToFields({
-        error: body.error ?? "Could not create task.",
-        code: body.code,
-      }),
-    };
-  }
-
-  const body = payload as ApiSuccessBody;
-  return { ok: true, task: persistedTaskToDashboard(body.data) };
 }
 
 export async function updateTaskViaApi(
@@ -121,39 +125,43 @@ export async function updateTaskViaApi(
       ? input.thumbnailSrc
       : undefined;
 
-  const response = await fetch(`/api/tasks/${input.taskId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: input.title,
-      description: input.description,
-      date: input.date,
-      priority: input.priority,
-      categoryId: input.categoryId,
-      ...(thumbnailSrc
-        ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
-        : {}),
-    }),
-  });
-
-  let payload: unknown;
   try {
-    payload = await response.json();
+    const response = await fetch(`/api/tasks/${input.taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        date: input.date,
+        priority: input.priority,
+        categoryId: input.categoryId,
+        ...(thumbnailSrc
+          ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
+          : {}),
+      }),
+    });
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, errors: { title: "Could not update task." } };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return {
+        ok: false,
+        errors: mapApiErrorToFields({
+          error: body.error ?? "Could not update task.",
+          code: body.code,
+        }),
+      };
+    }
+
+    const body = payload as ApiSuccessBody;
+    return { ok: true, task: persistedTaskToDashboard(body.data) };
   } catch {
     return { ok: false, errors: { title: "Could not update task." } };
   }
-
-  if (!response.ok) {
-    const body = payload as ApiErrorBody;
-    return {
-      ok: false,
-      errors: mapApiErrorToFields({
-        error: body.error ?? "Could not update task.",
-        code: body.code,
-      }),
-    };
-  }
-
-  const body = payload as ApiSuccessBody;
-  return { ok: true, task: persistedTaskToDashboard(body.data) };
 }
