@@ -2,8 +2,10 @@
 
 import { CircleAlertIcon, SquarePenIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ConfirmDeleteTaskDialog } from "@/components/tasks/confirm-delete-task-dialog";
 import { EditTaskDialog } from "@/components/tasks/edit-task-dialog";
 import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ import {
   toTaskView,
   type DashboardTask,
 } from "@/lib/dashboard/task-types";
+import { deleteTaskViaApi } from "@/lib/tasks/task-api-client";
 
 type ViewTaskViewProps = {
   initialTask: DashboardTask;
@@ -29,14 +32,51 @@ type ViewTaskViewProps = {
 };
 
 export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
+  const router = useRouter();
   const [task, setTask] = useState(initialTask);
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const view = toTaskView(task, new Date(nowIso));
   const checklist = view.checklist ?? [];
   const optionalItems = view.optionalItems ?? [];
 
+  async function handleDeleteTask() {
+    if (deleting) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const result = await deleteTaskViaApi(task.id);
+
+      if (!result.ok) {
+        setDeleteError(result.error);
+        setDeleting(false);
+        setConfirmOpen(false);
+        return;
+      }
+
+      router.push("/my-task");
+      return;
+    } catch {
+      setDeleteError("Could not delete task.");
+      setConfirmOpen(false);
+    }
+
+    setDeleting(false);
+  }
+
   return (
     <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
+      {deleteError ? (
+        <p className="text-destructive mb-4 text-sm" role="alert">
+          {deleteError}
+        </p>
+      ) : null}
       <Card className="rounded-card shadow-panel flex min-h-0 flex-1 flex-col py-6 ring-0 lg:h-full">
         <CardHeader className="gap-5">
           <div className="flex flex-col items-start gap-5 lg:flex-row">
@@ -100,7 +140,13 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
           ) : null}
         </CardContent>
         <CardContent className="mt-auto flex justify-end gap-2">
-          <Button type="button" size="icon-lg" aria-label="Delete task">
+          <Button
+            type="button"
+            size="icon-lg"
+            aria-label="Delete task"
+            disabled={deleting}
+            onClick={() => setConfirmOpen(true)}
+          >
             <Trash2Icon />
           </Button>
           <Button
@@ -122,6 +168,15 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
         existingTasks={[task]}
         onOpenChange={setEditOpen}
         onUpdate={setTask}
+      />
+      <ConfirmDeleteTaskDialog
+        open={confirmOpen}
+        taskTitle={task.title}
+        isDeleting={deleting}
+        onOpenChange={setConfirmOpen}
+        onConfirm={() => {
+          void handleDeleteTask();
+        }}
       />
     </div>
   );

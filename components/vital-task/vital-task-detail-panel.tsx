@@ -22,11 +22,15 @@ import {
 type VitalTaskDetailPanelProps = {
   task: DashboardTaskView | null;
   onEdit?: () => void;
+  onDelete?: () => void;
+  deleting?: boolean;
 };
 
 export function VitalTaskDetailPanel({
   task,
   onEdit,
+  onDelete,
+  deleting = false,
 }: VitalTaskDetailPanelProps) {
   const checklist = task?.checklist ?? [];
 
@@ -79,7 +83,13 @@ export function VitalTaskDetailPanel({
             ) : null}
           </CardContent>
           <CardContent className="mt-auto flex justify-end gap-2">
-            <Button type="button" size="icon-lg" aria-label="Delete task">
+            <Button
+              type="button"
+              size="icon-lg"
+              aria-label="Delete task"
+              disabled={deleting || !onDelete}
+              onClick={onDelete}
+            >
               <Trash2Icon />
             </Button>
             <Button

@@ -22,6 +22,8 @@ import {
 type TaskDetailPanelProps = {
   task: DashboardTaskView | null;
   onEdit?: () => void;
+  onDelete?: () => void;
+  deleting?: boolean;
 };
 
 function DetailLine({ label, value }: { label: string; value: string }) {
@@ -33,7 +35,12 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function TaskDetailPanel({ task, onEdit }: TaskDetailPanelProps) {
+export function TaskDetailPanel({
+  task,
+  onEdit,
+  onDelete,
+  deleting = false,
+}: TaskDetailPanelProps) {
   return (
     <Card className="rounded-card shadow-panel flex min-h-0 flex-col py-5 ring-0 lg:h-full">
       {task ? (
@@ -108,7 +115,13 @@ export function TaskDetailPanel({ task, onEdit }: TaskDetailPanelProps) {
             ) : null}
           </CardContent>
           <CardContent className="mt-auto flex justify-end gap-2">
-            <Button type="button" size="icon-lg" aria-label="Delete task">
+            <Button
+              type="button"
+              size="icon-lg"
+              aria-label="Delete task"
+              disabled={deleting || !onDelete}
+              onClick={onDelete}
+            >
               <Trash2Icon />
             </Button>
             <Button
