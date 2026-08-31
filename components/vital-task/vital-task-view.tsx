@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/empty";
 import { VitalTaskDetailPanel } from "@/components/vital-task/vital-task-detail-panel";
 import { toTaskView, type DashboardTask } from "@/lib/dashboard/task-types";
+import { useNow } from "@/lib/dashboard/use-now";
 import { deleteTaskViaApi } from "@/lib/tasks/task-api-client";
 
 type VitalTaskViewProps = {
@@ -34,7 +35,7 @@ export function VitalTaskView({ initialTasks, nowIso }: VitalTaskViewProps) {
   );
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const now = new Date(nowIso);
+  const now = useNow(nowIso);
   const views = tasks.map((task) => toTaskView(task, now));
   const selectedTask = views.find((task) => task.id === selectedId) ?? null;
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;

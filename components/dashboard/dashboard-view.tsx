@@ -16,6 +16,7 @@ import {
   toTaskView,
   type DashboardTask,
 } from "@/lib/dashboard/task-types";
+import { useNow } from "@/lib/dashboard/use-now";
 import { deleteTaskViaApi } from "@/lib/tasks/task-api-client";
 
 type DashboardViewProps = {
@@ -36,7 +37,7 @@ export function DashboardView({
   );
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const now = new Date(nowIso);
+  const now = useNow(nowIso);
   const views = tasks.map((task) => toTaskView(task, now));
   const openTasks = getOpenTasks(views);
   const completedTasks = getCompletedTasks(views);

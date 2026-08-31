@@ -31,6 +31,7 @@ import {
   type DashboardTask,
   type TaskStatus,
 } from "@/lib/dashboard/task-types";
+import { useNow } from "@/lib/dashboard/use-now";
 import {
   deleteTaskViaApi,
   updateTaskStatusViaApi,
@@ -50,7 +51,8 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   const [statusTransitioning, setStatusTransitioning] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
-  const view = toTaskView(task, new Date(nowIso));
+  const now = useNow(nowIso);
+  const view = toTaskView(task, now);
   const checklist = view.checklist ?? [];
   const optionalItems = view.optionalItems ?? [];
 
@@ -93,12 +95,11 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
     try {
       const result = await updateTaskStatusViaApi(task.id, status);
 
-      if (!result.ok) {
+      if (result.ok) {
+        setTask(result.task);
+      } else {
         setStatusError(result.error);
-        return;
       }
-
-      setTask(result.task);
     } catch {
       setStatusError("Could not update task status.");
     }
