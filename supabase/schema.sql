@@ -34,7 +34,7 @@ create table if not exists public.tasks (
     lower(regexp_replace(btrim(content), '\s+', ' ', 'g'))
   ) stored,
   description text not null default '',
-  status text not null default 'not_started',
+  status text not null default 'pending',
   priority text not null,
   scheduled_at timestamptz not null,
   scheduled_date date not null,
@@ -50,7 +50,7 @@ create table if not exists public.tasks (
   ),
   constraint tasks_description_check check (char_length(description) <= 2000),
   constraint tasks_status_check check (
-    status in ('not_started', 'in_progress', 'completed')
+    status in ('pending', 'completed')
   ),
   constraint tasks_priority_check check (
     priority in ('low', 'moderate', 'extreme')
@@ -299,7 +299,7 @@ begin
     p_category_id,
     p_thumbnail_src,
     p_thumbnail_alt,
-    'not_started'
+    'pending'
   )
   returning * into new_row;
 

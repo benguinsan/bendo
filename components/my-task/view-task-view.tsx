@@ -1,6 +1,12 @@
 "use client";
 
-import { CircleAlertIcon, SquarePenIcon, Trash2Icon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  CircleAlertIcon,
+  RotateCcwIcon,
+  SquarePenIcon,
+  Trash2Icon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -23,8 +29,13 @@ import {
   statusTextClass,
   toTaskView,
   type DashboardTask,
+  type TaskStatus,
 } from "@/lib/dashboard/task-types";
-import { deleteTaskViaApi } from "@/lib/tasks/task-api-client";
+import { useNow } from "@/lib/dashboard/use-now";
+import {
+  deleteTaskViaApi,
+  updateTaskStatusViaApi,
+} from "@/lib/tasks/task-api-client";
 
 type ViewTaskViewProps = {
   initialTask: DashboardTask;
@@ -37,8 +48,11 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusTransitioning, setStatusTransitioning] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const view = toTaskView(task, new Date(nowIso));
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const now = useNow(nowIso);
+  const view = toTaskView(task, now);
   const checklist = view.checklist ?? [];
   const optionalItems = view.optionalItems ?? [];
 
@@ -70,11 +84,39 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
     setDeleting(false);
   }
 
+  async function handleStatusChange(status: TaskStatus) {
+    if (statusTransitioning) {
+      return;
+    }
+
+    setStatusTransitioning(true);
+    setStatusError(null);
+
+    try {
+      const result = await updateTaskStatusViaApi(task.id, status);
+
+      if (result.ok) {
+        setTask(result.task);
+      } else {
+        setStatusError(result.error);
+      }
+    } catch {
+      setStatusError("Could not update task status.");
+    }
+
+    setStatusTransitioning(false);
+  }
+
   return (
     <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
       {deleteError ? (
         <p className="text-destructive mb-4 text-sm" role="alert">
           {deleteError}
+        </p>
+      ) : null}
+      {statusError ? (
+        <p className="text-destructive mb-4 text-sm" role="alert">
+          {statusError}
         </p>
       ) : null}
       <Card className="rounded-card shadow-panel flex min-h-0 flex-1 flex-col py-6 ring-0 lg:h-full">
@@ -99,8 +141,8 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
               </p>
               <p className="text-sm">
                 Status:{" "}
-                <span className={statusTextClass[view.status]}>
-                  {statusLabels[view.status]}
+                <span className={statusTextClass[view.displayStatus]}>
+                  {statusLabels[view.displayStatus]}
                 </span>
               </p>
               <p className="text-muted-foreground text-xs">
@@ -139,27 +181,55 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
             </div>
           ) : null}
         </CardContent>
-        <CardContent className="mt-auto flex justify-end gap-2">
-          <Button
-            type="button"
-            size="icon-lg"
-            aria-label="Delete task"
-            disabled={deleting}
-            onClick={() => setConfirmOpen(true)}
-          >
-            <Trash2Icon />
-          </Button>
-          <Button
-            type="button"
-            size="icon-lg"
-            aria-label="Edit task"
-            onClick={() => setEditOpen(true)}
-          >
-            <SquarePenIcon />
-          </Button>
-          <Button type="button" size="icon-lg" aria-label="Mark vital">
-            <CircleAlertIcon />
-          </Button>
+        <CardContent className="mt-auto flex flex-wrap items-center justify-between gap-2">
+          {view.status === "completed" ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={statusTransitioning}
+              onClick={() => {
+                void handleStatusChange("pending");
+              }}
+            >
+              <RotateCcwIcon />
+              {statusTransitioning ? "Reopening…" : "Reopen task"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={statusTransitioning}
+              onClick={() => {
+                void handleStatusChange("completed");
+              }}
+            >
+              <CheckCircle2Icon />
+              {statusTransitioning ? "Completing…" : "Mark complete"}
+            </Button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button
+              type="button"
+              size="icon-lg"
+              aria-label="Delete task"
+              disabled={deleting}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <Trash2Icon />
+            </Button>
+            <Button
+              type="button"
+              size="icon-lg"
+              aria-label="Edit task"
+              onClick={() => setEditOpen(true)}
+            >
+              <SquarePenIcon />
+            </Button>
+            <Button type="button" size="icon-lg" aria-label="Mark vital">
+              <CircleAlertIcon />
+            </Button>
+          </div>
         </CardContent>
       </Card>
       <EditTaskDialog

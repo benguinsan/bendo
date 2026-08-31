@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarIcon } from "lucide-react";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { TaskFormCategoryField } from "@/components/tasks/task-form-category-field";
 import { TaskFormImageField } from "@/components/tasks/task-form-image-field";
@@ -87,6 +87,7 @@ function TaskFormContent({
   const titleId = useId();
   const dateId = useId();
   const descriptionId = useId();
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [date, setDate] = useState(initialValues?.date ?? "");
@@ -133,6 +134,24 @@ function TaskFormContent({
 
   const dateDisplay = date ? formatNumericDate(parseLocalDateInput(date)) : "";
 
+  function openDatePicker() {
+    const input = dateInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+        return;
+      } catch {
+        // showPicker can throw when not allowed; fall back to focus.
+      }
+    }
+
+    input.focus();
+  }
+
   return (
     <DialogContent
       showCloseButton={false}
@@ -170,24 +189,29 @@ function TaskFormContent({
             <Field data-invalid={errors.date ? true : undefined}>
               <FieldLabel htmlFor={dateId}>Date</FieldLabel>
               <div className="relative">
-                <InputGroup>
+                <InputGroup className="cursor-pointer" onClick={openDatePicker}>
                   <InputGroupInput
                     readOnly
                     tabIndex={-1}
                     value={dateDisplay}
                     aria-hidden="true"
+                    className="pointer-events-none"
                   />
-                  <InputGroupAddon align="inline-end">
+                  <InputGroupAddon
+                    align="inline-end"
+                    className="pointer-events-none"
+                  >
                     <CalendarIcon />
                   </InputGroupAddon>
                 </InputGroup>
                 <input
+                  ref={dateInputRef}
                   id={dateId}
                   name="date"
                   type="date"
                   value={date}
                   aria-invalid={Boolean(errors.date)}
-                  className="absolute inset-0 cursor-pointer opacity-0"
+                  className="sr-only"
                   onChange={(event) => setDate(event.target.value)}
                 />
               </div>

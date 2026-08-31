@@ -1,4 +1,4 @@
-import type { TaskPriority } from "@/lib/dashboard/task-types";
+import type { TaskPriority, TaskStatus } from "@/lib/dashboard/task-types";
 import {
   persistedTaskToDashboard,
   type PersistedTask,
@@ -163,6 +163,42 @@ export async function updateTaskViaApi(
     return { ok: true, task: persistedTaskToDashboard(body.data) };
   } catch {
     return { ok: false, errors: { title: "Could not update task." } };
+  }
+}
+
+export async function updateTaskStatusViaApi(
+  taskId: string,
+  status: TaskStatus
+): Promise<
+  | { ok: true; task: ReturnType<typeof persistedTaskToDashboard> }
+  | { ok: false; error: string }
+> {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not update task status." };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return {
+        ok: false,
+        error: body.error ?? "Could not update task status.",
+      };
+    }
+
+    const body = payload as ApiSuccessBody;
+    return { ok: true, task: persistedTaskToDashboard(body.data) };
+  } catch {
+    return { ok: false, error: "Could not update task status." };
   }
 }
 

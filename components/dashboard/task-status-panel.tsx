@@ -30,16 +30,16 @@ export function TaskStatusPanel({ percents }: TaskStatusPanelProps) {
             dotClassName="bg-status-completed"
           />
           <StatusDonut
-            percent={percents.inProgress}
-            label="In Progress"
-            strokeClassName="stroke-status-in-progress"
-            dotClassName="bg-status-in-progress"
+            percent={percents.pending}
+            label="Pending"
+            strokeClassName="stroke-status-pending"
+            dotClassName="bg-status-pending"
           />
           <StatusDonut
-            percent={percents.notStarted}
-            label="Not Started"
-            strokeClassName="stroke-status-not-started"
-            dotClassName="bg-status-not-started"
+            percent={percents.expired}
+            label="Expired"
+            strokeClassName="stroke-status-expired"
+            dotClassName="bg-status-expired"
           />
         </div>
       </CardContent>

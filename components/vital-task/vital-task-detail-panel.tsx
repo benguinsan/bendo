@@ -59,8 +59,8 @@ export function VitalTaskDetailPanel({
                 </p>
                 <p className="text-sm">
                   Status:{" "}
-                  <span className={statusTextClass[task.status]}>
-                    {statusLabels[task.status]}
+                  <span className={statusTextClass[task.displayStatus]}>
+                    {statusLabels[task.displayStatus]}
                   </span>
                 </p>
                 <p className="text-muted-foreground text-xs">

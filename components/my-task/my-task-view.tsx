@@ -15,13 +15,47 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { toTaskView, type DashboardTask } from "@/lib/dashboard/task-types";
-import { deleteTaskViaApi } from "@/lib/tasks/task-api-client";
+import {
+  toTaskView,
+  type DashboardTask,
+  type TaskStatus,
+} from "@/lib/dashboard/task-types";
+import { useNow } from "@/lib/dashboard/use-now";
+import {
+  deleteTaskViaApi,
+  updateTaskStatusViaApi,
+} from "@/lib/tasks/task-api-client";
 
 type MyTaskViewProps = {
   initialTasks: DashboardTask[];
   nowIso: string;
 };
+
+function detailPanelStatusHandlers(
+  selectedId: string | null,
+  selectedStatus: DashboardTask["status"] | undefined,
+  onStatusChange: (taskId: string, status: TaskStatus) => void
+) {
+  if (!selectedId || !selectedStatus) {
+    return { handleComplete: undefined, handleReopen: undefined };
+  }
+
+  if (selectedStatus === "completed") {
+    return {
+      handleComplete: undefined,
+      handleReopen: () => {
+        void onStatusChange(selectedId, "pending");
+      },
+    };
+  }
+
+  return {
+    handleComplete: () => {
+      void onStatusChange(selectedId, "completed");
+    },
+    handleReopen: undefined,
+  };
+}
 
 export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
   const [tasks, setTasks] = useState(initialTasks);
@@ -33,8 +67,12 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
     null
   );
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [transitioningTaskId, setTransitioningTaskId] = useState<string | null>(
+    null
+  );
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const now = new Date(nowIso);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const now = useNow(nowIso);
   const views = tasks.map((task) => toTaskView(task, now));
   const selectedTask = views.find((task) => task.id === selectedId) ?? null;
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -77,11 +115,47 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
     setDeletingTaskId(null);
   }
 
+  async function handleStatusChange(taskId: string, status: TaskStatus) {
+    if (transitioningTaskId !== null) {
+      return;
+    }
+
+    setTransitioningTaskId(taskId);
+    setStatusError(null);
+
+    try {
+      const result = await updateTaskStatusViaApi(taskId, status);
+
+      if (result.ok) {
+        setTasks((current) =>
+          current.map((task) => (task.id === taskId ? result.task : task))
+        );
+      } else {
+        setStatusError(result.error);
+      }
+    } catch {
+      setStatusError("Could not update task status.");
+    }
+
+    setTransitioningTaskId(null);
+  }
+
+  const statusHandlers = detailPanelStatusHandlers(
+    selectedId,
+    selectedTask?.status,
+    handleStatusChange
+  );
+
   return (
     <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
       {deleteError ? (
         <p className="text-destructive mb-4 text-sm" role="alert">
           {deleteError}
+        </p>
+      ) : null}
+      {statusError ? (
+        <p className="text-destructive mb-4 text-sm" role="alert">
+          {statusError}
         </p>
       ) : null}
       <div className="grid grid-cols-1 gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:grid-rows-[minmax(0,1fr)]">
@@ -129,6 +203,11 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
             selectedId ? () => setPendingDeleteTaskId(selectedId) : undefined
           }
           deleting={selectedId !== null && deletingTaskId === selectedId}
+          onComplete={statusHandlers.handleComplete}
+          onReopen={statusHandlers.handleReopen}
+          statusTransitioning={
+            selectedId !== null && transitioningTaskId === selectedId
+          }
         />
       </div>
       <EditTaskDialog

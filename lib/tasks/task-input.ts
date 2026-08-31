@@ -28,11 +28,7 @@ export type TaskFormFieldErrors = {
   image?: string;
 };
 
-export const taskStatusSchema = z.enum([
-  "not_started",
-  "in_progress",
-  "completed",
-]);
+export const taskStatusSchema = z.enum(["pending", "completed"]);
 
 export const taskPrioritySchema = z.enum(["low", "moderate", "extreme"]);
 
