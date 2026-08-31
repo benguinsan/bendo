@@ -238,21 +238,33 @@ The routes above are preferred conventions, not an exhaustive API specification.
 
 # 12. Task Status Rules
 
-## Status Values
+## Persisted status values
 
-Tasks use a string-based status field with these allowed values:
+The `tasks.status` column and API accept only:
 
-- `pending` — Task is not yet started (default for new tasks).
-- `completed` — Task has been finished by user.
-- `expired` — Task has passed its scheduled time without completion (auto-set).
+- `pending` — Task is not yet completed (default for new tasks).
+- `completed` — Task has been finished by the user.
 
-## Status Transitions
+Do not store `expired` in Supabase or send it as a persisted status value.
+
+## Derived display status
+
+UI may show a third label, `expired`, derived at read/render time:
+
+- `status = 'pending'` and `scheduled_at < NOW()` → display **expired**
+- `status = 'pending'` and `scheduled_at >= NOW()` → display **pending**
+- `status = 'completed'` → display **completed**
+
+Derive this in application/view code (for example `getTaskDisplayStatus` in `lib/dashboard/task-types.ts`). Do not add an `expired` column or auto-update `tasks.status` when a schedule passes.
+
+## Status transitions (persisted)
 
 - New tasks default to `pending`.
-- Tasks transition from `pending` → `completed` when user marks as complete (checkbox/button).
-- Tasks transition from `pending` → `expired` automatically when `scheduled_at < NOW()` (derived, not stored).
-- Completed tasks remain `completed` regardless of scheduled time.
-- Expired tasks may be reopened by user, transitioning back to `pending`.
+- User marks a task complete: `pending` → `completed` (including tasks currently displayed as expired; stored status is still `pending`).
+- User reopens a completed task: `completed` → `pending`.
+- Completed tasks remain `completed` regardless of `scheduled_at`.
+
+There is no stored `pending` → `expired` transition. Expiration is a display-only outcome of schedule time passing while status stays `pending`.
 
 ## Completion Semantics
 
