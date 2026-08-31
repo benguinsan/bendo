@@ -274,7 +274,16 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 
 ---
 
-# 13. Security, code standards, and final rule
+# 13. Calender Rules
+  
+- Tasks are displayed on Calendar by their `scheduled_date` (day view).
+- Only incomplete (`status = 'pending'`) tasks are shown.
+- Clicking a selected day shows task details for that date.
+- Completed tasks are not displayed on Calendar.
+
+---
+
+# 14. Security, code standards, and final rule
 
 Never expose to browser code:
 - Supabase service role key
@@ -322,7 +331,7 @@ When in doubt:
 
 ---
 
-# 14. Commands and checks
+# 15. Commands and checks
 
 "Run available checks" (sections 2 and 11) means running these from the project root and reporting the results.
 
