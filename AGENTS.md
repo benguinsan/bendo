@@ -208,6 +208,8 @@ Task input requirements:
 - Every activity query must be scoped to the authenticated Clerk user.
 - Activity records include the actor, action, operation result, and timestamp.
 
+---
+
 # 11. API route method rules
 
 Use consistent API methods.
@@ -234,7 +236,33 @@ The routes above are preferred conventions, not an exhaustive API specification.
 
 ---
 
-# 12. Security, code standards, and final rule
+# 12. Task Status Rules
+
+## Status Values
+
+Tasks use a string-based status field with these allowed values:
+
+- `pending` — Task is not yet started (default for new tasks).
+- `completed` — Task has been finished by user.
+- `expired` — Task has passed its scheduled time without completion (auto-set).
+
+## Status Transitions
+
+- New tasks default to `pending`.
+- Tasks transition from `pending` → `completed` when user marks as complete (checkbox/button).
+- Tasks transition from `pending` → `expired` automatically when `scheduled_at < NOW()` (derived, not stored).
+- Completed tasks remain `completed` regardless of scheduled time.
+- Expired tasks may be reopened by user, transitioning back to `pending`.
+
+## Completion Semantics
+
+- Setting status to `completed` must record `completed_at` timestamp.
+- Reopening a completed task (status → `pending`) must clear `completed_at` to `null`.
+- `completed_at` is the source of truth for completion time.
+
+---
+
+# 13. Security, code standards, and final rule
 
 Never expose to browser code:
 - Supabase service role key
@@ -282,7 +310,7 @@ When in doubt:
 
 ---
 
-# 13. Commands and checks
+# 14. Commands and checks
 
 "Run available checks" (sections 2 and 11) means running these from the project root and reporting the results.
 

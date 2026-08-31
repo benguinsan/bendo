@@ -40,7 +40,7 @@ export function DashboardView({
   const views = tasks.map((task) => toTaskView(task, now));
   const openTasks = getOpenTasks(views);
   const completedTasks = getCompletedTasks(views);
-  const percents = getTaskStatusPercents(tasks);
+  const percents = getTaskStatusPercents(tasks, now);
   const completedLabels: Record<string, string> = {};
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
   const pendingDeleteTask =

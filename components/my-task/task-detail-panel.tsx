@@ -1,4 +1,10 @@
-import { ListTodoIcon, SquarePenIcon, Trash2Icon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  ListTodoIcon,
+  RotateCcwIcon,
+  SquarePenIcon,
+  Trash2Icon,
+} from "lucide-react";
 
 import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -24,6 +30,9 @@ type TaskDetailPanelProps = {
   onEdit?: () => void;
   onDelete?: () => void;
   deleting?: boolean;
+  onComplete?: () => void;
+  onReopen?: () => void;
+  statusTransitioning?: boolean;
 };
 
 function DetailLine({ label, value }: { label: string; value: string }) {
@@ -40,6 +49,9 @@ export function TaskDetailPanel({
   onEdit,
   onDelete,
   deleting = false,
+  onComplete,
+  onReopen,
+  statusTransitioning = false,
 }: TaskDetailPanelProps) {
   return (
     <Card className="rounded-card shadow-panel flex min-h-0 flex-col py-5 ring-0 lg:h-full">
@@ -66,8 +78,8 @@ export function TaskDetailPanel({
                 </p>
                 <p className="text-sm">
                   Status:{" "}
-                  <span className={statusTextClass[task.status]}>
-                    {statusLabels[task.status]}
+                  <span className={statusTextClass[task.displayStatus]}>
+                    {statusLabels[task.displayStatus]}
                   </span>
                 </p>
                 {task.categoryName ? (
@@ -114,24 +126,49 @@ export function TaskDetailPanel({
               />
             ) : null}
           </CardContent>
-          <CardContent className="mt-auto flex justify-end gap-2">
-            <Button
-              type="button"
-              size="icon-lg"
-              aria-label="Delete task"
-              disabled={deleting || !onDelete}
-              onClick={onDelete}
-            >
-              <Trash2Icon />
-            </Button>
-            <Button
-              type="button"
-              size="icon-lg"
-              aria-label="Edit task"
-              onClick={onEdit}
-            >
-              <SquarePenIcon />
-            </Button>
+          <CardContent className="mt-auto flex flex-wrap items-center justify-between gap-2">
+            {task.status !== "completed" && onComplete ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={statusTransitioning}
+                onClick={onComplete}
+              >
+                <CheckCircle2Icon />
+                {statusTransitioning ? "Completing…" : "Mark complete"}
+              </Button>
+            ) : null}
+            {task.status === "completed" && onReopen ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={statusTransitioning}
+                onClick={onReopen}
+              >
+                <RotateCcwIcon />
+                {statusTransitioning ? "Reopening…" : "Reopen task"}
+              </Button>
+            ) : null}
+            <div className="ml-auto flex gap-2">
+              <Button
+                type="button"
+                size="icon-lg"
+                aria-label="Delete task"
+                disabled={deleting || !onDelete}
+                onClick={onDelete}
+              >
+                <Trash2Icon />
+              </Button>
+              <Button
+                type="button"
+                size="icon-lg"
+                aria-label="Edit task"
+                onClick={onEdit}
+              >
+                <SquarePenIcon />
+              </Button>
+            </div>
           </CardContent>
         </>
       ) : (

@@ -83,7 +83,7 @@ export function TaskCard({
           <span
             className={cn(
               "size-2.5 shrink-0 rounded-full",
-              statusFillClass[task.status]
+              statusFillClass[task.displayStatus]
             )}
           />
           {task.title}
@@ -161,8 +161,8 @@ export function TaskCard({
         ) : null}
         <p>
           Status:{" "}
-          <span className={statusTextClass[task.status]}>
-            {statusLabels[task.status]}
+          <span className={statusTextClass[task.displayStatus]}>
+            {statusLabels[task.displayStatus]}
           </span>
         </p>
         <p>Created on: {formatNumericDate(new Date(task.createdAt))}</p>

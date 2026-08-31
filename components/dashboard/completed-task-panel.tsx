@@ -41,7 +41,7 @@ export function CompletedTaskPanel({
               <span
                 className={cn(
                   "mt-1.5 size-2.5 shrink-0 rounded-full",
-                  statusFillClass[task.status]
+                  statusFillClass[task.displayStatus]
                 )}
               />
               <div className="flex min-w-0 flex-1 gap-3">
@@ -66,8 +66,8 @@ export function CompletedTaskPanel({
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px]">
               <p className="text-muted-foreground">
                 Status:{" "}
-                <span className={statusTextClass[task.status]}>
-                  {statusLabels[task.status]}
+                <span className={statusTextClass[task.displayStatus]}>
+                  {statusLabels[task.displayStatus]}
                 </span>
               </p>
               <p className="text-muted-foreground">

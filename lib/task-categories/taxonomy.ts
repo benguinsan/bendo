@@ -1,12 +1,12 @@
 import {
   priorityLabels,
   statusLabels,
+  type TaskDisplayStatus,
   type TaskPriority,
-  type TaskStatus,
 } from "@/lib/dashboard/task-types";
 
 export type StatusTaxonomyRow = {
-  id: TaskStatus;
+  id: TaskDisplayStatus;
   label: string;
 };
 
@@ -17,8 +17,8 @@ export type PriorityTaxonomyRow = {
 
 export const statusTaxonomyRows: StatusTaxonomyRow[] = [
   { id: "completed", label: statusLabels.completed },
-  { id: "in_progress", label: statusLabels.in_progress },
-  { id: "not_started", label: statusLabels.not_started },
+  { id: "expired", label: statusLabels.expired },
+  { id: "pending", label: statusLabels.pending },
 ];
 
 export const priorityTaxonomyRows: PriorityTaxonomyRow[] = [

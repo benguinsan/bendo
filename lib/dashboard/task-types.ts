@@ -1,6 +1,11 @@
 import { formatRelativeCompleted } from "@/lib/dashboard/dates";
 
-export type TaskStatus = "not_started" | "in_progress" | "completed";
+/** Persisted in Supabase and sent over the API. */
+export type TaskStatus = "pending" | "completed";
+
+/** Shown in the UI; `expired` is derived from schedule time, not stored. */
+export type TaskDisplayStatus = TaskStatus | "expired";
+
 export type TaskPriority = "low" | "moderate" | "extreme";
 
 export type DashboardProfile = {
@@ -35,22 +40,37 @@ export type DashboardTask = {
 
 export type DashboardTaskView = DashboardTask & {
   isOverdue: boolean;
+  displayStatus: TaskDisplayStatus;
 };
 
 export type StatusPercents = {
   completed: number;
-  inProgress: number;
-  notStarted: number;
+  pending: number;
+  expired: number;
 };
 
 export function isTaskOverdue(task: DashboardTask, now: Date): boolean {
   return task.status !== "completed" && new Date(task.scheduledAt) < now;
 }
 
+export function getTaskDisplayStatus(
+  task: Pick<DashboardTask, "status" | "scheduledAt">,
+  now: Date
+): TaskDisplayStatus {
+  if (task.status === "completed") {
+    return "completed";
+  }
+
+  return new Date(task.scheduledAt) < now ? "expired" : "pending";
+}
+
 export function toTaskView(task: DashboardTask, now: Date): DashboardTaskView {
+  const isOverdue = isTaskOverdue(task, now);
+
   return {
     ...task,
-    isOverdue: isTaskOverdue(task, now),
+    isOverdue,
+    displayStatus: getTaskDisplayStatus(task, now),
   };
 }
 
@@ -64,20 +84,36 @@ export function getCompletedTasks(
   return tasks.filter((task) => task.status === "completed");
 }
 
-export function getTaskStatusPercents(tasks: DashboardTask[]): StatusPercents {
+export function getTaskStatusPercents(
+  tasks: DashboardTask[],
+  now: Date
+): StatusPercents {
   const total = tasks.length;
 
   if (total === 0) {
-    return { completed: 0, inProgress: 0, notStarted: 0 };
+    return { completed: 0, pending: 0, expired: 0 };
   }
 
-  const count = (status: TaskStatus) =>
-    tasks.filter((task) => task.status === status).length;
+  let completed = 0;
+  let pending = 0;
+  let expired = 0;
+
+  for (const task of tasks) {
+    const displayStatus = getTaskDisplayStatus(task, now);
+
+    if (displayStatus === "completed") {
+      completed += 1;
+    } else if (displayStatus === "expired") {
+      expired += 1;
+    } else {
+      pending += 1;
+    }
+  }
 
   return {
-    completed: Math.round((100 * count("completed")) / total),
-    inProgress: Math.round((100 * count("in_progress")) / total),
-    notStarted: Math.round((100 * count("not_started")) / total),
+    completed: Math.round((100 * completed) / total),
+    pending: Math.round((100 * pending) / total),
+    expired: Math.round((100 * expired) / total),
   };
 }
 
@@ -92,9 +128,9 @@ export function getCompletedLabel(
   return formatRelativeCompleted(task.completedAt, now);
 }
 
-export const statusLabels: Record<TaskStatus, string> = {
-  not_started: "Not Started",
-  in_progress: "In Progress",
+export const statusLabels: Record<TaskDisplayStatus, string> = {
+  pending: "Pending",
+  expired: "Expired",
   completed: "Completed",
 };
 
@@ -110,15 +146,15 @@ export const priorityTextClass: Record<TaskPriority, string> = {
   extreme: "text-priority-extreme",
 };
 
-export const statusTextClass: Record<TaskStatus, string> = {
-  not_started: "text-status-not-started",
-  in_progress: "text-status-in-progress",
+export const statusTextClass: Record<TaskDisplayStatus, string> = {
+  pending: "text-status-pending",
+  expired: "text-status-expired",
   completed: "text-status-completed",
 };
 
-export const statusFillClass: Record<TaskStatus, string> = {
-  not_started: "bg-status-not-started",
-  in_progress: "bg-status-in-progress",
+export const statusFillClass: Record<TaskDisplayStatus, string> = {
+  pending: "bg-status-pending",
+  expired: "bg-status-expired",
   completed: "bg-status-completed",
 };
 
