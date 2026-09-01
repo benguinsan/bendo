@@ -68,49 +68,48 @@ function DayCell({
   const dayNumber = day.date.getDate();
   const visibleTasks = tasks.slice(0, CALENDAR_MAX_VISIBLE_PILLS);
   const hiddenCount = tasks.length - visibleTasks.length;
+  const dayAriaLabel = formatDayAriaLabel(day, tasks.length);
 
   return (
-    <td
-      aria-label={formatDayAriaLabel(day, tasks.length)}
-      aria-selected={selected}
-      className="align-top"
-    >
+    <td className="align-top">
       <div className="flex min-h-[100px] flex-col gap-1 p-1 sm:min-h-[120px] sm:p-1.5">
         <button
           type="button"
-          className="focus-visible:ring-ring/50 flex w-full justify-end rounded-md outline-none focus-visible:ring-2"
+          aria-label={dayAriaLabel}
+          aria-pressed={selected}
+          className="focus-visible:ring-ring/50 flex min-h-0 flex-1 flex-col rounded-md outline-none focus-visible:ring-2"
           onClick={() => onSelectDate(day.dateKey)}
         >
-          <span
-            className={cn(
-              "inline-flex size-8 items-center justify-center text-sm tabular-nums",
-              isToday
-                ? "bg-foreground text-background rounded-full font-semibold"
-                : [
-                    selected && "ring-foreground/20 rounded-full ring-2",
-                    day.inCurrentMonth
-                      ? "text-foreground"
-                      : "text-muted-foreground/50",
-                  ]
-            )}
-          >
-            {dayNumber}
+          <span className="flex w-full justify-end">
+            <span
+              className={cn(
+                "inline-flex size-8 items-center justify-center text-sm tabular-nums",
+                isToday
+                  ? "bg-foreground text-background rounded-full font-semibold"
+                  : [
+                      selected && "ring-foreground/20 rounded-full ring-2",
+                      day.inCurrentMonth
+                        ? "text-foreground"
+                        : "text-muted-foreground/50",
+                    ]
+              )}
+            >
+              {dayNumber}
+            </span>
           </span>
         </button>
         {day.inCurrentMonth ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-1">
+          <div className="flex flex-col gap-1">
             {visibleTasks.map((task) => (
               <button
                 key={task.id}
                 type="button"
+                aria-label={task.title}
                 className={cn(
                   "focus-visible:ring-ring/50 w-full truncate rounded-md px-1.5 py-0.5 text-left text-[11px] outline-none focus-visible:ring-2 sm:text-xs",
                   calendarPriorityPillClass[task.priority]
                 )}
-                onClick={() => {
-                  onSelectDate(day.dateKey);
-                  onSelectTask?.(task.id, day.dateKey);
-                }}
+                onClick={() => onSelectTask?.(task.id, day.dateKey)}
               >
                 {task.title}
               </button>
@@ -125,14 +124,7 @@ function DayCell({
               </button>
             ) : null}
           </div>
-        ) : (
-          <button
-            type="button"
-            className="focus-visible:ring-ring/50 min-h-0 flex-1 rounded-md outline-none focus-visible:ring-2"
-            aria-label={formatDayAriaLabel(day, 0)}
-            onClick={() => onSelectDate(day.dateKey)}
-          />
-        )}
+        ) : null}
       </div>
     </td>
   );

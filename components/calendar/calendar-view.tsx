@@ -38,13 +38,9 @@ type CalendarViewProps = {
 function defaultSelectedDateKey(now: Date, visibleMonth: Date): string {
   const todayKey = toLocalDateKey(now);
   const monthStart = startOfMonth(visibleMonth);
-  const monthEnd = new Date(
-    visibleMonth.getFullYear(),
-    visibleMonth.getMonth() + 1,
-    0
-  );
+  const nextMonthStart = addMonths(monthStart, 1);
 
-  if (now >= monthStart && now <= monthEnd) {
+  if (now >= monthStart && now < nextMonthStart) {
     return todayKey;
   }
 

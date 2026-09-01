@@ -48,7 +48,7 @@ Do **not** add new API routes, schema changes, or Agent/Settings features.
    - `extreme` → light pink (`bg-pink-100 text-pink-950`)
 10. **Overflow.** Show at most **3** task pills per cell. If more exist, render a small blue **“view more”** text button that selects that day (same as clicking the cell).
 11. **Pill interaction.** Clicking a pill selects its day and highlights the corresponding task in the detail list (scroll into view optional; selection state required).
-12. **Day detail panel.** Below the calendar card, show a second card titled with the selected date (e.g. `Monday, 15 March 2026`) listing that day’s open tasks using existing `TaskCard` (with edit/delete). Empty state uses shadcn `Empty`.
+12. **Day detail panel.** Below the calendar card, show a second card titled with the selected date (e.g. `Sunday, 15 March 2026`) listing that day’s open tasks using existing `TaskCard` (with edit/delete). Empty state uses shadcn `Empty`.
 13. **Mutations.** Reuse `EditTaskDialog` + `ConfirmDeleteTaskDialog` + task API client patterns from `MyTaskView`. Updating/deleting a task updates local state; completing a task removes it from the calendar.
 14. **Week starts Sunday.** Column headers: Sun, Mon, Tue, Wed, Thu, Fri, Sat (matches PNG).
 15. **No shadcn Calendar primitive.** Build a custom month grid; do not install `date-fns` or `@/components/ui/calendar`.
@@ -73,7 +73,7 @@ Reference: `prompts-img/Calendar-1275.png` (March 2021 month view).
 │ │ └──┴──┴──┴──┴──┴──┴──┘                                 │ │
 │ └─────────────────────────────────────────────────────────┘ │
 │ ┌─────────────────────────────────────────────────────────┐ │
-│ │ Monday, 15 March 2026                                   │ │
+│ │ Sunday, 15 March 2026                                   │ │
 │ │ [TaskCard] [TaskCard] …                                 │ │
 │ └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -125,7 +125,7 @@ Do **not** change Supabase schema, API routes, shell, or unrelated pages.
 ### `lib/calendar/calendar-dates.ts`
 
 - `formatCalendarMonthYear(date: Date): string` — e.g. `March 2021` (`en-GB`, long month).
-- `formatCalendarDayHeading(date: Date): string` — e.g. `Monday, 15 March 2026`.
+- `formatCalendarDayHeading(date: Date): string` — e.g. `Sunday, 15 March 2026`.
 - `getCalendarWeekdayLabels(): readonly string[]` — `["Sun", …, "Sat"]`.
 - `buildMonthGrid(year: number, month: number): CalendarDay[]` where each entry has `{ date: Date, dateKey: string, inCurrentMonth: boolean }`.
 - Grid always covers full weeks: include leading/trailing days so row count is 5 or 6.
