@@ -275,7 +275,7 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 ---
 
 # 13. Calender Rules
-  
+
 - Tasks are displayed on Calendar by their `scheduled_date` (day view).
 - Only incomplete (`status = 'pending'`) tasks are shown.
 - Clicking a selected day shows task details for that date.
