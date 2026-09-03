@@ -5,14 +5,23 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Root popover container component.
+ */
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
+/**
+ * Popover trigger element that toggles the popover open state.
+ */
 function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
+/**
+ * Popover content panel with positioning and animation styles.
+ */
 function PopoverContent({
   className,
   align = "center",
@@ -47,6 +56,9 @@ function PopoverContent({
   );
 }
 
+/**
+ * Popover header section with consistent styling.
+ */
 function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -57,6 +69,9 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/**
+ * Popover title element for accessibility.
+ */
 function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
   return (
     <PopoverPrimitive.Title
@@ -67,6 +82,9 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
   );
 }
 
+/**
+ * Popover description element for additional context.
+ */
 function PopoverDescription({
   className,
   ...props

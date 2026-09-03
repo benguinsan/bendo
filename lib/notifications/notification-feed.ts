@@ -9,6 +9,9 @@ export type NotificationTaskGroup = {
   tasks: DashboardTask[];
 };
 
+/**
+ * Filters tasks to exclude completed ones and sorts by creation date descending.
+ */
 export function getNotificationTasks(tasks: DashboardTask[]): DashboardTask[] {
   return tasks
     .filter((task) => task.status !== "completed")
@@ -18,6 +21,9 @@ export function getNotificationTasks(tasks: DashboardTask[]): DashboardTask[] {
     );
 }
 
+/**
+ * Formats a timestamp as compact relative time (e.g., "now", "5m", "2h", "3d").
+ */
 export function formatCompactRelativeTime(iso: string, now: Date): string {
   const then = new Date(iso);
   const diffMs = Math.max(0, now.getTime() - then.getTime());
@@ -41,6 +47,9 @@ export function formatCompactRelativeTime(iso: string, now: Date): string {
   return `${days}d`;
 }
 
+/**
+ * Formats a date key as a group label (e.g., "Today", "Yesterday", "1 Mar").
+ */
 export function formatNotificationGroupLabel(
   dateKey: string,
   todayKey: string
@@ -63,6 +72,9 @@ export function formatNotificationGroupLabel(
   }).format(date);
 }
 
+/**
+ * Groups incomplete tasks by scheduled date, sorted newest to oldest, with formatted labels.
+ */
 export function groupNotificationTasks(
   tasks: DashboardTask[],
   now: Date

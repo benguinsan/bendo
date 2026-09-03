@@ -32,6 +32,10 @@ import {
 import { listTasksViaApi } from "@/lib/tasks/task-api-client";
 import { cn } from "@/lib/utils";
 
+/**
+ * Notifications popover component that displays incomplete tasks grouped by scheduled date.
+ * Loads tasks when opened and allows dismissing individual notifications.
+ */
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false);
   const [tasks, setTasks] = useState<DashboardTask[]>([]);
@@ -50,6 +54,9 @@ export function NotificationsPopover() {
 
     let cancelled = false;
 
+    /**
+     * Fetches tasks from the API and updates component state.
+     */
     async function loadTasks() {
       setLoading(true);
       setError(null);
@@ -82,6 +89,9 @@ export function NotificationsPopover() {
   const groups = groupNotificationTasks(visibleTasks, now);
   const headerGroupLabel = groups[0]?.label ?? null;
 
+  /**
+   * Handles popover open/close state changes. Updates the current timestamp when opening.
+   */
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
       setNowIso(new Date().toISOString());
@@ -90,6 +100,10 @@ export function NotificationsPopover() {
     setOpen(nextOpen);
   }
 
+  /**
+   * Dismisses a notification by adding its task ID to the dismissed set.
+   * Prevents event propagation to avoid navigation.
+   */
   function handleDismiss(event: MouseEvent<HTMLButtonElement>, taskId: string) {
     event.preventDefault();
     event.stopPropagation();

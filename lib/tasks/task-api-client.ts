@@ -66,6 +66,9 @@ function mapApiErrorToFields(body: ApiErrorBody): TaskFormFieldErrors {
   }
 }
 
+/**
+ * Fetches all tasks for the current user from the API.
+ */
 export async function listTasksViaApi(): Promise<
   | { ok: true; tasks: ReturnType<typeof persistedTaskToDashboard>[] }
   | { ok: false; error: string }

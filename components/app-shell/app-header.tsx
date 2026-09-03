@@ -13,6 +13,9 @@ type AppHeaderProps = {
   onMenuClick: () => void;
 };
 
+/**
+ * Main application header with menu button, logo, search, notifications, calendar, and date display.
+ */
 export function AppHeader({
   weekday,
   numericDate,
