@@ -65,6 +65,7 @@ Reference: `prompts-img/Notifications.png`.
 ### Layout
 
 ```
+text
 Header bell button
         ▼
 ┌──────────────────────────────────────────┐
