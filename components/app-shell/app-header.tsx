@@ -1,9 +1,10 @@
 "use client";
 
-import { BellIcon, CalendarDaysIcon, MenuIcon } from "lucide-react";
+import { CalendarDaysIcon, MenuIcon } from "lucide-react";
 import Link from "next/link";
 
 import { HeaderSearch } from "@/components/app-shell/header-search";
+import { NotificationsPopover } from "@/components/app-shell/notifications-popover";
 import { Button } from "@/components/ui/button";
 
 type AppHeaderProps = {
@@ -40,9 +41,7 @@ export function AppHeader({
         <HeaderSearch />
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <Button type="button" size="icon-lg" aria-label="Notifications">
-          <BellIcon />
-        </Button>
+        <NotificationsPopover />
         <Button
           nativeButton={false}
           render={<Link href="/calendar" />}

@@ -25,6 +25,10 @@ type ApiSuccessBody = {
   data: PersistedTask;
 };
 
+type ApiListSuccessBody = {
+  data: PersistedTask[];
+};
+
 export type CreateTaskClientInput = {
   title: string;
   description: string;
@@ -59,6 +63,35 @@ function mapApiErrorToFields(body: ApiErrorBody): TaskFormFieldErrors {
     default: {
       return { title: body.error };
     }
+  }
+}
+
+export async function listTasksViaApi(): Promise<
+  | { ok: true; tasks: ReturnType<typeof persistedTaskToDashboard>[] }
+  | { ok: false; error: string }
+> {
+  try {
+    const response = await fetch("/api/tasks");
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not load tasks." };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return { ok: false, error: body.error ?? "Could not load tasks." };
+    }
+
+    const body = payload as ApiListSuccessBody;
+    return {
+      ok: true,
+      tasks: body.data.map((task) => persistedTaskToDashboard(task)),
+    };
+  } catch {
+    return { ok: false, error: "Could not load tasks." };
   }
 }
 
