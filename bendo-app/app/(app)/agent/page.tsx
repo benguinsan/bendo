@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 
-import { StubPage } from "@/components/app-shell/stub-page";
+import { AgentView } from "@/components/agent/agent-view";
 import { requireUser } from "@/lib/auth/require-user";
+import { toDashboardProfile } from "@/lib/auth/to-dashboard-profile";
 
 export const metadata: Metadata = {
   title: "Agent · bendo",
 };
 
 export default async function AgentPage() {
-  await requireUser();
-  return <StubPage title="Agent" />;
+  const user = await requireUser();
+
+  return <AgentView profile={toDashboardProfile(user)} />;
 }
