@@ -3,7 +3,7 @@ import {
   DORO_AVATAR_SRC,
   DORO_DISPLAY_NAME,
   formatChatTime,
-} from "@/lib/agent/mock-messages";
+} from "@/lib/agent/chat";
 import type { ChatMessage } from "@/lib/agent/types";
 import type { DashboardProfile } from "@/lib/dashboard/task-types";
 import { cn } from "@/lib/utils";

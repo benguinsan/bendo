@@ -25,6 +25,10 @@ export type SendChatTurnInput = {
   sessionId?: string;
   /** Clerk session JWT forwarded to Doro tools (server-only). */
   clerkToken: string;
+  /** Client-generated id; same value on retry dedupes an aborted POST. */
+  clientRequestId?: string;
+  /** Aborts the bridge fetch when the HTTP client disconnects. */
+  signal?: AbortSignal;
 };
 
 export type SendChatTurnResult = {

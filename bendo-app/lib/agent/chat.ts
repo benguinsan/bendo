@@ -4,30 +4,18 @@ export const DORO_AVATAR_SRC = "/agent/doro.jpeg";
 export const DORO_DISPLAY_NAME = "Doro";
 export const DORO_SUBTITLE = "Task assistant";
 
-export function getMockAgentMessages(): ChatMessage[] {
-  return [
-    {
-      id: "msg-1",
-      role: "agent",
-      kind: "text",
-      createdAt: "2024-08-21T22:15:00+07:00",
-      body: "Mình có thể giúp sắp xếp việc trong ngày, nhắc hạn, hoặc cập nhật trạng thái task. Cứ nhắn khi cần — mình sẽ kiểm tra và hỗ trợ từng bước cho rõ ràng.",
-    },
-    {
-      id: "msg-2",
-      role: "user",
-      kind: "text",
-      createdAt: "2024-08-21T12:15:00+07:00",
-      body: "Ok, giúp mình xem task nào sắp đến hạn nhé.",
-    },
-    {
-      id: "msg-3",
-      role: "agent",
-      kind: "text",
-      createdAt: "2024-08-22T18:00:00+07:00",
-      body: "Nếu cần chỉnh ưu tiên hoặc lịch, cứ nói mình biết nhé.",
-    },
-  ];
+const DORO_WELCOME_BODY =
+  "Xin chào mình là Doro, trợ lý viên hỗ trợ cho ứng dụng Bendo";
+
+/** Local welcome bubble until chat history is persisted. */
+export function createDoroWelcomeMessage(now = new Date()): ChatMessage {
+  return {
+    id: "msg-doro-welcome",
+    role: "agent",
+    kind: "text",
+    createdAt: now.toISOString(),
+    body: DORO_WELCOME_BODY,
+  };
 }
 
 /** Fixed zone so SSR (often UTC) and the browser format the same labels. */
@@ -88,6 +76,7 @@ export function groupMessagesByDate(messages: ChatMessage[]): ChatDateGroup[] {
   return groups;
 }
 
+/** Local optimistic user bubble before Harness reply arrives. */
 export function createUserTextMessage(
   body: string,
   now = new Date()

@@ -23,6 +23,7 @@ const chatTurnBodySchema = z.object({
       `Message must be at most ${AGENT_CHAT_MESSAGE_MAX} characters.`
     ),
   sessionId: z.string().trim().min(1).max(200).optional(),
+  clientRequestId: z.string().uuid().optional(),
 });
 
 export async function POST(request: Request) {
@@ -51,6 +52,8 @@ export async function POST(request: Request) {
     message: parsed.data.message,
     sessionId: parsed.data.sessionId,
     clerkToken,
+    clientRequestId: parsed.data.clientRequestId,
+    signal: request.signal,
   });
 
   return fromServiceResult(result);
