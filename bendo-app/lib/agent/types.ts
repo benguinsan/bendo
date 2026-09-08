@@ -7,7 +7,7 @@ export type ChatMessage = {
   role: ChatRole;
   kind: ChatMessageKind;
   createdAt: string;
-  body?: string;
+  body: string;
 };
 
 export type ChatDateGroup = {
