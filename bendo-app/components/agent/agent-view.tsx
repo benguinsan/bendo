@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChatComposer } from "@/components/agent/chat-composer";
 import { ChatHeader } from "@/components/agent/chat-header";
@@ -24,6 +24,9 @@ export function AgentView({ profile }: AgentViewProps) {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const turnAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => turnAbortRef.current?.abort(), []);
 
   async function handleSend(body: string) {
     if (pending) {
@@ -35,10 +38,20 @@ export function AgentView({ profile }: AgentViewProps) {
     setPending(true);
     setError(null);
 
+    turnAbortRef.current?.abort();
+    const controller = new AbortController();
+    turnAbortRef.current = controller;
+
     const result = await sendChatTurnViaApi({
       message: body,
       sessionId,
+      signal: controller.signal,
     });
+
+    if (controller.signal.aborted) {
+      setPending(false);
+      return;
+    }
 
     if (!result.ok) {
       setError(result.error);

@@ -16,6 +16,84 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function bridgeErrorMessage(payload: unknown, fallback: string): string {
+  return isRecord(payload) && typeof payload.error === "string"
+    ? payload.error
+    : fallback;
+}
+
+function parseBridgeBody(
+  text: string
+):
+  | { ok: true; payload: unknown }
+  | { ok: false; result: ServiceResult<never> } {
+  if (!text) {
+    return { ok: true, payload: null };
+  }
+  try {
+    return { ok: true, payload: JSON.parse(text) as unknown };
+  } catch {
+    return {
+      ok: false,
+      result: fail("AGENT_UNAVAILABLE", "Agent bridge returned non-JSON."),
+    };
+  }
+}
+
+function mapBridgeSuccess(payload: unknown): ServiceResult<SendChatTurnResult> {
+  if (!isRecord(payload)) {
+    return fail("AGENT_UNAVAILABLE", "Agent bridge returned an empty body.");
+  }
+
+  const body = payload as BridgeSuccess;
+  if (typeof body.sessionId !== "string" || body.sessionId.trim() === "") {
+    return fail(
+      "AGENT_UNAVAILABLE",
+      "Agent bridge response missing sessionId."
+    );
+  }
+  if (typeof body.replyText !== "string") {
+    return fail(
+      "AGENT_UNAVAILABLE",
+      "Agent bridge response missing replyText."
+    );
+  }
+
+  return ok({
+    sessionId: body.sessionId,
+    reply: {
+      id: `msg-agent-${randomUUID()}`,
+      role: "agent",
+      kind: "text",
+      createdAt: new Date().toISOString(),
+      body: body.replyText,
+    },
+  });
+}
+
+function linkParentAbort(
+  parent: AbortSignal | undefined,
+  controller: AbortController
+): (() => void) | undefined {
+  if (!parent) {
+    return undefined;
+  }
+
+  const onParentAbort = () => {
+    controller.abort();
+  };
+
+  if (parent.aborted) {
+    controller.abort();
+    return undefined;
+  }
+
+  parent.addEventListener("abort", onParentAbort, { once: true });
+  return () => {
+    parent.removeEventListener("abort", onParentAbort);
+  };
+}
+
 /**
  * Server-only adapter: POST to the dsh Doro chat-bridge.
  * Returns null when bridge URL/secret are not configured.
@@ -37,6 +115,7 @@ export function createDshChatAdapter(): AgentRuntime | null {
       const timer = setTimeout(() => {
         controller.abort();
       }, timeoutMs);
+      const unlinkParent = linkParentAbort(input.signal, controller);
 
       try {
         const response = await fetch(url, {
@@ -49,84 +128,51 @@ export function createDshChatAdapter(): AgentRuntime | null {
             message: input.message,
             sessionId: input.sessionId,
             clerkToken: input.clerkToken,
+            clientRequestId: input.clientRequestId,
           }),
           signal: controller.signal,
         });
 
-        let payload: unknown = null;
-        const text = await response.text();
-        if (text) {
-          try {
-            payload = JSON.parse(text) as unknown;
-          } catch {
-            return fail(
-              "AGENT_UNAVAILABLE",
-              `Agent bridge returned non-JSON (${response.status}).`
-            );
-          }
+        const parsed = parseBridgeBody(await response.text());
+        if (!parsed.ok) {
+          return fail(
+            "AGENT_UNAVAILABLE",
+            `Agent bridge returned non-JSON (${response.status}).`
+          );
         }
+        const { payload } = parsed;
 
         if (response.status === 504) {
-          const message =
-            isRecord(payload) && typeof payload.error === "string"
-              ? payload.error
-              : "Agent turn timed out.";
-          return fail("AGENT_TIMEOUT", message);
+          return fail(
+            "AGENT_TIMEOUT",
+            bridgeErrorMessage(payload, "Agent turn timed out.")
+          );
         }
 
         if (!response.ok) {
-          const message =
-            isRecord(payload) && typeof payload.error === "string"
-              ? payload.error
-              : `Agent bridge failed (${response.status}).`;
+          const message = bridgeErrorMessage(
+            payload,
+            `Agent bridge failed (${response.status}).`
+          );
           if (response.status === 400) {
             return fail("VALIDATION", message);
           }
           return fail("AGENT_UNAVAILABLE", message);
         }
 
-        if (!isRecord(payload)) {
-          return fail(
-            "AGENT_UNAVAILABLE",
-            "Agent bridge returned an empty body."
-          );
-        }
-
-        const body = payload as BridgeSuccess;
-        if (
-          typeof body.sessionId !== "string" ||
-          body.sessionId.trim() === ""
-        ) {
-          return fail(
-            "AGENT_UNAVAILABLE",
-            "Agent bridge response missing sessionId."
-          );
-        }
-        if (typeof body.replyText !== "string") {
-          return fail(
-            "AGENT_UNAVAILABLE",
-            "Agent bridge response missing replyText."
-          );
-        }
-
-        return ok({
-          sessionId: body.sessionId,
-          reply: {
-            id: `msg-agent-${randomUUID()}`,
-            role: "agent",
-            kind: "text",
-            createdAt: new Date().toISOString(),
-            body: body.replyText,
-          },
-        });
+        return mapBridgeSuccess(payload);
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") {
+          if (input.signal?.aborted) {
+            return fail("AGENT_UNAVAILABLE", "Agent request was cancelled.");
+          }
           return fail("AGENT_TIMEOUT", "Agent turn timed out.");
         }
         const detail = error instanceof Error ? error.message : String(error);
         return fail("AGENT_UNAVAILABLE", `Agent bridge unreachable: ${detail}`);
       } finally {
         clearTimeout(timer);
+        unlinkParent?.();
       }
     },
   };
