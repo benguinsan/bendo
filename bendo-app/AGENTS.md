@@ -300,6 +300,9 @@ Canonical list lives in `.env.example`. Only `NEXT_PUBLIC_*` values may reach br
 | `NEXT_PUBLIC_SUPABASE_URL`                                                    | Supabase project URL                                                                           | client + server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                               | Supabase anon key                                                                              | client + server |
 | `SUPABASE_SERVICE_ROLE_KEY`                                                   | Service-role DB access for writes and pipeline reads                                           | server only     |
+| `DSH_CHAT_BRIDGE_URL`                                                         | dsh Doro chat-bridge URL                       | server only     |
+| `DSH_CHAT_BRIDGE_SECRET`                                                      | Shared secret for `x-bendo-chat-secret` (must match cordis bridge `secret`)                    | server only     |
+| `DSH_CHAT_TIMEOUT_MS`                                                         | Max wait for one agent turn in ms (default `120000`)                                           | server only     |
 
 Keep this table and `.env.example` in sync when variables change.
 

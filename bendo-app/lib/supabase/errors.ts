@@ -10,6 +10,8 @@ export type ServiceErrorCode =
   | "TASK_NOT_FOUND"
   | "CATEGORY_NOT_FOUND"
   | "NOTIFICATION_NOT_FOUND"
+  | "AGENT_UNAVAILABLE"
+  | "AGENT_TIMEOUT"
   | "INTERNAL";
 
 export type ServiceResult<T> =
