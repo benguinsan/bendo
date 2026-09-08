@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { ChatMessageBubble } from "@/components/agent/chat-message-bubble";
 import { Separator } from "@/components/ui/separator";
-import { groupMessagesByDate } from "@/lib/agent/mock-messages";
+import { groupMessagesByDate } from "@/lib/agent/chat";
 import type { ChatMessage } from "@/lib/agent/types";
 import type { DashboardProfile } from "@/lib/dashboard/task-types";
 

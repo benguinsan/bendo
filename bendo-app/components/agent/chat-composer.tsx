@@ -8,12 +8,17 @@ import { Input } from "@/components/ui/input";
 
 type ChatComposerProps = {
   onSend: (body: string) => void;
+  disabled?: boolean;
 };
 
-export function ChatComposer({ onSend }: ChatComposerProps) {
+export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
   const [draft, setDraft] = useState("");
+  const canSend = !disabled && draft.trim().length > 0;
 
   function submit() {
+    if (disabled) {
+      return;
+    }
     const body = draft.trim();
     if (!body) {
       return;
@@ -46,6 +51,7 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
           onKeyDown={handleKeyDown}
           placeholder="Write a message..."
           aria-label="Write a message"
+          disabled={disabled}
           className="h-10 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 md:text-sm"
         />
         <Button
@@ -54,6 +60,7 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
           size="icon"
           className="text-muted-foreground size-9 shrink-0"
           aria-label="Attach file"
+          disabled={disabled}
         >
           <PaperclipIcon />
         </Button>
@@ -63,6 +70,7 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
           size="icon"
           className="text-muted-foreground size-9 shrink-0"
           aria-label="Insert emoji"
+          disabled={disabled}
         >
           <SmileIcon />
         </Button>
@@ -72,7 +80,7 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
         size="icon"
         className="bg-priority-moderate text-primary-foreground hover:bg-priority-moderate/90 hover:text-primary-foreground size-11 shrink-0 rounded-xl"
         aria-label="Send message"
-        disabled={draft.trim().length === 0}
+        disabled={!canSend}
       >
         <SendHorizontalIcon />
       </Button>

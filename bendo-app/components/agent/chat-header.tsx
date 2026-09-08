@@ -6,7 +6,7 @@ import {
   DORO_AVATAR_SRC,
   DORO_DISPLAY_NAME,
   DORO_SUBTITLE,
-} from "@/lib/agent/mock-messages";
+} from "@/lib/agent/chat";
 
 export function ChatHeader() {
   return (
