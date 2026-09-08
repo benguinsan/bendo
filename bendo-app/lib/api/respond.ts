@@ -10,6 +10,8 @@ const statusByCode: Record<ServiceErrorCode, number> = {
   TASK_NOT_FOUND: 404,
   CATEGORY_NOT_FOUND: 404,
   NOTIFICATION_NOT_FOUND: 404,
+  AGENT_UNAVAILABLE: 503,
+  AGENT_TIMEOUT: 504,
   INTERNAL: 500,
 };
 

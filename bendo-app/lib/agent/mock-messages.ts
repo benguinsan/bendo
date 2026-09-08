@@ -23,14 +23,6 @@ export function getMockAgentMessages(): ChatMessage[] {
     {
       id: "msg-3",
       role: "agent",
-      kind: "audio",
-      createdAt: "2024-08-21T18:00:00+07:00",
-      durationLabel: "0:56",
-      progress: 0.4,
-    },
-    {
-      id: "msg-4",
-      role: "agent",
       kind: "text",
       createdAt: "2024-08-22T18:00:00+07:00",
       body: "Nếu cần chỉnh ưu tiên hoặc lịch, cứ nói mình biết nhé.",

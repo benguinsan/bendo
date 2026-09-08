@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-import { ChatAudioBubble } from "@/components/agent/chat-audio-bubble";
 import { ChatMessageBubble } from "@/components/agent/chat-message-bubble";
 import { Separator } from "@/components/ui/separator";
 import { groupMessagesByDate } from "@/lib/agent/mock-messages";
@@ -42,17 +41,13 @@ export function ChatMessageList({ messages, profile }: ChatMessageListProps) {
             <Separator className="flex-1" />
           </div>
           <div className="flex flex-col gap-5">
-            {group.messages.map((message) =>
-              message.kind === "audio" ? (
-                <ChatAudioBubble key={message.id} message={message} />
-              ) : (
-                <ChatMessageBubble
-                  key={message.id}
-                  message={message}
-                  profile={profile}
-                />
-              )
-            )}
+            {group.messages.map((message) => (
+              <ChatMessageBubble
+                key={message.id}
+                message={message}
+                profile={profile}
+              />
+            ))}
           </div>
         </section>
       ))}
