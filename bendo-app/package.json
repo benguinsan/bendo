@@ -17,15 +17,7 @@
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "docker:build": "docker build -t bendo .",
-    "docker:run": "docker run --rm -p 3000:3000 bendo",
-    "tf:init:dev": "terraform -chdir=terraform/environment/dev init",
-    "tf:plan:dev": "terraform -chdir=terraform/environment/dev plan",
-    "tf:apply:dev": "terraform -chdir=terraform/environment/dev apply",
-    "tf:destroy:dev": "terraform -chdir=terraform/environment/dev destroy",
-    "tf:init:prod": "terraform -chdir=terraform/environment/prod init",
-    "tf:plan:prod": "terraform -chdir=terraform/environment/prod plan",
-    "tf:apply:prod": "terraform -chdir=terraform/environment/prod apply",
-    "tf:destroy:prod": "terraform -chdir=terraform/environment/prod destroy"
+    "docker:run": "docker run --rm -p 3000:3000 bendo"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
