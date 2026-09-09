@@ -1,0 +1,91 @@
+# Doro overlay — tracked in the Bendo repo at `agent/doro/`.
+# Clone DeepSeek Harness separately, then from the harness root:
+#   pnpm dsh web --patch '/absolute/path/to/bendo/agent/doro/cordis.yml'
+# Or copy this folder into the harness checkout and:
+#   pnpm dsh web --patch './agent/doro/cordis.yml'
+#
+# Bendo API (tools.ts → bendo-app/app/api):
+#   export BENDO_API_BASE_URL=http://localhost:3000   # optional
+#   export BENDO_API_TOKEN=<Clerk session JWT>        # optional fallback; chat bridge prefers per-request clerkToken
+#
+# Chat bridge (Phase 1):
+#   POST http://127.0.0.1:3080/bendo-chat
+#   Header: x-bendo-chat-secret: <secret>
+#   Body: { "message": "...", "sessionId?: "...", "clerkToken?: "..." }
+#   Env override for secret: DSH_CHAT_BRIDGE_SECRET (or DSH_BENDO_CHAT_SECRET)
+#
+# Match bendo-app `.env.local`:
+#   DSH_CHAT_BRIDGE_URL=http://127.0.0.1:3080/bendo-chat
+#   DSH_CHAT_BRIDGE_SECRET=<same as bridge secret below>
+#
+# Web research (web_search / web_fetch) — NOT agent-default-model below.
+# Pin provider/model in the `web` + `web-search-*` rows. Swap later without
+# touching chat model:
+#   deepseek-official → export DEEPSEEK_API_KEY=...  (Messages search API)
+#   exa               → export EXA_API_KEY=...       + insert dsh-web-search-exa
+#   perplexity        → export PERPLEXITY_API_KEY=... + insert dsh-web-search-perplexity
+# Optional MCP (default off). Uncomment and point at a real server:
+# - insert another row with name: '@deepseek-ai/dsh-mcp-client'
+
+- id: agent-default-model
+  config:
+    provider: vilao
+    model: 7n/openrouter/free
+
+# web_search backend (independent from agent-default-model).
+# Placeholder: DeepSeek official defaults — change searchProvider / model here.
+- id: web
+  config:
+    # Allowed ids once the matching provider plugin is loaded:
+    #   deepseek-official | exa | perplexity
+    searchProvider: deepseek-official
+    fetchProvider: http
+
+- id: web-search-deepseek
+  config:
+    apiKeyEnv: DEEPSEEK_API_KEY
+    # Search-side model (Anthropic-compatible Messages), not the Vilao chat model.
+    # Change this string when you want a different DeepSeek search model.
+    model: deepseek-v4-flash
+    # baseURL: https://api.deepseek.com/anthropic   # optional override
+
+# --- Switch away from DeepSeek search (example) ---
+# 1) Set searchProvider above to `exa` or `perplexity`
+# 2) Uncomment the matching insert below (and set env key)
+# - insert:
+#     - id: web-search-exa
+#       name: '@deepseek-ai/dsh-web-search-exa'
+#       # config: { apiKeyEnv is not used — set EXA_API_KEY in env }
+#     - id: web-search-perplexity
+#       name: '@deepseek-ai/dsh-web-search-perplexity'
+#       config:
+#         model: sonar
+
+- id: system-prompt
+  config:
+    persona: >-
+      You are Doro, the Bendo personal task assistant.
+      Follow doro:personality, doro:operations, and doro:safety.
+      Use Doro tools for task work. Use web_search/web_fetch for research
+      when facts may be outdated or unknown. Never invent task IDs or sources.
+      Working directory is {{cwd}}. Model is {{model}}.
+
+- insert:
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+      config:
+        timeZone: Asia/Ho_Chi_Minh
+        refreshIntervalMs: 60000
+    - id: doro-persona
+      name: ./persona.ts
+    - id: doro-tools
+      name: ./tools.ts
+      config:
+        baseUrl: http://localhost:3000
+    - id: bendo-chat-bridge
+      name: ./chat-bridge.ts
+      config:
+        path: /bendo-chat
+        secret: "abcdefbendo"
+        timeoutMs: 120000
+        maxBodyBytes: 1000000
