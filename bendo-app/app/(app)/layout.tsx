@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
+import { AppHeader } from "@/components/app-shell/app-header";
 import { AppShell } from "@/components/app-shell/app-shell";
+import { HeaderDate } from "@/components/app-shell/header-date";
 import { requireUser } from "@/lib/auth/require-user";
 import { toDashboardProfile } from "@/lib/auth/to-dashboard-profile";
 import { formatNumericDate, formatWeekday } from "@/lib/dashboard/dates";
@@ -18,8 +20,16 @@ export default async function AppGroupLayout({
   return (
     <AppShell
       profile={toDashboardProfile(user)}
-      weekday={formatWeekday(now)}
-      numericDate={formatNumericDate(now)}
+      header={
+        <AppHeader
+          dateDisplay={
+            <HeaderDate
+              weekday={formatWeekday(now)}
+              numericDate={formatNumericDate(now)}
+            />
+          }
+        />
+      }
     >
       {children}
     </AppShell>

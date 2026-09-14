@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PageFrame } from "@/components/app-shell/page-frame";
 import { ViewTaskView } from "@/components/my-task/view-task-view";
 import { requireUser } from "@/lib/auth/require-user";
 import { loadUserTask } from "@/lib/tasks/load-tasks";
@@ -31,5 +32,9 @@ export default async function ViewTaskPage({ params }: ViewTaskPageProps) {
     notFound();
   }
 
-  return <ViewTaskView initialTask={task} nowIso={now.toISOString()} />;
+  return (
+    <PageFrame variant="fill">
+      <ViewTaskView initialTask={task} nowIso={now.toISOString()} />
+    </PageFrame>
+  );
 }

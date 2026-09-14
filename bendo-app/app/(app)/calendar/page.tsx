@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
+import { PageFrame } from "@/components/app-shell/page-frame";
 import { CalendarView } from "@/components/calendar/calendar-view";
+import { buildTaskCategoryTextSlots } from "@/components/tasks/build-task-category-text-slots";
 import { requireUser } from "@/lib/auth/require-user";
 import { loadUserTasks } from "@/lib/tasks/load-tasks";
 
@@ -14,8 +16,12 @@ export default async function CalendarPage() {
   const tasks = await loadUserTasks(user.id);
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <CalendarView initialTasks={tasks} nowIso={now.toISOString()} />
-    </div>
+    <PageFrame>
+      <CalendarView
+        categoryTextByTaskId={buildTaskCategoryTextSlots(tasks)}
+        initialTasks={tasks}
+        nowIso={now.toISOString()}
+      />
+    </PageFrame>
   );
 }

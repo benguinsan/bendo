@@ -5,6 +5,7 @@ import {
   SquarePenIcon,
   Trash2Icon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
 
 type TaskDetailPanelProps = {
   task: DashboardTaskView | null;
+  categoryText?: ReactNode;
   onEdit?: () => void;
   onDelete?: () => void;
   deleting?: boolean;
@@ -46,6 +48,7 @@ function DetailLine({ label, value }: { label: string; value: string }) {
 
 export function TaskDetailPanel({
   task,
+  categoryText,
   onEdit,
   onDelete,
   deleting = false,
@@ -82,12 +85,7 @@ export function TaskDetailPanel({
                     {statusLabels[task.displayStatus]}
                   </span>
                 </p>
-                {task.categoryName ? (
-                  <p className="text-sm">
-                    Category:{" "}
-                    <span className="text-foreground">{task.categoryName}</span>
-                  </p>
-                ) : null}
+                {categoryText}
                 <p className="text-muted-foreground text-xs">
                   Created on: {formatNumericDate(new Date(task.createdAt))}
                 </p>

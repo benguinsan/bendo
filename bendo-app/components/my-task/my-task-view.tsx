@@ -1,12 +1,15 @@
 "use client";
 
 import { ListTodoIcon } from "lucide-react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 
 import { TaskCard } from "@/components/dashboard/task-card";
 import { TaskDetailPanel } from "@/components/my-task/task-detail-panel";
-import { ConfirmDeleteTaskDialog } from "@/components/tasks/confirm-delete-task-dialog";
-import { EditTaskDialog } from "@/components/tasks/edit-task-dialog";
+import {
+  LazyConfirmDeleteTaskDialog,
+  LazyEditTaskDialog,
+} from "@/components/tasks/lazy-dialogs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Empty,
@@ -27,6 +30,9 @@ import {
 } from "@/lib/tasks/task-api-client";
 
 type MyTaskViewProps = {
+  listHeading: ReactNode;
+  categoryTextByTaskId: Record<string, ReactNode>;
+  detailCategoryTextByTaskId: Record<string, ReactNode>;
   initialTasks: DashboardTask[];
   nowIso: string;
 };
@@ -57,8 +63,16 @@ function detailPanelStatusHandlers(
   };
 }
 
-export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
+export function MyTaskView({
+  listHeading,
+  categoryTextByTaskId,
+  detailCategoryTextByTaskId,
+  initialTasks,
+  nowIso,
+}: MyTaskViewProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
+  const [tasksBaseline, setTasksBaseline] = useState(initialTasks);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialTasks[0]?.id ?? null
   );
@@ -72,12 +86,22 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
   );
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  if (initialTasks !== tasksBaseline) {
+    setTasksBaseline(initialTasks);
+    setTasks(initialTasks);
+  }
+
   const now = useNow(nowIso);
   const views = tasks.map((task) => toTaskView(task, now));
   const selectedTask = views.find((task) => task.id === selectedId) ?? null;
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
   const pendingDeleteTask =
     tasks.find((task) => task.id === pendingDeleteTaskId) ?? null;
+
+  function refreshCategoryTextSlots() {
+    router.refresh();
+  }
 
   async function handleDeleteTask(taskId: string) {
     if (deletingTaskId !== null) {
@@ -107,6 +131,7 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
         setEditingTaskId(null);
       }
       setPendingDeleteTaskId(null);
+      refreshCategoryTextSlots();
     } catch {
       setDeleteError("Could not delete task.");
       setPendingDeleteTaskId(null);
@@ -147,7 +172,7 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
   );
 
   return (
-    <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
+    <>
       {deleteError ? (
         <p className="text-destructive mb-4 text-sm" role="alert">
           {deleteError}
@@ -160,11 +185,7 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
       ) : null}
       <div className="grid grid-cols-1 gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:grid-rows-[minmax(0,1fr)]">
         <Card className="rounded-card shadow-panel flex min-h-0 flex-col py-5 ring-0 lg:h-full">
-          <CardHeader>
-            <h1 className="text-foreground font-sans text-[15px] font-medium">
-              <span className="border-primary border-b-2 pb-0.5">My</span> Tasks
-            </h1>
-          </CardHeader>
+          <CardHeader>{listHeading}</CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {views.length > 0 ? (
               <div className="flex flex-col gap-3">
@@ -172,6 +193,7 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    categoryText={categoryTextByTaskId[task.id]}
                     selected={task.id === selectedId}
                     href={`/my-task/${task.id}`}
                     onSelect={() => setSelectedId(task.id)}
@@ -198,6 +220,9 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
         </Card>
         <TaskDetailPanel
           task={selectedTask}
+          categoryText={
+            selectedId ? detailCategoryTextByTaskId[selectedId] : undefined
+          }
           onEdit={selectedId ? () => setEditingTaskId(selectedId) : undefined}
           onDelete={
             selectedId ? () => setPendingDeleteTaskId(selectedId) : undefined
@@ -210,38 +235,39 @@ export function MyTaskView({ initialTasks, nowIso }: MyTaskViewProps) {
           }
         />
       </div>
-      <EditTaskDialog
-        task={editingTask}
-        open={editingTask !== null}
-        existingTasks={tasks}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setEditingTaskId(null);
-          }
-        }}
-        onUpdate={(updated) => {
-          setTasks((current) =>
-            current.map((task) => (task.id === updated.id ? updated : task))
-          );
-        }}
-      />
-      <ConfirmDeleteTaskDialog
-        open={pendingDeleteTaskId !== null}
-        taskTitle={pendingDeleteTask?.title}
-        isDeleting={
-          pendingDeleteTaskId !== null && deletingTaskId === pendingDeleteTaskId
-        }
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingDeleteTaskId(null);
-          }
-        }}
-        onConfirm={() => {
-          if (pendingDeleteTaskId) {
+      {editingTask ? (
+        <LazyEditTaskDialog
+          task={editingTask}
+          open
+          existingTasks={tasks}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setEditingTaskId(null);
+            }
+          }}
+          onUpdate={(updated) => {
+            setTasks((current) =>
+              current.map((task) => (task.id === updated.id ? updated : task))
+            );
+            refreshCategoryTextSlots();
+          }}
+        />
+      ) : null}
+      {pendingDeleteTaskId ? (
+        <LazyConfirmDeleteTaskDialog
+          open
+          taskTitle={pendingDeleteTask?.title}
+          isDeleting={deletingTaskId === pendingDeleteTaskId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingDeleteTaskId(null);
+            }
+          }}
+          onConfirm={() => {
             void handleDeleteTask(pendingDeleteTaskId);
-          }
-        }}
-      />
-    </div>
+          }}
+        />
+      ) : null}
+    </>
   );
 }

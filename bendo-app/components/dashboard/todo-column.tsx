@@ -6,7 +6,8 @@ import { Separator } from "@/components/ui/separator";
 import type { DashboardTaskView } from "@/lib/dashboard/task-types";
 
 type TodoColumnProps = {
-  dateLine: string;
+  dateLine: ReactNode;
+  categoryTextByTaskId?: Record<string, ReactNode>;
   tasks: DashboardTaskView[];
   addTaskTrigger: ReactNode;
   onEditTask: (taskId: string) => void;
@@ -16,6 +17,7 @@ type TodoColumnProps = {
 
 export function TodoColumn({
   dateLine,
+  categoryTextByTaskId,
   tasks,
   addTaskTrigger,
   onEditTask,
@@ -32,12 +34,13 @@ export function TodoColumn({
         {addTaskTrigger}
       </div>
       <Separator />
-      <p className="text-muted-foreground text-sm">{dateLine}</p>
+      {dateLine}
       <div className="flex flex-col gap-3">
         {tasks.map((task) => (
           <TaskCard
             key={task.id}
             task={task}
+            categoryText={categoryTextByTaskId?.[task.id]}
             href={`/my-task/${task.id}`}
             onEdit={() => onEditTask(task.id)}
             onDelete={() => onDeleteTask(task.id)}
