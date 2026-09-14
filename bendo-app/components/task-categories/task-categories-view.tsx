@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { EditCategoryDialog } from "@/components/task-categories/edit-category-dialog";
-import { TaxonomyLabelDialog } from "@/components/task-categories/edit-taxonomy-dialog";
 import { TaxonomyTable } from "@/components/task-categories/taxonomy-table";
+import {
+  LazyEditCategoryDialog,
+  LazyTaxonomyLabelDialog,
+} from "@/components/tasks/lazy-dialogs";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -296,34 +298,38 @@ export function TaskCategoriesView({
           />
         </CardContent>
       </Card>
-      <EditCategoryDialog
-        category={editingCategory}
-        existingNames={categories.map((category) => category.name)}
-        open={editingCategory !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingCategoryId(null);
-          }
-        }}
-        onUpdate={(updated) => {
-          setCategories((current) =>
-            current
-              .map((category) =>
-                category.id === updated.id ? updated : category
-              )
-              .toSorted((left, right) => left.name.localeCompare(right.name))
-          );
-        }}
-      />
-      <TaxonomyLabelDialog
-        open={taxonomyDialog !== null}
-        mode={taxonomyMode}
-        kind={taxonomyKind}
-        row={taxonomyDialog?.mode === "edit" ? taxonomyDialog.row : null}
-        existingLabels={taxonomyExistingLabels}
-        onOpenChange={handleTaxonomyOpenChange}
-        onSubmitLabel={handleTaxonomySubmitLabel}
-      />
+      {editingCategory ? (
+        <LazyEditCategoryDialog
+          category={editingCategory}
+          existingNames={categories.map((category) => category.name)}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingCategoryId(null);
+            }
+          }}
+          onUpdate={(updated) => {
+            setCategories((current) =>
+              current
+                .map((category) =>
+                  category.id === updated.id ? updated : category
+                )
+                .toSorted((left, right) => left.name.localeCompare(right.name))
+            );
+          }}
+        />
+      ) : null}
+      {taxonomyDialog ? (
+        <LazyTaxonomyLabelDialog
+          open
+          mode={taxonomyMode}
+          kind={taxonomyKind}
+          row={taxonomyDialog.mode === "edit" ? taxonomyDialog.row : null}
+          existingLabels={taxonomyExistingLabels}
+          onOpenChange={handleTaxonomyOpenChange}
+          onSubmitLabel={handleTaxonomySubmitLabel}
+        />
+      ) : null}
     </div>
   );
 }

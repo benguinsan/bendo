@@ -11,8 +11,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ConfirmDeleteTaskDialog } from "@/components/tasks/confirm-delete-task-dialog";
-import { EditTaskDialog } from "@/components/tasks/edit-task-dialog";
+import {
+  LazyConfirmDeleteTaskDialog,
+  LazyEditTaskDialog,
+} from "@/components/tasks/lazy-dialogs";
 import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,7 +110,7 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-col px-4 py-6 sm:px-6 lg:h-full lg:px-8 lg:py-8">
+    <>
       {deleteError ? (
         <p className="text-destructive mb-4 text-sm" role="alert">
           {deleteError}
@@ -232,22 +234,26 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
           </div>
         </CardContent>
       </Card>
-      <EditTaskDialog
-        task={task}
-        open={editOpen}
-        existingTasks={[task]}
-        onOpenChange={setEditOpen}
-        onUpdate={setTask}
-      />
-      <ConfirmDeleteTaskDialog
-        open={confirmOpen}
-        taskTitle={task.title}
-        isDeleting={deleting}
-        onOpenChange={setConfirmOpen}
-        onConfirm={() => {
-          void handleDeleteTask();
-        }}
-      />
-    </div>
+      {editOpen ? (
+        <LazyEditTaskDialog
+          task={task}
+          open={editOpen}
+          existingTasks={[task]}
+          onOpenChange={setEditOpen}
+          onUpdate={setTask}
+        />
+      ) : null}
+      {confirmOpen ? (
+        <LazyConfirmDeleteTaskDialog
+          open={confirmOpen}
+          taskTitle={task.title}
+          isDeleting={deleting}
+          onOpenChange={setConfirmOpen}
+          onConfirm={() => {
+            void handleDeleteTask();
+          }}
+        />
+      ) : null}
+    </>
   );
 }

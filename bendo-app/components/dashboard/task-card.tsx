@@ -2,6 +2,7 @@
 
 import { MoreHorizontalIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { TaskThumbnail } from "@/components/tasks/task-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 
 type TaskCardProps = {
   task: DashboardTaskView;
+  categoryText?: ReactNode;
   selected?: boolean;
   href?: string;
   onSelect?: () => void;
@@ -42,6 +44,7 @@ type TaskCardProps = {
 
 export function TaskCard({
   task,
+  categoryText,
   selected = false,
   href,
   onSelect,
@@ -153,12 +156,7 @@ export function TaskCard({
             {priorityLabels[task.priority]}
           </span>
         </p>
-        {task.categoryName ? (
-          <p>
-            Category:{" "}
-            <span className="text-foreground">{task.categoryName}</span>
-          </p>
-        ) : null}
+        {categoryText}
         <p>
           Status:{" "}
           <span className={statusTextClass[task.displayStatus]}>

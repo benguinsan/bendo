@@ -1,12 +1,15 @@
 "use client";
 
 import { CalendarDaysIcon } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { CalendarMonthGrid } from "@/components/calendar/calendar-month-grid";
 import { TaskCard } from "@/components/dashboard/task-card";
-import { ConfirmDeleteTaskDialog } from "@/components/tasks/confirm-delete-task-dialog";
-import { EditTaskDialog } from "@/components/tasks/edit-task-dialog";
+import {
+  LazyConfirmDeleteTaskDialog,
+  LazyEditTaskDialog,
+} from "@/components/tasks/lazy-dialogs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Empty,
@@ -31,6 +34,7 @@ import { parseLocalDateInput, toLocalDateKey } from "@/lib/tasks/task-input";
 import { cn } from "@/lib/utils";
 
 type CalendarViewProps = {
+  categoryTextByTaskId: Record<string, ReactNode>;
   initialTasks: DashboardTask[];
   nowIso: string;
 };
@@ -47,9 +51,15 @@ function defaultSelectedDateKey(now: Date, visibleMonth: Date): string {
   return toLocalDateKey(monthStart);
 }
 
-export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
+export function CalendarView({
+  categoryTextByTaskId,
+  initialTasks,
+  nowIso,
+}: CalendarViewProps) {
+  const router = useRouter();
   const now = useNow(nowIso);
   const [tasks, setTasks] = useState(initialTasks);
+  const [tasksBaseline, setTasksBaseline] = useState(initialTasks);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(now));
   const [selectedDateKey, setSelectedDateKey] = useState(() =>
     defaultSelectedDateKey(now, startOfMonth(now))
@@ -63,6 +73,11 @@ export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const taskRefs = useRef(new Map<string, HTMLDivElement | null>());
 
+  if (initialTasks !== tasksBaseline) {
+    setTasksBaseline(initialTasks);
+    setTasks(initialTasks);
+  }
+
   const tasksByDate = useMemo(() => groupTasksByDateKey(tasks), [tasks]);
   const selectedDayTasks = getTasksForDateKey(tasksByDate, selectedDateKey);
   const selectedDayViews = selectedDayTasks.map((task) =>
@@ -72,6 +87,10 @@ export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
   const editingTask = tasks.find((task) => task.id === editingTaskId) ?? null;
   const pendingDeleteTask =
     tasks.find((task) => task.id === pendingDeleteTaskId) ?? null;
+
+  function refreshCategoryTextSlots() {
+    router.refresh();
+  }
 
   function handleMonthChange(nextMonth: Date) {
     setVisibleMonth(nextMonth);
@@ -117,6 +136,7 @@ export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
         setEditingTaskId(null);
       }
       setPendingDeleteTaskId(null);
+      refreshCategoryTextSlots();
     } catch {
       setDeleteError("Could not delete task.");
       setPendingDeleteTaskId(null);
@@ -134,12 +154,14 @@ export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
       if (editingTaskId === updated.id) {
         setEditingTaskId(null);
       }
+      refreshCategoryTextSlots();
       return;
     }
 
     setTasks((current) =>
       current.map((task) => (task.id === updated.id ? updated : task))
     );
+    refreshCategoryTextSlots();
   }
 
   return (
@@ -181,6 +203,7 @@ export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
                 >
                   <TaskCard
                     task={task}
+                    categoryText={categoryTextByTaskId[task.id]}
                     selected={selectedTaskId === task.id}
                     href={`/my-task/${task.id}`}
                     onEdit={() => setEditingTaskId(task.id)}
@@ -205,34 +228,34 @@ export function CalendarView({ initialTasks, nowIso }: CalendarViewProps) {
           )}
         </CardContent>
       </Card>
-      <EditTaskDialog
-        task={editingTask}
-        open={editingTask !== null}
-        existingTasks={tasks}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setEditingTaskId(null);
-          }
-        }}
-        onUpdate={handleTaskUpdate}
-      />
-      <ConfirmDeleteTaskDialog
-        open={pendingDeleteTaskId !== null}
-        taskTitle={pendingDeleteTask?.title}
-        isDeleting={
-          pendingDeleteTaskId !== null && deletingTaskId === pendingDeleteTaskId
-        }
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingDeleteTaskId(null);
-          }
-        }}
-        onConfirm={() => {
-          if (pendingDeleteTaskId) {
+      {editingTask ? (
+        <LazyEditTaskDialog
+          task={editingTask}
+          open
+          existingTasks={tasks}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setEditingTaskId(null);
+            }
+          }}
+          onUpdate={handleTaskUpdate}
+        />
+      ) : null}
+      {pendingDeleteTaskId ? (
+        <LazyConfirmDeleteTaskDialog
+          open
+          taskTitle={pendingDeleteTask?.title}
+          isDeleting={deletingTaskId === pendingDeleteTaskId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingDeleteTaskId(null);
+            }
+          }}
+          onConfirm={() => {
             void handleDeleteTask(pendingDeleteTaskId);
-          }
-        }}
-      />
+          }}
+        />
+      ) : null}
     </div>
   );
 }

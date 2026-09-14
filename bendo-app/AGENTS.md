@@ -112,6 +112,20 @@ Keep these layers separate:
 - Agent boundary: a replaceable interface for future AI Agent integration; it must not be coupled directly to page components or Supabase.
 - Activity: task and category activity records, including the actor and operation result where applicable.
 
+## Server-first component architecture
+
+- Use React Server Components by default for presentational UI and components that read server data.
+- Treat UI as server-compatible when it does not require React state or effects, event handlers, browser APIs, or client-only hooks. Server-compatible does not mean the route must be statically generated.
+- Add `"use client"` only at the smallest practical interactive boundary. Do not make a parent a Client Component solely because one descendant is interactive.
+- Pass serializable data or server-rendered `children` into Client Components instead of moving otherwise static UI into the client bundle.
+- Appropriate Server Components include page headings, read-only task lists, summaries, metadata, and layout content.
+- Appropriate Client Components include forms, dialogs, menus, optimistic updates, drag interactions, and browser-dependent behavior.
+- Use `loading.tsx` or focused `Suspense` boundaries when independently slow server data should stream without blocking the surrounding UI.
+- Dynamically import heavy client-only UI, such as dialogs or editors, when it is unnecessary for the initial render.
+- Do not apply lazy loading mechanically when it creates request waterfalls, layout shifts, or negligible bundle savings.
+- Keep server-only secrets, privileged Supabase access, and unnecessary private user data out of Client Component props.
+- Do not conflate Server Components, server-side rendering, static generation, streaming, and lazy loading; choose each based on the route's rendering and interaction needs.
+
 ---
 
 # 6. Tech stack
