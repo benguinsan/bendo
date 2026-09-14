@@ -24,12 +24,14 @@ export default async function DashboardPage() {
     <PageFrame>
       <PageHeading>Welcome back, {firstName} 👋</PageHeading>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[7fr_5fr]">
-        <DashboardView
-          dateLine={<TodoDateLine date={now} />}
-          categoryTextByTaskId={buildTaskCategoryTextSlots(tasks)}
-          initialTasks={tasks}
-          nowIso={now.toISOString()}
-        />
+        <div className="min-w-0">
+          <DashboardView
+            dateLine={<TodoDateLine date={now} />}
+            categoryTextByTaskId={buildTaskCategoryTextSlots(tasks)}
+            initialTasks={tasks}
+            nowIso={now.toISOString()}
+          />
+        </div>
         <DashboardStaticPanels tasks={tasks} now={now} />
       </div>
     </PageFrame>
