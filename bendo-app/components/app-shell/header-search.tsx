@@ -2,7 +2,7 @@
 
 import { SearchIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ export function HeaderSearch() {
   const urlQuery = searchParams.get("q") ?? "";
   const [draft, setDraft] = useState(urlQuery);
   const [syncedUrlQuery, setSyncedUrlQuery] = useState(urlQuery);
+  const debounceTimeoutRef = useRef<number | null>(null);
 
   if (urlQuery !== syncedUrlQuery) {
     setSyncedUrlQuery(urlQuery);
@@ -63,19 +64,28 @@ export function HeaderSearch() {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    debounceTimeoutRef.current = window.setTimeout(() => {
+      debounceTimeoutRef.current = null;
       router.replace(buildSearchHref(pathname, searchParams, trimmedDraft), {
         scroll: false,
       });
     }, SEARCH_DEBOUNCE_MS);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      if (debounceTimeoutRef.current !== null) {
+        window.clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
     };
   }, [draft, pathname, router, searchParams, urlQuery]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (debounceTimeoutRef.current !== null) {
+      window.clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
 
     router.push(
       buildSearchHref(pathname, searchParams, draft, {
