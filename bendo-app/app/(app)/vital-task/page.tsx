@@ -6,16 +6,31 @@ import { buildTaskCategoryTextSlots } from "@/components/tasks/build-task-catego
 import { VitalTaskView } from "@/components/vital-task/vital-task-view";
 import { requireUser } from "@/lib/auth/require-user";
 import { filterVitalTasks } from "@/lib/dashboard/task-types";
+import {
+  filterTasksByQuery,
+  normalizeTaskSearchQuery,
+} from "@/lib/tasks/filter-tasks-by-query";
 import { loadUserTasks } from "@/lib/tasks/load-tasks";
 
 export const metadata: Metadata = {
   title: "Vital Task · bendo",
 };
 
-export default async function VitalTaskPage() {
+type VitalTaskPageProps = {
+  searchParams: Promise<{ q?: string | string[] }>;
+};
+
+export default async function VitalTaskPage({
+  searchParams,
+}: VitalTaskPageProps) {
   const user = await requireUser();
   const now = new Date();
-  const tasks = filterVitalTasks(await loadUserTasks(user.id));
+  const { q } = await searchParams;
+  const query = normalizeTaskSearchQuery(q);
+  const tasks = filterTasksByQuery(
+    filterVitalTasks(await loadUserTasks(user.id)),
+    query
+  );
 
   return (
     <PageFrame variant="fill">

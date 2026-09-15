@@ -1,9 +1,12 @@
 import { CalendarDaysIcon } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { HeaderMenuButton } from "@/components/app-shell/header-menu-button";
-import { HeaderSearch } from "@/components/app-shell/header-search";
+import {
+  HeaderSearch,
+  HeaderSearchFallback,
+} from "@/components/app-shell/header-search";
 import { NotificationsPopover } from "@/components/app-shell/notifications-popover";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,7 +31,9 @@ export function AppHeader({ dateDisplay }: AppHeaderProps) {
         <span className="text-foreground hidden sm:inline">board</span>
       </Link>
       <div className="flex min-w-0 flex-1 justify-center">
-        <HeaderSearch />
+        <Suspense fallback={<HeaderSearchFallback />}>
+          <HeaderSearch />
+        </Suspense>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <NotificationsPopover />
