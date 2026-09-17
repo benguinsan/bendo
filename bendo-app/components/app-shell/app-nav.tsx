@@ -5,6 +5,7 @@ import {
   FolderIcon,
   LayoutDashboardIcon,
   ListTodoIcon,
+  SettingsIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/my-task", label: "My Task", icon: ListTodoIcon },
   { href: "/task-categories", label: "Task Categories", icon: FolderIcon },
   { href: "/agent", label: "Agent", icon: BotMessageSquareIcon },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
 type AppNavProps = {
