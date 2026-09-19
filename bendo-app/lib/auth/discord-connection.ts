@@ -61,7 +61,8 @@ export async function getDiscordConnectionStatus(
   user: DiscordConnectionUser
 ): Promise<DiscordConnection> {
   const discordAccount = user.externalAccounts.find(
-    (account) => account.provider === "discord"
+    (account) =>
+      account.provider === "discord" || account.provider === "oauth_discord"
   );
   const identity = discordIdentity(discordAccount);
   const verificationStatus = discordAccount?.verification?.status;

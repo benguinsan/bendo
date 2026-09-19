@@ -153,6 +153,7 @@ Core tables:
 - `categories`
 - `task_activities`
 - `notifications`
+- `discord_identities` — maps `clerk_user_id` ↔ `discord_user_id` for Discord bot / Agent resolution (see section 10)
 
 Rules:
 
@@ -213,7 +214,31 @@ Task input requirements:
 
 ---
 
-# 10. Task activity rules
+# 10. Discord identity mapping rules
+
+Persist the link between a Clerk user and their Discord account in `discord_identities` so the Discord bot / Doro harness can resolve `discord_user_id` → `clerk_user_id` without calling Clerk on every message.
+
+Table purpose:
+
+- Map `clerk_user_id` (Clerk user id) to `discord_user_id` (Discord snowflake from Clerk Discord OAuth `externalAccounts.providerUserId`).
+- Support Agent/Discord flows that create or update Bendo tasks for the correct user.
+
+Rules:
+
+- One Clerk user may have at most one Discord identity row (`clerk_user_id` unique).
+- One Discord user id may map to at most one Clerk user (`discord_user_id` unique).
+- Both ids are required, non-empty text. Do not accept a user-typed Discord id from Settings UI.
+- Source of Discord id: Clerk Discord OAuth only (Settings Connect Discord / `externalAccounts` with `provider === "discord"`). Prefer verifying a usable link with server-only `getUserOauthAccessToken(userId, "discord")` before upserting.
+- On successful Connect: upsert the row for the authenticated Clerk user.
+- On Disconnect: delete the row for that Clerk user (and never leave a stale Discord id pointing at them).
+- Do not store Discord OAuth access tokens, refresh tokens, or bot tokens in this table (or any other app table).
+- All reads and writes are server-only via the Supabase service role. Same RLS pattern as other public tables.
+- Lookups by `discord_user_id` (bot / harness) and by `clerk_user_id` (Settings / sync) must use this table as the app cache; Clerk remains the source of the OAuth link itself.
+- Do not couple page components directly to Discord bot code; expose a thin API or server service for resolve/upsert/delete when the feature is implemented.
+
+---
+
+# 11. Task activity rules
 
 - Task activities are append-only records.
 - Application services create activity records by calling the matching `*_with_activity` RPC (mutation + activity in one transaction). Do not insert the activity in a second PostgREST call.
@@ -224,7 +249,7 @@ Task input requirements:
 
 ---
 
-# 11. API route method rules
+# 12. API route method rules
 
 Use consistent API methods.
 
@@ -246,11 +271,16 @@ Use DELETE to delete resources:
 - DELETE /api/tasks/:task_id
 - DELETE /api/categories/:category_id
 
+When Discord identity routes are added, prefer:
+- POST or PUT to upsert the authenticated user's `discord_identities` row after Clerk Connect
+- DELETE to remove it on Disconnect
+- GET (server/bot-facing, authenticated) to resolve `discord_user_id` → `clerk_user_id` when the Discord bot feature requires it
+
 The routes above are preferred conventions, not an exhaustive API specification. Add or adjust routes when required by a feature or domain behavior.
 
 ---
 
-# 12. Task Status Rules
+# 13. Task Status Rules
 
 ## Persisted status values
 
@@ -288,7 +318,7 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 
 ---
 
-# 13. Calender Rules
+# 14. Calender Rules
 
 - Tasks are displayed on Calendar by their `scheduled_date` (day view).
 - Only incomplete (`status = 'pending'`) tasks are shown.
@@ -297,7 +327,7 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 
 ---
 
-# 14. Security, code standards, and final rule
+# 15. Security, code standards, and final rule
 
 Never expose to browser code:
 - Supabase service role key
@@ -348,9 +378,9 @@ When in doubt:
 
 ---
 
-# 15. Commands and checks
+# 16. Commands and checks
 
-"Run available checks" (sections 2 and 11) means running these from the project root and reporting the results.
+"Run available checks" (sections 2 and 16) means running these from the project root and reporting the results.
 
 This project uses **Ultracite** over **oxlint** and **oxfmt** — not ESLint or Prettier.
 

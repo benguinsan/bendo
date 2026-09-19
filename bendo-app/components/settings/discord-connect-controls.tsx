@@ -17,7 +17,14 @@ type DiscordConnectControlsProps = {
   connection: DiscordConnection;
 };
 
-function statusLabel(connection: DiscordConnection): string {
+function isDiscordProvider(provider: string): boolean {
+  return provider === "discord" || provider === "oauth_discord";
+}
+
+function statusLabel(
+  connection: DiscordConnection,
+  hasClerkDiscordAccount: boolean
+): string {
   if (connection.status === "connected") {
     if (connection.discordUsername) {
       return `Connected as ${connection.discordUsername}`;
@@ -27,6 +34,11 @@ function statusLabel(connection: DiscordConnection): string {
 
   if (connection.status === "needs_verification") {
     return "Verification needed";
+  }
+
+  // Clerk still has a Discord link, but OAuth token / server status is stale.
+  if (hasClerkDiscordAccount) {
+    return "Linked in Clerk — disconnect to reconnect";
   }
 
   return "Not connected";
@@ -47,12 +59,27 @@ export function DiscordConnectControls({
     account.destroy()
   );
 
-  const discordAccount = user?.externalAccounts.find(
-    (account) => account.provider === "discord"
+  const discordAccount = user?.externalAccounts.find((account) =>
+    isDiscordProvider(account.provider)
   );
+  const hasClerkDiscordAccount = Boolean(discordAccount);
+  // Always offer disconnect when Clerk still has the Discord external account,
+  // even if server status is not_connected (common after linking before DB sync).
+  const showDisconnect =
+    hasClerkDiscordAccount || connection.status === "connected";
+  const showReverify =
+    !showDisconnect && connection.status === "needs_verification";
+  const showConnect = !(showDisconnect || showReverify);
 
   async function connectDiscord() {
     if (!user) {
+      return;
+    }
+
+    if (discordAccount) {
+      setError(
+        "Discord is already linked in Clerk. Disconnect first, then connect again."
+      );
       return;
     }
 
@@ -70,10 +97,13 @@ export function DiscordConnectControls({
         window.location.assign(redirectUrl);
         return;
       }
+      await user.reload();
       router.refresh();
       setBusy(false);
     } catch {
-      setError("Could not start Discord connection. Try again.");
+      setError(
+        "Could not start Discord connection. If Discord is already linked, disconnect first."
+      );
       setBusy(false);
     }
   }
@@ -89,16 +119,38 @@ export function DiscordConnectControls({
   }
 
   async function disconnectDiscord() {
-    if (!discordAccount) {
-      setError("Discord account not found. Refresh and try again.");
-      return;
-    }
-
     setBusy(true);
     setError(null);
 
     try {
-      await destroyAccount(discordAccount);
+      const account =
+        discordAccount ??
+        user?.externalAccounts.find((item) => isDiscordProvider(item.provider));
+
+      if (account) {
+        await destroyAccount(account);
+        await user?.reload();
+      }
+
+      const response = await fetch("/api/discord-identity", {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        let message = "Could not clear Discord mapping. Try again.";
+        try {
+          const body = (await response.json()) as { error?: string };
+          if (body.error) {
+            message = body.error;
+          }
+        } catch {
+          // keep default message
+        }
+        setError(message);
+        router.refresh();
+        setBusy(false);
+        return;
+      }
+
       router.refresh();
       setBusy(false);
     } catch {
@@ -115,11 +167,11 @@ export function DiscordConnectControls({
         <p className="text-muted-foreground text-sm">
           Status:{" "}
           <span className="text-foreground font-medium">
-            {statusLabel(connection)}
+            {statusLabel(connection, hasClerkDiscordAccount)}
           </span>
         </p>
 
-        {connection.status === "connected" ? (
+        {showDisconnect ? (
           <Button
             type="button"
             variant="outline"
@@ -132,7 +184,7 @@ export function DiscordConnectControls({
           </Button>
         ) : null}
 
-        {connection.status === "not_connected" ? (
+        {showConnect ? (
           <Button
             type="button"
             disabled={controlsDisabled}
@@ -144,7 +196,7 @@ export function DiscordConnectControls({
           </Button>
         ) : null}
 
-        {connection.status === "needs_verification" ? (
+        {showReverify ? (
           <Button
             type="button"
             disabled={controlsDisabled}

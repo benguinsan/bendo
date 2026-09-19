@@ -128,6 +128,26 @@ create index if not exists notifications_clerk_user_id_unread_idx
   on public.notifications (clerk_user_id)
   where read_at is null;
 
+create table if not exists public.discord_identities (
+  id uuid primary key default gen_random_uuid(),
+  clerk_user_id text not null,
+  discord_user_id text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint discord_identities_clerk_user_id_check check (
+    char_length(clerk_user_id) > 0
+  ),
+  constraint discord_identities_discord_user_id_check check (
+    char_length(discord_user_id) > 0
+  )
+);
+
+create unique index if not exists discord_identities_clerk_user_id_uidx
+  on public.discord_identities (clerk_user_id);
+
+create unique index if not exists discord_identities_discord_user_id_uidx
+  on public.discord_identities (discord_user_id);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -201,6 +221,11 @@ $$;
 
 create or replace trigger categories_set_updated_at
   before update on public.categories
+  for each row
+  execute procedure public.set_updated_at();
+
+create or replace trigger discord_identities_set_updated_at
+  before update on public.discord_identities
   for each row
   execute procedure public.set_updated_at();
 
@@ -562,16 +587,19 @@ alter table public.categories enable row level security;
 alter table public.tasks enable row level security;
 alter table public.task_activities enable row level security;
 alter table public.notifications enable row level security;
+alter table public.discord_identities enable row level security;
 
 revoke all on table public.categories from anon, authenticated, public;
 revoke all on table public.tasks from anon, authenticated, public;
 revoke all on table public.task_activities from anon, authenticated, public;
 revoke all on table public.notifications from anon, authenticated, public;
+revoke all on table public.discord_identities from anon, authenticated, public;
 
 grant select, insert, update, delete on table public.categories to service_role;
 grant select, insert, update, delete on table public.tasks to service_role;
 grant select, insert on table public.task_activities to service_role;
 grant select, insert, update, delete on table public.notifications to service_role;
+grant select, insert, update, delete on table public.discord_identities to service_role;
 
 revoke all on function public.set_updated_at() from public, anon, authenticated;
 revoke all on function public.tasks_before_write() from public, anon, authenticated;

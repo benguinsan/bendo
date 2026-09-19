@@ -7,6 +7,7 @@ export type ServiceErrorCode =
   | "TASKS_PER_DATE_MAX"
   | "DUPLICATE_TASK"
   | "DUPLICATE_CATEGORY"
+  | "DISCORD_IDENTITY_IN_USE"
   | "TASK_NOT_FOUND"
   | "CATEGORY_NOT_FOUND"
   | "NOTIFICATION_NOT_FOUND"
@@ -60,6 +61,13 @@ export function mapSupabaseError(error: PostgrestError): ServiceResult<never> {
       return fail(
         "DUPLICATE_CATEGORY",
         "A category with this name already exists."
+      );
+    }
+
+    if (blob.includes("discord_identities_discord_user_id")) {
+      return fail(
+        "DISCORD_IDENTITY_IN_USE",
+        "This Discord account is already linked to another Bendo user."
       );
     }
 

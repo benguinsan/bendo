@@ -33,6 +33,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      discord_identities: {
+        Row: {
+          clerk_user_id: string;
+          created_at: string;
+          discord_user_id: string;
+          id: string;
+          updated_at: string;
+        };
+        Insert: {
+          clerk_user_id: string;
+          created_at?: string;
+          discord_user_id: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Update: {
+          clerk_user_id?: string;
+          created_at?: string;
+          discord_user_id?: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           body: string;
