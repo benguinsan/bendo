@@ -228,7 +228,7 @@ Rules:
 - One Clerk user may have at most one Discord identity row (`clerk_user_id` unique).
 - One Discord user id may map to at most one Clerk user (`discord_user_id` unique).
 - Both ids are required, non-empty text. Do not accept a user-typed Discord id from Settings UI.
-- Source of Discord id: Clerk Discord OAuth only (Settings Connect Discord / `externalAccounts` with `provider === "discord"`). Prefer verifying a usable link with server-only `getUserOauthAccessToken(userId, "discord")` before upserting.
+- Source of Discord id: Clerk Discord OAuth only (Settings Connect Discord / `externalAccounts` with `provider === "discord"` or `provider === "oauth_discord"`; connect flow uses strategy `oauth_discord`). Prefer verifying a usable link with server-only `getUserOauthAccessToken(userId, "discord")` before upserting.
 - On successful Connect: upsert the row for the authenticated Clerk user.
 - On Disconnect: delete the row for that Clerk user (and never leave a stale Discord id pointing at them).
 - Do not store Discord OAuth access tokens, refresh tokens, or bot tokens in this table (or any other app table).

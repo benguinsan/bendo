@@ -36,6 +36,10 @@ function statusLabel(
     return "Verification needed";
   }
 
+  if (connection.status === "lookup_failed") {
+    return "Unable to verify Discord link";
+  }
+
   // Clerk still has a Discord link, but OAuth token / server status is stale.
   if (hasClerkDiscordAccount) {
     return "Linked in Clerk — disconnect to reconnect";
@@ -127,11 +131,6 @@ export function DiscordConnectControls({
         discordAccount ??
         user?.externalAccounts.find((item) => isDiscordProvider(item.provider));
 
-      if (account) {
-        await destroyAccount(account);
-        await user?.reload();
-      }
-
       const response = await fetch("/api/discord-identity", {
         method: "DELETE",
       });
@@ -149,6 +148,11 @@ export function DiscordConnectControls({
         router.refresh();
         setBusy(false);
         return;
+      }
+
+      if (account) {
+        await destroyAccount(account);
+        await user?.reload();
       }
 
       router.refresh();

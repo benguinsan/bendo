@@ -78,7 +78,9 @@ export async function deleteDiscordIdentityForClerkUser(
 
 /**
  * Keep `discord_identities` aligned with Clerk Discord link status on Settings.
- * Does not upsert or delete while status is `needs_verification`.
+ * - `connected`: upsert mapping
+ * - `not_connected`: delete mapping (Clerk confirmed absent)
+ * - `needs_verification` / `lookup_failed`: leave mapping unchanged
  */
 export function syncDiscordIdentityForSettings(
   clerkUserId: string,

@@ -4,7 +4,9 @@ import { clerkClient } from "@clerk/nextjs/server";
 export type DiscordConnectionStatus =
   | "connected"
   | "not_connected"
-  | "needs_verification";
+  | "needs_verification"
+  /** Clerk OAuth token lookup failed; do not treat as confirmed disconnect. */
+  | "lookup_failed";
 
 export type DiscordConnection = {
   status: DiscordConnectionStatus;
@@ -24,6 +26,8 @@ type DiscordConnectionUser = {
   externalAccounts: DiscordExternalAccount[];
 };
 
+type OauthTokenLookup = "present" | "absent" | "error";
+
 function discordIdentity(account: DiscordExternalAccount | undefined): {
   discordUsername: string | null;
   discordUserId: string | null;
@@ -38,17 +42,26 @@ function discordIdentity(account: DiscordExternalAccount | undefined): {
   };
 }
 
-async function hasDiscordOauthToken(userId: string): Promise<boolean> {
+function isDiscordProvider(provider: string): boolean {
+  return provider === "discord" || provider === "oauth_discord";
+}
+
+/**
+ * Lookup Discord OAuth access token without exposing it.
+ * Distinguishes confirmed absence from Clerk API failures.
+ */
+async function lookupDiscordOauthToken(
+  userId: string
+): Promise<OauthTokenLookup> {
   try {
     const client = await clerkClient();
     const response = await client.users.getUserOauthAccessToken(
       userId,
       "discord"
     );
-    const token = response.data[0]?.token;
-    return Boolean(token);
+    return response.data[0]?.token ? "present" : "absent";
   } catch {
-    return false;
+    return "error";
   }
 }
 
@@ -60,9 +73,8 @@ async function hasDiscordOauthToken(userId: string): Promise<boolean> {
 export async function getDiscordConnectionStatus(
   user: DiscordConnectionUser
 ): Promise<DiscordConnection> {
-  const discordAccount = user.externalAccounts.find(
-    (account) =>
-      account.provider === "discord" || account.provider === "oauth_discord"
+  const discordAccount = user.externalAccounts.find((account) =>
+    isDiscordProvider(account.provider)
   );
   const identity = discordIdentity(discordAccount);
   const verificationStatus = discordAccount?.verification?.status;
@@ -78,14 +90,31 @@ export async function getDiscordConnectionStatus(
     };
   }
 
-  const connected = await hasDiscordOauthToken(user.id);
-  if (connected) {
+  // No Discord external account → confirmed not connected (skip token lookup).
+  if (!discordAccount) {
+    return {
+      status: "not_connected",
+      discordUsername: null,
+      discordUserId: null,
+    };
+  }
+
+  const tokenLookup = await lookupDiscordOauthToken(user.id);
+  if (tokenLookup === "present") {
     return {
       status: "connected",
       ...identity,
     };
   }
 
+  if (tokenLookup === "error") {
+    return {
+      status: "lookup_failed",
+      ...identity,
+    };
+  }
+
+  // Token lookup succeeded with no token → confirmed not connected.
   return {
     status: "not_connected",
     discordUsername: null,
