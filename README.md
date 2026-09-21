@@ -26,10 +26,12 @@ bendo/
 ├── AGENTS.md            # Agent monorepo map
 ├── bendo-app/           # Next.js UI + API
 │   └── supabase/        # schema.sql + DB docs
+├── desktop/             # Electron shell (loads local Bendo URL)
 └── deepseek-harness/    # Local harness checkout (gitignored); Doro overlay lives here
 ```
 
 - App: [`bendo-app/README.md`](bendo-app/README.md)
+- Desktop: [`desktop/README.md`](desktop/README.md)
 - Supabase: [`bendo-app/supabase/README.md`](bendo-app/supabase/README.md)
 - Agents: [`AGENTS.md`](AGENTS.md) (repo map) · [`bendo-app/AGENTS.md`](bendo-app/AGENTS.md) (app rules)
 

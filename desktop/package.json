@@ -1,0 +1,22 @@
+{
+  "name": "bendo-desktop",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Bendo Electron shell — loads local Bendo (Docker/Next); does not embed the web UI",
+  "main": "dist/main/main.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "build": "tsc",
+    "dev": "npm run build && electron .",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "electron": "^39.2.7",
+    "typescript": "^5.9.3"
+  }
+}
