@@ -23,15 +23,15 @@ Personal-first todo app with an optional AI assistant (**Doro**).
 
 ```text
 bendo/
-├── agent/doro/          # Doro harness overlay (template)
+├── AGENTS.md            # Agent monorepo map
 ├── bendo-app/           # Next.js UI + API
 │   └── supabase/        # schema.sql + DB docs
-└── deepseek-harness/    # Local harness checkout (gitignored)
+└── deepseek-harness/    # Local harness checkout (gitignored); Doro overlay lives here
 ```
 
 - App: [`bendo-app/README.md`](bendo-app/README.md)
 - Supabase: [`bendo-app/supabase/README.md`](bendo-app/supabase/README.md)
-- Agent: [`agent/doro/README.md`](agent/doro/README.md)
+- Agents: [`AGENTS.md`](AGENTS.md) (repo map) · [`bendo-app/AGENTS.md`](bendo-app/AGENTS.md) (app rules)
 
 ---
 
@@ -86,4 +86,4 @@ Open [http://localhost:3000](http://localhost:3000). Stop with `docker compose d
 
 Optional. Without a harness bridge, Agent UI works but chat stays offline.
 
-Setup: [`agent/doro/README.md`](agent/doro/README.md)
+Doro runs as an overlay inside the local DeepSeek Harness checkout (for example `deepseek-harness/bendo-agent(doro)/`). Point `bendo-app` at the chat bridge with `DSH_CHAT_BRIDGE_URL` and `DSH_CHAT_BRIDGE_SECRET` — see `bendo-app/.env.example`.

@@ -1,3 +1,4 @@
 # Local DeepSeek Harness checkout — separate git repo
 deepseek-harness/
 .pnpm-store/
+AGENTS.md

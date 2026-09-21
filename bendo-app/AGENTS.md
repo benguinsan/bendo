@@ -4,11 +4,13 @@ You are a **principal-level full-stack engineer and AI implementation agent** wo
 
 Your job is to understand the request, use the right project skills, create a clear implementation prompt, ask for approval, then implement.
 
+Monorepo map (desktop priorities, package layout): see [`../AGENTS.md`](../AGENTS.md) at the repo root.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
 
-This version has breaking changes â€” APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 
 <!-- END:nextjs-agent-rules -->
 
@@ -16,7 +18,7 @@ This version has breaking changes â€” APIs, conventions, and file structure
 
 # 1. Product
 
-bendo is a personal-first todo and project-management web app with an integrated AI agent.
+bendo is a personal-first todo and project-management web app with an integrated AI agent (Doro). Desktop packaging and Electron are owned by the repo-root [`../AGENTS.md`](../AGENTS.md), not this file.
 
 Build only:
 - Authenticated home dashboard with task cards.
@@ -49,7 +51,7 @@ For every implementation request:
 5. Ask a focused question only if the task has meaningful ambiguity.
 6. Create a detailed prompt file in `prompts/`.
 7. Ask: `I prepared the implementation prompt at prompts/<file-name>.md. Is this good to execute?`
-8. On approval, re-read the approval prompt file in prompts/ and implement it strictly. Implement only after user approval.
+8. On approval, re-read the approval prompt file in `prompts/` and implement it strictly. Implement only after user approval.
 9. Run available checks.
 10. Share exact steps to test or run the completed feature.
 
@@ -108,8 +110,8 @@ Keep these layers separate:
 - Website: authenticated pages, shared app shell, task cards, task forms, filters, calendar views, settings, and presentational Agent UI.
 - API: thin route handlers only
 - Database: Supabase reads/writes
-- Application services: reusable task, category, calendar, activity, and future Agent operations.
-- Agent boundary: a replaceable interface for future AI Agent integration; it must not be coupled directly to page components or Supabase.
+- Application services: reusable task, category, calendar, activity, and Agent operations.
+- Agent boundary: a replaceable interface for Doro / DeepSeek Harness integration; it must not be coupled directly to page components or Supabase. See section 10.
 - Activity: task and category activity records, including the actor and operation result where applicable.
 
 ## Server-first component architecture
@@ -139,7 +141,7 @@ Keep these layers separate:
 Do not use:
 - Supabase auth
 - local JSON app storage
-- a separate backend framework
+- a separate backend framework (except calling the existing DeepSeek Harness / Doro chat-bridge for the Agent)
 
 ---
 
@@ -153,7 +155,7 @@ Core tables:
 - `categories`
 - `task_activities`
 - `notifications`
-- `discord_identities` — maps `clerk_user_id` ↔ `discord_user_id` for Discord bot / Agent resolution (see section 10)
+- `discord_identities` — maps `clerk_user_id` ↔ `discord_user_id` for Discord bot / Agent resolution (see section 11)
 
 Rules:
 
@@ -214,9 +216,32 @@ Task input requirements:
 
 ---
 
-# 10. Discord identity mapping rules
+# 10. Agent runtime rules
 
-Persist the link between a Clerk user and their Discord account in `discord_identities` so the Discord bot / Doro harness can resolve `discord_user_id` → `clerk_user_id` without calling Clerk on every message.
+Doro (DeepSeek Harness overlay) is the Agent runtime. This Next.js app talks to it through a replaceable server-side adapter and the dsh **chat-bridge**, not from React page components.
+
+Desktop shell / Electron packaging is **out of scope** for this file — see repo-root [`../AGENTS.md`](../AGENTS.md).
+
+## Chat path
+
+- Default path: **Browser → Next.js (Bendo) → harness chat-bridge** (`DSH_CHAT_BRIDGE_URL` + `DSH_CHAT_BRIDGE_SECRET`).
+- The Next **server** owns the bridge call. Never put the bridge secret, harness tokens, or Supabase service role in Client Components.
+- Keep the Agent boundary in `lib/agent/*` (adapter + runtime interface). Pages must not import harness process code.
+- Without a reachable bridge, Agent UI may still render but chat stays offline / unavailable.
+- Local Docker Compose may reach a harness on the host via `host.docker.internal` (see `.env.example`); that is an env wiring detail for this app, not a desktop shell rule.
+
+## Discord identity vs Agent chat
+
+- Settings **Connect Discord** and `discord_identities` support a future Discord channel. They are not required for Agent chat through the chat-bridge.
+- Discord Gateway / public bot hosting is deferred; see repo-root `AGENTS.md` for product priority. Do not couple page components to Discord bot code.
+
+---
+
+# 11. Discord identity mapping rules
+
+Persist the link between a Clerk user and their Discord account in `discord_identities` so a future Discord bot / Doro harness can resolve `discord_user_id` → `clerk_user_id` without calling Clerk on every message.
+
+Discord Gateway bot, invite links, and bot-token hosting are **out of scope** for this Next.js app’s day-to-day feature work (product priority lives in repo-root `AGENTS.md`). Identity mapping and Settings Connect may still exist without the bot.
 
 Table purpose:
 
@@ -238,7 +263,7 @@ Rules:
 
 ---
 
-# 11. Task activity rules
+# 12. Task activity rules
 
 - Task activities are append-only records.
 - Application services create activity records by calling the matching `*_with_activity` RPC (mutation + activity in one transaction). Do not insert the activity in a second PostgREST call.
@@ -249,7 +274,7 @@ Rules:
 
 ---
 
-# 12. API route method rules
+# 13. API route method rules
 
 Use consistent API methods.
 
@@ -280,7 +305,7 @@ The routes above are preferred conventions, not an exhaustive API specification.
 
 ---
 
-# 13. Task Status Rules
+# 14. Task Status Rules
 
 ## Persisted status values
 
@@ -318,7 +343,7 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 
 ---
 
-# 14. Calender Rules
+# 15. Calender Rules
 
 - Tasks are displayed on Calendar by their `scheduled_date` (day view).
 - Only incomplete (`status = 'pending'`) tasks are shown.
@@ -327,10 +352,12 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 
 ---
 
-# 15. Security, code standards, and final rule
+# 16. Security, code standards, and final rule
 
-Never expose to browser code:
+Never expose to browser / Client Component code:
 - Supabase service role key
+- `DSH_CHAT_BRIDGE_SECRET`
+- Discord bot tokens and harness model API keys
 
 ## Environment variables
 
@@ -344,7 +371,7 @@ Canonical list lives in `.env.example`. Only `NEXT_PUBLIC_*` values may reach br
 | `NEXT_PUBLIC_SUPABASE_URL`                                                    | Supabase project URL                                                                           | client + server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                               | Supabase anon key                                                                              | client + server |
 | `SUPABASE_SERVICE_ROLE_KEY`                                                   | Service-role DB access for writes and pipeline reads                                           | server only     |
-| `DSH_CHAT_BRIDGE_URL`                                                         | dsh Doro chat-bridge URL                       | server only     |
+| `DSH_CHAT_BRIDGE_URL`                                                         | dsh Doro chat-bridge URL (see section 10)                                                      | server only     |
 | `DSH_CHAT_BRIDGE_SECRET`                                                      | Shared secret for `x-bendo-chat-secret` (must match cordis bridge `secret`)                    | server only     |
 | `DSH_CHAT_TIMEOUT_MS`                                                         | Max wait for one agent turn in ms (default `120000`)                                           | server only     |
 
@@ -378,9 +405,9 @@ When in doubt:
 
 ---
 
-# 16. Commands and checks
+# 17. Commands and checks
 
-"Run available checks" (sections 2 and 16) means running these from the project root and reporting the results.
+"Run available checks" (sections 2 and 17) means running these from the project root (`bendo-app/`) and reporting the results.
 
 This project uses **Ultracite** over **oxlint** and **oxfmt** — not ESLint or Prettier.
 
@@ -395,7 +422,3 @@ Development and runtime:
 - `npm run start` — run the production build locally after `npm run build`
 
 After implementation, run `typecheck` and `lint` at minimum. Use `format` when style/format issues are reported. Add `build` when routes, config, or server modules changed. Report the exact command output; do not claim a check passed without running it. Do not introduce ESLint or Prettier.
-
-
-
-
