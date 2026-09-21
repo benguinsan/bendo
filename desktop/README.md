@@ -7,33 +7,57 @@ Per repo [`AGENTS.md`](../AGENTS.md): `main` + `preload` only; spawn harness com
 ## Prerequisites
 
 - Node.js `>= 22`
-- Bendo running locally (Docker Compose or Next) on the URL below
+- Bendo web running locally (Docker Compose or Next) on the URL below
 
-## Run
+## Chạy app (cửa sổ giữ mở)
 
 ```bash
 # terminal 1 — from bendo-app/
 docker compose up
 # or: npm run dev
 
-# terminal 2
-cd desktop
+# terminal 2 — from desktop/
 npm install
 # if electron binary missing:
 node node_modules/electron/install.js
-npm run dev
+npm start
+# aliases: npm run app   |   npm run dev
 ```
 
-Default URL: `http://127.0.0.1:3000`  
-Override: `BENDO_APP_URL=http://127.0.0.1:3000 npm run dev`
+- Checks `http://127.0.0.1:3000` (or `BENDO_APP_URL`)
+- Opens Electron and **keeps the window open**
+- If Bendo is down: offline page with **Retry**
+
+Override URL (**http/https only** — `data:` / `file:` are rejected):
+
+```bash
+BENDO_APP_URL=http://127.0.0.1:3000 npm start
+```
+
+If the Next.js **dev** server logs blocked HMR from `127.0.0.1`, ensure `bendo-app/next.config.ts` includes `allowedDevOrigins: ["127.0.0.1"]` and restart the web server (or rebuild Docker).
+
+## Kiểm tra nhanh (tự tắt sau khi OK)
+
+Chỉ dùng để verify CI / máy local — **không** dùng để làm việc hàng ngày:
+
+```bash
+npm run test:smoke
+# alias cũ: npm run smoke
+```
+
+Expect `[smoke] OK — Bendo loaded in Electron`, rồi process thoát (exit `0`).
+
+Note: scripts gỡ `ELECTRON_RUN_AS_NODE` khi launch Electron.
 
 ## Layout
 
 ```text
 desktop/
-├── src/main/main.ts       # BrowserWindow + loadURL
-├── src/preload/preload.ts # Narrow bridge (platform only)
-├── dist/                  # Compiled output (gitignored)
+├── src/main/              # BrowserWindow, health check, optional smoke mode
+├── src/preload/           # Narrow bridge (platform, reload, getAppUrl)
+├── static/offline.html    # Shown when Bendo URL is down
+├── scripts/run-app.mjs    # npm start — real app
+├── scripts/smoke.mjs      # npm run test:smoke — auto quit
 └── package.json
 ```
 

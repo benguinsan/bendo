@@ -10,9 +10,12 @@
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
     "build": "tsc",
-    "dev": "npm run build && electron .",
-    "start": "npm run build && electron .",
-    "typecheck": "tsc --noEmit"
+    "app": "npm run build && node scripts/run-app.mjs",
+    "dev": "npm run app",
+    "start": "npm run app",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "npm run build && node scripts/smoke.mjs",
+    "smoke": "npm run test:smoke"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

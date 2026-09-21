@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bendo — waiting</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f3ee;
+        --ink: #1c1917;
+        --muted: #57534e;
+        --accent: #0f766e;
+        --danger: #b91c1c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background:
+          radial-gradient(ellipse 80% 50% at 20% 0%, #d9f0eb 0%, transparent 55%),
+          var(--bg);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+      }
+      main {
+        max-width: 28rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.5rem;
+        font-weight: 650;
+      }
+      p {
+        margin: 0 0 0.75rem;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      code {
+        font-size: 0.9em;
+        color: var(--accent);
+        word-break: break-all;
+      }
+      .error {
+        color: var(--danger);
+        font-size: 0.9rem;
+      }
+      button {
+        margin-top: 1rem;
+        padding: 0.6rem 1.1rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Bendo is not reachable</h1>
+      <p>
+        Start the web app (Docker Compose or Next), then retry.
+      </p>
+      <p>Expected URL: <code id="url">…</code></p>
+      <p class="error" id="reason"></p>
+      <button type="button" id="retry">Retry</button>
+    </main>
+    <script src="./offline.js"></script>
+  </body>
+</html>
