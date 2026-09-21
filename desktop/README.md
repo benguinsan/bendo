@@ -28,7 +28,7 @@ npm start
 - Opens Electron and **keeps the window open**
 - If Bendo is down: offline page with **Retry**
 
-Override URL:
+Override URL (**http/https only** — `data:` / `file:` are rejected):
 
 ```bash
 BENDO_APP_URL=http://127.0.0.1:3000 npm start

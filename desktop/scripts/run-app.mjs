@@ -15,7 +15,45 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
-const url = process.env.BENDO_APP_URL?.trim() || "http://127.0.0.1:3000";
+
+const DEFAULT_BENDO_APP_URL = "http://127.0.0.1:3000";
+
+/**
+ * @param {string | undefined} raw
+ * @returns {{ ok: true, url: string } | { ok: false, reason: string }}
+ */
+function resolveBendoAppUrl(raw) {
+  const trimmed = raw?.trim();
+  if (!trimmed) {
+    return { ok: true, url: DEFAULT_BENDO_APP_URL };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return {
+      ok: false,
+      reason: `Invalid BENDO_APP_URL (not a valid URL): ${trimmed}`,
+    };
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return {
+      ok: false,
+      reason: `Invalid BENDO_APP_URL protocol "${parsed.protocol}" (only http: and https: are allowed): ${trimmed}`,
+    };
+  }
+
+  return { ok: true, url: parsed.toString() };
+}
+
+const resolved = resolveBendoAppUrl(process.env.BENDO_APP_URL);
+if (!resolved.ok) {
+  console.error(`[app] ${resolved.reason}`);
+  process.exit(1);
+}
+const url = resolved.url;
 
 async function checkHttp() {
   const controller = new AbortController();
