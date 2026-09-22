@@ -71,7 +71,7 @@ async function checkHttp() {
     console.warn(`[app] Bendo not reachable yet — ${url}`);
     console.warn(`  ${message}`);
     console.warn(
-      "  Start bendo-app (docker compose up / npm run dev). Offline page will offer Retry."
+      "  Electron will try to spawn `npm run dev` in sibling bendo-app/ (or BENDO_APP_DIR)."
     );
     return false;
   } finally {
