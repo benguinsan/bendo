@@ -2,17 +2,16 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { getBendoAppUrl } from "./bendo-url";
-import { isBendoReachable } from "./check-bendo";
+import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
+import { ensureBendoServer, stopSpawnedNext } from "./spawn-next";
 
 const isMac = process.platform === "darwin";
-// const SMOKE_TIMEOUT_MS = 30_000;
+const SMOKE_TIMEOUT_MS = 30_000;
 
 function offlinePagePath(): string {
   return path.join(app.getAppPath(), "static", "offline.html");
 }
 
-// Config window (electron shell)
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -42,11 +41,11 @@ async function showOffline(win: BrowserWindow, reason: string): Promise<void> {
 
 async function loadBendo(win: BrowserWindow): Promise<boolean> {
   const url = getBendoAppUrl();
-  const check = await isBendoReachable(url);
+  const ensured = await ensureBendoServer(url);
 
-  if (!check.ok) {
-    console.error(`Bendo not reachable at ${url}: ${check.reason}`);
-    await showOffline(win, check.reason);
+  if (!ensured.ok) {
+    console.error(`Bendo not reachable at ${url}: ${ensured.reason}`);
+    await showOffline(win, ensured.reason);
     return false;
   }
 
@@ -74,50 +73,52 @@ function registerIpc(): void {
   });
 }
 
-// async function runSmoke(win: BrowserWindow): Promise<void> {
-//   const url = getBendoAppUrl();
-//   console.log(`[smoke] Checking ${url}…`);
+async function runSmoke(win: BrowserWindow): Promise<void> {
+  const url = getBendoAppUrl();
+  console.log(`[smoke] Checking ${url}…`);
 
-//   const timer = setTimeout(() => {
-//     console.error("[smoke] Timed out");
-//     app.exit(1);
-//   }, SMOKE_TIMEOUT_MS);
+  const timer = setTimeout(() => {
+    console.error("[smoke] Timed out");
+    app.exit(1);
+  }, SMOKE_TIMEOUT_MS);
 
-//   const loadFinished = new Promise<boolean>((resolve) => {
-//     win.webContents.once("did-finish-load", () => resolve(true));
-//     win.webContents.once("did-fail-load", (_e, _code, desc) => {
-//       console.error(`[smoke] FAIL — did-fail-load: ${desc}`);
-//       resolve(false);
-//     });
-//   });
+  const loadFinished = new Promise<boolean>((resolve) => {
+    win.webContents.once("did-finish-load", () => resolve(true));
+    win.webContents.once("did-fail-load", (_e, _code, desc) => {
+      console.error(`[smoke] FAIL — did-fail-load: ${desc}`);
+      resolve(false);
+    });
+  });
 
-//   const started = await loadBendo(win);
-//   if (!started) {
-//     clearTimeout(timer);
-//     console.error("[smoke] FAIL — start bendo-app (Docker/Next), then re-run.");
-//     app.exit(1);
-//     return;
-//   }
+  const started = await loadBendo(win);
+  if (!started) {
+    clearTimeout(timer);
+    console.error(
+      "[smoke] FAIL — start bendo-app (Docker/Next), then re-run. Smoke does not spawn Next."
+    );
+    app.exit(1);
+    return;
+  }
 
-//   const ok = await loadFinished;
-//   clearTimeout(timer);
-//   if (!ok) {
-//     app.exit(1);
-//     return;
-//   }
+  const ok = await loadFinished;
+  clearTimeout(timer);
+  if (!ok) {
+    app.exit(1);
+    return;
+  }
 
-//   console.log("[smoke] OK — Bendo loaded in Electron");
-//   app.exit(0);
-// }
+  console.log("[smoke] OK — Bendo loaded in Electron");
+  app.exit(0);
+}
 
 app.whenReady().then(() => {
   registerIpc();
   const win = createWindow();
 
-  // if (isSmokeMode()) {
-  //   void runSmoke(win);
-  //   return;
-  // }
+  if (isSmokeMode()) {
+    void runSmoke(win);
+    return;
+  }
 
   void loadBendo(win);
 
@@ -127,6 +128,10 @@ app.whenReady().then(() => {
       void loadBendo(next);
     }
   });
+});
+
+app.on("before-quit", () => {
+  stopSpawnedNext();
 });
 
 app.on("window-all-closed", () => {
