@@ -80,8 +80,7 @@ export function resolveBendoAppDir():
 }
 
 function pipeChildOutput(child: ChildProcess): void {
-  const forward = (chunk: Buffer, stream: "stdout" | "stderr") => {
-    const text = chunk.toString("utf8");
+  const forward = (text: string, stream: "stdout" | "stderr") => {
     for (const line of text.split(/\r?\n/)) {
       if (!line) {
         continue;
@@ -94,8 +93,38 @@ function pipeChildOutput(child: ChildProcess): void {
     }
   };
 
-  child.stdout?.on("data", (chunk: Buffer) => forward(chunk, "stdout"));
-  child.stderr?.on("data", (chunk: Buffer) => forward(chunk, "stderr"));
+  // Next prints normal text logs. Tell Node to decode stdout/stderr as UTF-8
+  // *before* we listen, so each "data" event gives us a string we can print.
+  // If we skip this, Node gives raw bytes (Buffer) instead.
+  if (child.stdout) {
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => forward(chunk, "stdout"));
+  }
+  if (child.stderr) {
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => forward(chunk, "stderr"));
+  }
+}
+
+/**
+ * Format child "error" into an offline reason.
+ * Missing `npm` is ENOENT — spawn() does not throw for that; it emits "error" later.
+ */
+function spawnErrorReason(
+  error: NodeJS.ErrnoException,
+  npmCommand: string
+): string {
+  if (error.code === "ENOENT") {
+    return `Missing executable "${npmCommand}" (ENOENT). Is Node.js/npm on PATH?`;
+  }
+  const message = error.message || String(error);
+  return `Failed to spawn Next: ${message}`;
+}
+
+function clearOwnedChild(child: ChildProcess): void {
+  if (ownedChild === child) {
+    ownedChild = null;
+  }
 }
 
 function startNextDev(appDir: string):
@@ -125,10 +154,16 @@ function startNextDev(appDir: string):
   ownedChild = child;
   pipeChildOutput(child);
 
+  // spawn() returns immediately even when the binary is missing. That failure
+  // arrives here as "error" (often ENOENT), not as a throw in the try/catch above.
+  // Clear ownedChild so we do not try to tear down a process that never started.
+  child.on("error", (error: NodeJS.ErrnoException) => {
+    clearOwnedChild(child);
+    console.error(`[next] ${spawnErrorReason(error, npm)}`);
+  });
+
   child.on("exit", (code, signal) => {
-    if (ownedChild === child) {
-      ownedChild = null;
-    }
+    clearOwnedChild(child);
     const detail =
       signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
     console.log(`[next] Process exited (${detail})`);
@@ -181,6 +216,7 @@ export async function ensureBendoServer(
   }
 
   const child = started.child;
+  const npm = getNpmCommand();
   const timeoutMs = spawnTimeoutMs();
   console.log(
     `[next] Waiting for ${url} (timeout ${timeoutMs}ms)…`
@@ -198,12 +234,20 @@ export async function ensureBendoServer(
     child.once("exit", onExit);
   });
 
+  // Same async launch failure as above — surface it as offline instead of hanging
+  // on the HTTP wait (or risking an uncaught "error" with no listener here).
+  const spawnFailed = new Promise<EnsureBendoResult>((resolve) => {
+    child.once("error", (error: NodeJS.ErrnoException) => {
+      resolve({ ok: false, reason: spawnErrorReason(error, npm) });
+    });
+  });
+
   const waited = waitForBendo(url, {
     timeoutMs,
     intervalMs: WAIT_INTERVAL_MS,
   });
 
-  const result = await Promise.race([waited, exitedEarly]);
+  const result = await Promise.race([waited, exitedEarly, spawnFailed]);
 
   if (result.ok) {
     console.log(`[next] Bendo ready at ${url}`);
