@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 
 type ProcessTarget = {
   getNpmCommand: () => string;
+  getPnpmCommand: () => string;
   shouldDetachChild: () => boolean;
   killProcessTree: (child: ChildProcess) => void;
 };
@@ -25,6 +26,7 @@ function killUnixProcessTree(child: ChildProcess): void {
 
 const win32: ProcessTarget = {
   getNpmCommand: () => "npm.cmd",
+  getPnpmCommand: () => "pnpm.cmd",
   shouldDetachChild: () => false,
   killProcessTree(child) {
     const pid = child.pid;
@@ -40,12 +42,14 @@ const win32: ProcessTarget = {
 
 const darwin: ProcessTarget = {
   getNpmCommand: () => "npm",
+  getPnpmCommand: () => "pnpm",
   shouldDetachChild: () => true,
   killProcessTree: killUnixProcessTree,
 };
 
 const linux: ProcessTarget = {
   getNpmCommand: () => "npm",
+  getPnpmCommand: () => "pnpm",
   shouldDetachChild: () => true,
   killProcessTree: killUnixProcessTree,
 };
@@ -70,5 +74,6 @@ function selectTarget(): ProcessTarget {
 const target = selectTarget();
 
 export const getNpmCommand = target.getNpmCommand;
+export const getPnpmCommand = target.getPnpmCommand;
 export const shouldDetachChild = target.shouldDetachChild;
 export const killProcessTree = target.killProcessTree;
