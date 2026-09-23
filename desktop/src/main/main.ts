@@ -3,15 +3,18 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
+import { ensureHarnessServer, stopSpawnedHarness } from "./spawn-harness";
 import { ensureBendoServer, stopSpawnedNext } from "./spawn-next";
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;
 
+// Load the offline page from the static folder.
 function offlinePagePath(): string {
   return path.join(app.getAppPath(), "static", "offline.html");
 }
 
+// Create a new browser window.
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -33,10 +36,20 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+// Show the offline page with a reason message.
 async function showOffline(win: BrowserWindow, reason: string): Promise<void> {
   const fileUrl = pathToFileURL(offlinePagePath());
   fileUrl.searchParams.set("reason", reason);
   await win.loadURL(fileUrl.href);
+}
+
+async function ensureLocalHarness(bendoUrl: string): Promise<void> {
+  const harness = await ensureHarnessServer(bendoUrl);
+  if (!harness.ok) {
+    console.warn(
+      `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
+    );
+  }
 }
 
 async function loadBendo(win: BrowserWindow): Promise<boolean> {
@@ -48,6 +61,13 @@ async function loadBendo(win: BrowserWindow): Promise<boolean> {
     await showOffline(win, ensured.reason);
     return false;
   }
+
+  // Soft-fail + non-blocking: show Bendo immediately; harness starts in the background.
+  // Harness is a background process that starts in the background.
+  void ensureLocalHarness(url).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[harness] Unexpected error: ${message}`);
+  });
 
   try {
     await win.loadURL(url);
@@ -94,7 +114,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
   if (!started) {
     clearTimeout(timer);
     console.error(
-      "[smoke] FAIL — start bendo-app (Docker/Next), then re-run. Smoke does not spawn Next."
+      "[smoke] FAIL — start bendo-app (Docker/Next), then re-run. Smoke does not spawn Next or harness."
     );
     app.exit(1);
     return;
@@ -131,6 +151,7 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
+  stopSpawnedHarness();
   stopSpawnedNext();
 });
 

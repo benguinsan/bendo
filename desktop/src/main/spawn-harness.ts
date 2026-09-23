@@ -5,32 +5,35 @@ import path from "node:path";
 import { app } from "electron";
 
 import {
-  getNpmCommand,
+  getPnpmCommand,
   killProcessTree,
   shouldDetachChild,
   spawnCommand,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
 import { isBendoReachable, waitForBendo } from "./check-bendo";
+import { getHarnessUrl } from "./harness-url";
 
-const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
+const DEFAULT_SPAWN_TIMEOUT_MS = 90_000;
 const WAIT_INTERVAL_MS = 500;
+const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
+const DSH_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
 
 let ownedChild: ChildProcess | null = null;
 
-export type EnsureBendoResult =
+export type EnsureHarnessResult =
   | { ok: true; spawned: boolean }
   | { ok: false; reason: string };
 
 function spawnTimeoutMs(): number {
-  const raw = process.env.BENDO_SPAWN_TIMEOUT_MS?.trim();
+  const raw = process.env.BENDO_HARNESS_SPAWN_TIMEOUT_MS?.trim();
   if (!raw) {
     return DEFAULT_SPAWN_TIMEOUT_MS;
   }
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) {
     console.warn(
-      `[next] Invalid BENDO_SPAWN_TIMEOUT_MS="${raw}"; using ${DEFAULT_SPAWN_TIMEOUT_MS}`
+      `[harness] Invalid BENDO_HARNESS_SPAWN_TIMEOUT_MS="${raw}"; using ${DEFAULT_SPAWN_TIMEOUT_MS}`
     );
     return DEFAULT_SPAWN_TIMEOUT_MS;
   }
@@ -38,19 +41,19 @@ function spawnTimeoutMs(): number {
 }
 
 /**
- * Resolve the Next app directory: `BENDO_APP_DIR` or sibling `../bendo-app`
+ * Resolve the harness directory: `BENDO_HARNESS_DIR` or sibling `../deepseek-harness`
  * relative to the desktop package root.
  */
-export function resolveBendoAppDir():
+export function resolveHarnessDir():
   | { ok: true; dir: string }
   | { ok: false; reason: string } {
-  const raw = process.env.BENDO_APP_DIR?.trim();
+  const raw = process.env.BENDO_HARNESS_DIR?.trim();
   const desktopRoot = app.getAppPath();
   const candidate = raw
     ? path.isAbsolute(raw)
       ? raw
       : path.resolve(process.cwd(), raw)
-    : path.resolve(desktopRoot, "..", "bendo-app");
+    : path.resolve(desktopRoot, "..", "deepseek-harness");
 
   let st: fs.Stats;
   try {
@@ -58,14 +61,14 @@ export function resolveBendoAppDir():
   } catch {
     return {
       ok: false,
-      reason: `bendo-app directory not found: ${candidate}`,
+      reason: `deepseek-harness directory not found: ${candidate}`,
     };
   }
 
   if (!st.isDirectory()) {
     return {
       ok: false,
-      reason: `BENDO_APP_DIR is not a directory: ${candidate}`,
+      reason: `BENDO_HARNESS_DIR is not a directory: ${candidate}`,
     };
   }
 
@@ -74,6 +77,14 @@ export function resolveBendoAppDir():
     return {
       ok: false,
       reason: `Missing package.json in ${candidate}`,
+    };
+  }
+
+  const cordis = path.join(candidate, "bendo-agent(doro)", "cordis.yml");
+  if (!fs.existsSync(cordis)) {
+    return {
+      ok: false,
+      reason: `Missing Doro overlay cordis.yml: ${cordis}`,
     };
   }
 
@@ -87,16 +98,13 @@ function pipeChildOutput(child: ChildProcess): void {
         continue;
       }
       if (stream === "stderr") {
-        console.error(`[next] ${line}`);
+        console.error(`[harness] ${line}`);
       } else {
-        console.log(`[next] ${line}`);
+        console.log(`[harness] ${line}`);
       }
     }
   };
 
-  // Next prints normal text logs. Tell Node to decode stdout/stderr as UTF-8
-  // *before* we listen, so each "data" event gives us a string we can print.
-  // If we skip this, Node gives raw bytes (Buffer) instead.
   if (child.stdout) {
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => forward(chunk, "stdout"));
@@ -107,19 +115,15 @@ function pipeChildOutput(child: ChildProcess): void {
   }
 }
 
-/**
- * Format child "error" into an offline reason.
- * Missing `npm` is ENOENT — spawn() does not throw for that; it emits "error" later.
- */
 function spawnErrorReason(
   error: NodeJS.ErrnoException,
-  npmCommand: string
+  pnpmCommand: string
 ): string {
   if (error.code === "ENOENT") {
-    return `Missing executable "${npmCommand}" (ENOENT). Is Node.js/npm on PATH?`;
+    return `Missing executable "${pnpmCommand}" (ENOENT). Is pnpm on PATH?`;
   }
   const message = error.message || String(error);
-  return `Failed to spawn Next: ${message}`;
+  return `Failed to spawn harness: ${message}`;
 }
 
 function clearOwnedChild(child: ChildProcess): void {
@@ -128,69 +132,81 @@ function clearOwnedChild(child: ChildProcess): void {
   }
 }
 
-function startNextDev(appDir: string):
+function harnessChildEnv(bendoAppUrl: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  if (!env.BENDO_API_BASE_URL?.trim()) {
+    env.BENDO_API_BASE_URL = bendoAppUrl;
+  }
+  return env;
+}
+
+function startHarness(
+  harnessDir: string,
+  bendoAppUrl: string
+):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
 
-  const npm = getNpmCommand();
+  const pnpm = getPnpmCommand();
 
   let child: ChildProcess;
   try {
-    child = spawnCommand(npm, ["run", "dev"], {
-      cwd: appDir,
-      env: { ...process.env },
+    child = spawnCommand(pnpm, DSH_ARGS, {
+      cwd: harnessDir,
+      env: harnessChildEnv(bendoAppUrl),
       stdio: ["ignore", "pipe", "pipe"],
       detached: shouldDetachChild(),
       windowsHide: true,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, reason: `Failed to spawn Next: ${message}` };
+    return { ok: false, reason: `Failed to spawn harness: ${message}` };
   }
 
   ownedChild = child;
   pipeChildOutput(child);
 
-  // spawn() returns immediately even when the binary is missing. That failure
-  // arrives here as "error" (often ENOENT), not as a throw in the try/catch above.
-  // Clear ownedChild so we do not try to tear down a process that never started.
   child.on("error", (error: NodeJS.ErrnoException) => {
     clearOwnedChild(child);
-    console.error(`[next] ${spawnErrorReason(error, npm)}`);
+    console.error(`[harness] ${spawnErrorReason(error, pnpm)}`);
   });
 
   child.on("exit", (code, signal) => {
     clearOwnedChild(child);
     const detail =
       signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
-    console.log(`[next] Process exited (${detail})`);
+    console.log(`[harness] Process exited (${detail})`);
   });
 
-  console.log(`[next] Spawned \`npm run dev\` in ${appDir} (pid ${child.pid})`);
+  console.log(
+    `[harness] Spawned \`pnpm ${DSH_ARGS.join(" ")}\` in ${harnessDir} (pid ${child.pid})`
+  );
   return { ok: true, child };
 }
 
-/** Tear down only the Next child this session spawned. */
-export function stopSpawnedNext(): void {
+/** Tear down only the harness child this session spawned. */
+export function stopSpawnedHarness(): void {
   const child = ownedChild;
   if (!child) {
     return;
   }
   ownedChild = null;
-  console.log("[next] Stopping spawned Next process…");
+  console.log("[harness] Stopping spawned harness process…");
   killProcessTree(child);
 }
 
 /**
- * If Bendo is already up, attach. Otherwise spawn local `npm run dev` and wait.
- * Smoke mode never spawns.
+ * If harness is already up, attach. Otherwise spawn local dsh web + Doro patch and wait.
+ * Smoke mode never spawns. Failures are soft (caller may still load Bendo).
  */
-export async function ensureBendoServer(
-  url: string
-): Promise<EnsureBendoResult> {
+export async function ensureHarnessServer(
+  bendoAppUrl: string
+): Promise<EnsureHarnessResult> {
+  const url = getHarnessUrl();
+
   if (isSmokeMode()) {
     const check = await isBendoReachable(url);
     if (!check.ok) {
@@ -201,44 +217,40 @@ export async function ensureBendoServer(
 
   const existing = await isBendoReachable(url);
   if (existing.ok) {
-    console.log(`[next] Attaching to existing Bendo at ${url}`);
+    console.log(`[harness] Attaching to existing harness at ${url}`);
     return { ok: true, spawned: false };
   }
 
-  const resolved = resolveBendoAppDir();
+  const resolved = resolveHarnessDir();
   if (!resolved.ok) {
     return resolved;
   }
 
-  const started = startNextDev(resolved.dir);
+  const started = startHarness(resolved.dir, bendoAppUrl);
   if (!started.ok) {
     return started;
   }
 
   const child = started.child;
-  const npm = getNpmCommand();
+  const pnpm = getPnpmCommand();
   const timeoutMs = spawnTimeoutMs();
-  console.log(
-    `[next] Waiting for ${url} (timeout ${timeoutMs}ms)…`
-  );
+  console.log(`[harness] Waiting for ${url} (timeout ${timeoutMs}ms)…`);
 
-  const exitedEarly = new Promise<EnsureBendoResult>((resolve) => {
+  const exitedEarly = new Promise<EnsureHarnessResult>((resolve) => {
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
       const detail =
         signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
       resolve({
         ok: false,
-        reason: `Next process exited before ready (${detail})`,
+        reason: `Harness process exited before ready (${detail})`,
       });
     };
     child.once("exit", onExit);
   });
 
-  // Same async launch failure as above — surface it as offline instead of hanging
-  // on the HTTP wait (or risking an uncaught "error" with no listener here).
-  const spawnFailed = new Promise<EnsureBendoResult>((resolve) => {
+  const spawnFailed = new Promise<EnsureHarnessResult>((resolve) => {
     child.once("error", (error: NodeJS.ErrnoException) => {
-      resolve({ ok: false, reason: spawnErrorReason(error, npm) });
+      resolve({ ok: false, reason: spawnErrorReason(error, pnpm) });
     });
   });
 
@@ -250,10 +262,10 @@ export async function ensureBendoServer(
   const result = await Promise.race([waited, exitedEarly, spawnFailed]);
 
   if (result.ok) {
-    console.log(`[next] Bendo ready at ${url}`);
+    console.log(`[harness] Ready at ${url}`);
     return { ok: true, spawned: true };
   }
 
-  stopSpawnedNext();
+  stopSpawnedHarness();
   return result;
 }
