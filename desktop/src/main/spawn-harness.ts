@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -8,6 +8,7 @@ import {
   getPnpmCommand,
   killProcessTree,
   shouldDetachChild,
+  spawnCommand,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
 import { isBendoReachable, waitForBendo } from "./check-bendo";
@@ -153,11 +154,10 @@ function startHarness(
 
   let child: ChildProcess;
   try {
-    child = spawn(pnpm, [...DSH_ARGS], {
+    child = spawnCommand(pnpm, DSH_ARGS, {
       cwd: harnessDir,
       env: harnessChildEnv(bendoAppUrl),
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
       detached: shouldDetachChild(),
       windowsHide: true,
     });

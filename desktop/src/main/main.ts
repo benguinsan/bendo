@@ -62,8 +62,12 @@ async function loadBendo(win: BrowserWindow): Promise<boolean> {
     return false;
   }
 
-  // Soft-fail: harness must not block the Bendo window.
-  await ensureLocalHarness(url);
+  // Soft-fail + non-blocking: show Bendo immediately; harness starts in the background.
+  // Harness is a background process that starts in the background.
+  void ensureLocalHarness(url).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[harness] Unexpected error: ${message}`);
+  });
 
   try {
     await win.loadURL(url);

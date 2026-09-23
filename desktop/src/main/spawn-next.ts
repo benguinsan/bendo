@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -8,6 +8,7 @@ import {
   getNpmCommand,
   killProcessTree,
   shouldDetachChild,
+  spawnCommand,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
 import { isBendoReachable, waitForBendo } from "./check-bendo";
@@ -138,11 +139,10 @@ function startNextDev(appDir: string):
 
   let child: ChildProcess;
   try {
-    child = spawn(npm, ["run", "dev"], {
+    child = spawnCommand(npm, ["run", "dev"], {
       cwd: appDir,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
       detached: shouldDetachChild(),
       windowsHide: true,
     });
