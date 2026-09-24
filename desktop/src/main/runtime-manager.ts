@@ -8,16 +8,30 @@ export type EnsureRuntimesResult = {
   bendo: EnsureBendoResult;
 };
 
+let harnessEnsureInFlight: Promise<void> | undefined;
+
 /**
  * Soft-fail harness ensure: log failures; never throw to the UI path.
+ * Deduplicate concurrent calls (e.g. repeated load/reload) via one shared in-flight
+ * promise so parallel ensures do not conflict.
  */
-async function ensureHarnessInBackground(bendoUrl: string): Promise<void> {
-  const harness = await ensureHarnessServer(bendoUrl);
-  if (!harness.ok) {
-    console.warn(
-      `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
-    );
+function ensureHarnessInBackground(bendoUrl: string): Promise<void> {
+  if (harnessEnsureInFlight) {
+    return harnessEnsureInFlight;
   }
+  
+  const attempt = (async () => {
+      const harness = await ensureHarnessServer(bendoUrl);
+      if (!harness.ok) {
+        console.warn(
+          `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
+        );
+      }
+    })().finally(() => {
+      harnessEnsureInFlight = undefined;
+    });
+  harnessEnsureInFlight = attempt;
+  return attempt;
 }
 
 /**

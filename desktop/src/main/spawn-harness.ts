@@ -20,6 +20,8 @@ const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
 const DSH_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
 
 let ownedChild: ChildProcess | null = null;
+/** Once true, `startHarness` refuses new spawns (quit / stopRuntimes). */
+let shuttingDown = false;
 
 export type EnsureHarnessResult =
   | { ok: true; spawned: boolean }
@@ -149,6 +151,12 @@ function startHarness(
 ):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
+  if (shuttingDown) {
+    return {
+      ok: false,
+      reason: "Shutdown in progress; refusing to spawn harness",
+    };
+  }
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
@@ -188,6 +196,11 @@ function startHarness(
     `[harness] Spawned \`pnpm ${DSH_ARGS.join(" ")}\` in ${harnessDir} (pid ${child.pid})`
   );
   return { ok: true, child };
+}
+
+/** Block further harness spawns (call before tearing down owned children). */
+export function beginHarnessShutdown(): void {
+  shuttingDown = true;
 }
 
 /** Tear down only the harness child this session spawned. */

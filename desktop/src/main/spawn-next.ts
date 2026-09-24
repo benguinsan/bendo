@@ -17,6 +17,8 @@ const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
 
 let ownedChild: ChildProcess | null = null;
+/** Once true, `startNextDev` refuses new spawns (quit / stopRuntimes). */
+let shuttingDown = false;
 
 export type EnsureBendoResult =
   | { ok: true; spawned: boolean }
@@ -132,6 +134,12 @@ function clearOwnedChild(child: ChildProcess): void {
 function startNextDev(appDir: string):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
+  if (shuttingDown) {
+    return {
+      ok: false,
+      reason: "Shutdown in progress; refusing to spawn Next",
+    };
+  }
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
@@ -172,6 +180,11 @@ function startNextDev(appDir: string):
 
   console.log(`[next] Spawned \`npm run dev\` in ${appDir} (pid ${child.pid})`);
   return { ok: true, child };
+}
+
+/** Block further Next spawns (call before tearing down owned children). */
+export function beginNextShutdown(): void {
+  shuttingDown = true;
 }
 
 /** Tear down only the Next child this session spawned. */
