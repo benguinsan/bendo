@@ -3,8 +3,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
-import { ensureHarnessServer, stopSpawnedHarness } from "./spawn-harness";
-import { ensureBendoServer, stopSpawnedNext } from "./spawn-next";
+import { ensureRuntimes } from "./runtime-manager";
+import { stopRuntimes } from "./runtime-shutdown";
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;
@@ -43,31 +43,15 @@ async function showOffline(win: BrowserWindow, reason: string): Promise<void> {
   await win.loadURL(fileUrl.href);
 }
 
-async function ensureLocalHarness(bendoUrl: string): Promise<void> {
-  const harness = await ensureHarnessServer(bendoUrl);
-  if (!harness.ok) {
-    console.warn(
-      `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
-    );
-  }
-}
-
 async function loadBendo(win: BrowserWindow): Promise<boolean> {
   const url = getBendoAppUrl();
-  const ensured = await ensureBendoServer(url);
+  const { bendo } = await ensureRuntimes(url);
 
-  if (!ensured.ok) {
-    console.error(`Bendo not reachable at ${url}: ${ensured.reason}`);
-    await showOffline(win, ensured.reason);
+  if (!bendo.ok) {
+    console.error(`Bendo not reachable at ${url}: ${bendo.reason}`);
+    await showOffline(win, bendo.reason);
     return false;
   }
-
-  // Soft-fail + non-blocking: show Bendo immediately; harness starts in the background.
-  // Harness is a background process that starts in the background.
-  void ensureLocalHarness(url).catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[harness] Unexpected error: ${message}`);
-  });
 
   try {
     await win.loadURL(url);
@@ -80,6 +64,7 @@ async function loadBendo(win: BrowserWindow): Promise<boolean> {
   }
 }
 
+// Register IPC handlers between main and preload/renderer.
 function registerIpc(): void {
   ipcMain.handle("bendo:get-url", () => getBendoAppUrl());
 
@@ -151,8 +136,7 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
-  stopSpawnedHarness();
-  stopSpawnedNext();
+  stopRuntimes();
 });
 
 app.on("window-all-closed", () => {

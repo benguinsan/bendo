@@ -10,13 +10,15 @@ import {
   shouldDetachChild,
   spawnCommand,
 } from "../platform/process";
-import { isSmokeMode } from "./bendo-url";
-import { isBendoReachable, waitForBendo } from "./check-bendo";
+import { getBendoHealthUrl, isSmokeMode } from "./bendo-url";
+import { isHealthy, waitForHealthy } from "./check-bendo";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
 
 let ownedChild: ChildProcess | null = null;
+/** Once true, `startNextDev` refuses new spawns (quit / stopRuntimes). */
+let shuttingDown = false;
 
 export type EnsureBendoResult =
   | { ok: true; spawned: boolean }
@@ -80,6 +82,7 @@ export function resolveBendoAppDir():
   return { ok: true, dir: candidate };
 }
 
+// Log the output of the Next child process to the console.
 function pipeChildOutput(child: ChildProcess): void {
   const forward = (text: string, stream: "stdout" | "stderr") => {
     for (const line of text.split(/\r?\n/)) {
@@ -131,6 +134,12 @@ function clearOwnedChild(child: ChildProcess): void {
 function startNextDev(appDir: string):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
+  if (shuttingDown) {
+    return {
+      ok: false,
+      reason: "Shutdown in progress; refusing to spawn Next",
+    };
+  }
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
@@ -173,6 +182,11 @@ function startNextDev(appDir: string):
   return { ok: true, child };
 }
 
+/** Block further Next spawns (call before tearing down owned children). */
+export function beginNextShutdown(): void {
+  shuttingDown = true;
+}
+
 /** Tear down only the Next child this session spawned. */
 export function stopSpawnedNext(): void {
   const child = ownedChild;
@@ -186,22 +200,26 @@ export function stopSpawnedNext(): void {
 
 /**
  * If Bendo is already up, attach. Otherwise spawn local `npm run dev` and wait.
- * Smoke mode never spawns.
+ * Smoke mode never spawns. Readiness = 2xx on health URL (`/api/health` by default).
  */
 export async function ensureBendoServer(
   url: string
 ): Promise<EnsureBendoResult> {
+  const healthUrl = getBendoHealthUrl();
+
   if (isSmokeMode()) {
-    const check = await isBendoReachable(url);
+    const check = await isHealthy(healthUrl);
     if (!check.ok) {
       return { ok: false, reason: check.reason };
     }
     return { ok: true, spawned: false };
   }
 
-  const existing = await isBendoReachable(url);
+  const existing = await isHealthy(healthUrl);
   if (existing.ok) {
-    console.log(`[next] Attaching to existing Bendo at ${url}`);
+    console.log(
+      `[next] Attaching to existing Bendo at ${url} (health ${healthUrl})`
+    );
     return { ok: true, spawned: false };
   }
 
@@ -219,7 +237,7 @@ export async function ensureBendoServer(
   const npm = getNpmCommand();
   const timeoutMs = spawnTimeoutMs();
   console.log(
-    `[next] Waiting for ${url} (timeout ${timeoutMs}ms)…`
+    `[next] Waiting for health ${healthUrl} (timeout ${timeoutMs}ms)…`
   );
 
   const exitedEarly = new Promise<EnsureBendoResult>((resolve) => {
@@ -242,7 +260,7 @@ export async function ensureBendoServer(
     });
   });
 
-  const waited = waitForBendo(url, {
+  const waited = waitForHealthy(healthUrl, {
     timeoutMs,
     intervalMs: WAIT_INTERVAL_MS,
   });
@@ -250,7 +268,7 @@ export async function ensureBendoServer(
   const result = await Promise.race([waited, exitedEarly, spawnFailed]);
 
   if (result.ok) {
-    console.log(`[next] Bendo ready at ${url}`);
+    console.log(`[next] Bendo ready at ${url} (health ${healthUrl})`);
     return { ok: true, spawned: true };
   }
 

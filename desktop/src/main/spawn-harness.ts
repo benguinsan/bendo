@@ -11,8 +11,8 @@ import {
   spawnCommand,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
-import { isBendoReachable, waitForBendo } from "./check-bendo";
-import { getHarnessUrl } from "./harness-url";
+import { isHealthy, waitForHealthy } from "./check-bendo";
+import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 90_000;
 const WAIT_INTERVAL_MS = 500;
@@ -20,6 +20,8 @@ const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
 const DSH_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
 
 let ownedChild: ChildProcess | null = null;
+/** Once true, `startHarness` refuses new spawns (quit / stopRuntimes). */
+let shuttingDown = false;
 
 export type EnsureHarnessResult =
   | { ok: true; spawned: boolean }
@@ -41,8 +43,8 @@ function spawnTimeoutMs(): number {
 }
 
 /**
- * Resolve the harness directory: `BENDO_HARNESS_DIR` or sibling `../deepseek-harness`
- * relative to the desktop package root.
+ * Find and validate the harness directory: `BENDO_HARNESS_DIR` or sibling
+ * `../deepseek-harness` relative to the desktop package root.
  */
 export function resolveHarnessDir():
   | { ok: true; dir: string }
@@ -91,6 +93,7 @@ export function resolveHarnessDir():
   return { ok: true, dir: candidate };
 }
 
+// Log the output of the harness child process to the console.
 function pipeChildOutput(child: ChildProcess): void {
   const forward = (text: string, stream: "stdout" | "stderr") => {
     for (const line of text.split(/\r?\n/)) {
@@ -115,6 +118,7 @@ function pipeChildOutput(child: ChildProcess): void {
   }
 }
 
+// Spawn error reason message.
 function spawnErrorReason(
   error: NodeJS.ErrnoException,
   pnpmCommand: string
@@ -132,6 +136,7 @@ function clearOwnedChild(child: ChildProcess): void {
   }
 }
 
+// Set the environment variables for the harness child process.
 function harnessChildEnv(bendoAppUrl: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (!env.BENDO_API_BASE_URL?.trim()) {
@@ -146,6 +151,12 @@ function startHarness(
 ):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
+  if (shuttingDown) {
+    return {
+      ok: false,
+      reason: "Shutdown in progress; refusing to spawn harness",
+    };
+  }
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
@@ -187,6 +198,11 @@ function startHarness(
   return { ok: true, child };
 }
 
+/** Block further harness spawns (call before tearing down owned children). */
+export function beginHarnessShutdown(): void {
+  shuttingDown = true;
+}
+
 /** Tear down only the harness child this session spawned. */
 export function stopSpawnedHarness(): void {
   const child = ownedChild;
@@ -201,23 +217,27 @@ export function stopSpawnedHarness(): void {
 /**
  * If harness is already up, attach. Otherwise spawn local dsh web + Doro patch and wait.
  * Smoke mode never spawns. Failures are soft (caller may still load Bendo).
+ * Readiness = 2xx on bridge health URL (`/bendo-chat` GET by default).
  */
 export async function ensureHarnessServer(
   bendoAppUrl: string
 ): Promise<EnsureHarnessResult> {
   const url = getHarnessUrl();
+  const healthUrl = getHarnessHealthUrl();
 
   if (isSmokeMode()) {
-    const check = await isBendoReachable(url);
+    const check = await isHealthy(healthUrl);
     if (!check.ok) {
       return { ok: false, reason: check.reason };
     }
     return { ok: true, spawned: false };
   }
 
-  const existing = await isBendoReachable(url);
+  const existing = await isHealthy(healthUrl);
   if (existing.ok) {
-    console.log(`[harness] Attaching to existing harness at ${url}`);
+    console.log(
+      `[harness] Attaching to existing harness at ${url} (health ${healthUrl})`
+    );
     return { ok: true, spawned: false };
   }
 
@@ -234,7 +254,9 @@ export async function ensureHarnessServer(
   const child = started.child;
   const pnpm = getPnpmCommand();
   const timeoutMs = spawnTimeoutMs();
-  console.log(`[harness] Waiting for ${url} (timeout ${timeoutMs}ms)…`);
+  console.log(
+    `[harness] Waiting for health ${healthUrl} (timeout ${timeoutMs}ms)…`
+  );
 
   const exitedEarly = new Promise<EnsureHarnessResult>((resolve) => {
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
@@ -254,7 +276,7 @@ export async function ensureHarnessServer(
     });
   });
 
-  const waited = waitForBendo(url, {
+  const waited = waitForHealthy(healthUrl, {
     timeoutMs,
     intervalMs: WAIT_INTERVAL_MS,
   });
@@ -262,7 +284,7 @@ export async function ensureHarnessServer(
   const result = await Promise.race([waited, exitedEarly, spawnFailed]);
 
   if (result.ok) {
-    console.log(`[harness] Ready at ${url}`);
+    console.log(`[harness] Ready at ${url} (health ${healthUrl})`);
     return { ok: true, spawned: true };
   }
 

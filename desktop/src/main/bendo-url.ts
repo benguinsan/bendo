@@ -1,4 +1,5 @@
 const DEFAULT_BENDO_APP_URL = "http://127.0.0.1:3000";
+const DEFAULT_HEALTH_PATH = "/api/health";
 
 export type ResolveBendoAppUrlResult =
   | { ok: true; url: string }
@@ -46,6 +47,27 @@ export function getBendoAppUrl(): string {
     return result.fallbackUrl;
   }
   return result.url;
+}
+
+/**
+ * Health probe URL for spawn/attach. Override with `BENDO_HEALTH_URL`,
+ * otherwise `{BENDO_APP_URL origin}/api/health`.
+ */
+export function getBendoHealthUrl(): string {
+  const raw = process.env.BENDO_HEALTH_URL?.trim();
+  if (raw) {
+    const resolved = resolveBendoAppUrl(raw);
+    if (!resolved.ok) {
+      console.error(
+        `${resolved.reason.replaceAll("BENDO_APP_URL", "BENDO_HEALTH_URL")}. Falling back to default health path.`
+      );
+    } else {
+      return resolved.url;
+    }
+  }
+
+  const appUrl = new URL(getBendoAppUrl());
+  return new URL(DEFAULT_HEALTH_PATH, appUrl.origin).toString();
 }
 
 export function isSmokeMode(): boolean {

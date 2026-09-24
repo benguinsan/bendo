@@ -2,7 +2,7 @@
 
 Electron **shell** for Bendo. Loads the existing Next.js app over HTTP — it does **not** embed a second UI.
 
-Per repo [`AGENTS.md`](../AGENTS.md): `main` + `preload`; may spawn local Next and DeepSeek Harness (Doro + chat-bridge).
+Per repo [`AGENTS.md`](../AGENTS.md): `main` + `preload`; may spawn local Next and DeepSeek Harness (Doro + chat-bridge). Startup goes through **Runtime Manager**; quit teardown through **Runtime Shutdown**.
 
 ## Prerequisites
 
@@ -21,11 +21,11 @@ npm start
 # aliases: npm run app   |   npm run dev
 ```
 
-- Checks `http://127.0.0.1:3000` (or `BENDO_APP_URL`)
-- If already up (Docker / existing Next): **attaches** — does not start a second server
-- If down: spawns `npm run dev` in sibling `bendo-app/` (or `BENDO_APP_DIR`), waits, then loads
-- After Bendo is up: checks harness at `http://127.0.0.1:3080` (or `BENDO_HARNESS_URL`)
-  - If up: attaches
+- Checks health `http://127.0.0.1:3000/api/health` (or `BENDO_HEALTH_URL`)
+- If already healthy (Docker / existing Next): **attaches** — does not start a second server
+- If down: spawns `npm run dev` in sibling `bendo-app/` (or `BENDO_APP_DIR`), waits for health 2xx, then loads
+- After Bendo is up: checks harness health `http://127.0.0.1:3080/bendo-chat` (or `BENDO_HARNESS_HEALTH_URL`)
+  - If healthy: attaches
   - If down: spawns `pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open` in `deepseek-harness/` (or `BENDO_HARNESS_DIR`)
   - Harness failure is **soft** — Bendo still loads; Agent chat stays offline until the bridge is up
 - Quit Electron: stops **only** Next / harness processes this session spawned
@@ -46,9 +46,11 @@ Override URLs / paths (**http/https only** for URLs — `data:` / `file:` are re
 
 ```bash
 BENDO_APP_URL=http://127.0.0.1:3000 npm start
+BENDO_HEALTH_URL=http://127.0.0.1:3000/api/health npm start
 BENDO_APP_DIR=../bendo-app npm start
 BENDO_SPAWN_TIMEOUT_MS=90000 npm start
 BENDO_HARNESS_URL=http://127.0.0.1:3080 npm start
+BENDO_HARNESS_HEALTH_URL=http://127.0.0.1:3080/bendo-chat npm start
 BENDO_HARNESS_DIR=../deepseek-harness npm start
 BENDO_HARNESS_SPAWN_TIMEOUT_MS=120000 npm start
 ```
@@ -75,7 +77,7 @@ Note: scripts gỡ `ELECTRON_RUN_AS_NODE` khi launch Electron.
 ```text
 desktop/
 ├── .agents/skills/        # Electron agent skills (electron, electron-egg, upgradelink)
-├── src/main/              # BrowserWindow, health check, spawn Next/harness, smoke mode
+├── src/main/              # BrowserWindow, Runtime Manager, spawn Next/harness, smoke mode
 ├── src/platform/          # Cross-platform OS helpers (npm/pnpm binary, kill tree)
 ├── src/preload/           # Narrow bridge (platform, reload, getAppUrl)
 ├── static/offline.html    # Shown when Bendo URL is down

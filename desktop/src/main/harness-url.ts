@@ -1,4 +1,5 @@
 const DEFAULT_HARNESS_URL = "http://127.0.0.1:3080";
+const DEFAULT_BRIDGE_HEALTH_PATH = "/bendo-chat";
 
 export type ResolveHarnessUrlResult =
   | { ok: true; url: string }
@@ -46,6 +47,27 @@ export function getHarnessUrl(): string {
     return result.fallbackUrl;
   }
   return result.url;
+}
+
+/**
+ * Health probe URL for harness spawn/attach. Override with `BENDO_HARNESS_HEALTH_URL`,
+ * otherwise `{BENDO_HARNESS_URL origin}/bendo-chat`.
+ */
+export function getHarnessHealthUrl(): string {
+  const raw = process.env.BENDO_HARNESS_HEALTH_URL?.trim();
+  if (raw) {
+    const resolved = resolveHarnessUrl(raw);
+    if (!resolved.ok) {
+      console.error(
+        `${resolved.reason.replaceAll("BENDO_HARNESS_URL", "BENDO_HARNESS_HEALTH_URL")}. Falling back to default bridge health path.`
+      );
+    } else {
+      return resolved.url;
+    }
+  }
+
+  const harnessUrl = new URL(getHarnessUrl());
+  return new URL(DEFAULT_BRIDGE_HEALTH_PATH, harnessUrl.origin).toString();
 }
 
 export { DEFAULT_HARNESS_URL };

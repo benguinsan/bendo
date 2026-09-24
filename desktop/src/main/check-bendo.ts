@@ -1,7 +1,7 @@
 /**
- * Returns true if something answers at the URL (any HTTP status counts as up).
+ * HTTP GET health probe. Success = 2xx only.
  */
-export async function isBendoReachable(
+export async function isHealthy(
   url: string,
   timeoutMs = 5000
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -14,9 +14,13 @@ export async function isBendoReachable(
       redirect: "manual",
       signal: controller.signal,
     });
-    // 2xx–5xx / 3xx all mean the server process is listening
-    void response.status;
-    return { ok: true };
+    if (response.status >= 200 && response.status < 300) {
+      return { ok: true };
+    }
+    return {
+      ok: false,
+      reason: `Health check returned HTTP ${response.status} for ${url}`,
+    };
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "AbortError") {
       return { ok: false, reason: `Timed out after ${timeoutMs}ms` };
@@ -29,19 +33,19 @@ export async function isBendoReachable(
 }
 
 /**
- * Poll until Bendo answers or the overall timeout elapses.
+ * Poll until the health URL returns 2xx or the overall timeout elapses.
  */
-export async function waitForBendo(
+export async function waitForHealthy(
   url: string,
   options: { timeoutMs: number; intervalMs?: number } = { timeoutMs: 60_000 }
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const intervalMs = options.intervalMs ?? 500;
   const deadline = Date.now() + options.timeoutMs;
-  let lastReason = "not reachable";
+  let lastReason = "not healthy";
 
   while (Date.now() < deadline) {
     const remaining = deadline - Date.now();
-    const check = await isBendoReachable(
+    const check = await isHealthy(
       url,
       Math.min(5000, Math.max(200, remaining))
     );
