@@ -59,6 +59,24 @@ Point `bendo-app` at the bridge with `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SE
 
 If the Next.js **dev** server logs blocked HMR from `127.0.0.1`, ensure `bendo-app/next.config.ts` includes `allowedDevOrigins: ["127.0.0.1"]` and restart the web server (or rebuild Docker).
 
+## Đóng gói (macOS) — shell + Bendo runtime
+
+Tạo `.dmg` gồm Electron shell **và** Next standalone (`resources/bendo-app` → `Contents/Resources/bendo-app`). **Chưa** bundle harness — Agent vẫn cần dsh local hoặc soft-fail.
+
+```bash
+# from desktop/
+npm install
+npm run build:bendo   # next build (standalone) + sync → resources/bendo-app
+npm run dist           # build:bendo + tsc + .dmg → release/
+# thử nhanh không tạo dmg:
+npm run pack
+```
+
+- Packaged app spawn: `server.js` qua Electron-as-Node (`ELECTRON_RUN_AS_NODE=1`)
+- Dev `npm start`: vẫn sibling `bendo-app` + `npm run dev`
+- `build:bendo` có thể copy `bendo-app/.env` vào resources (gitignore) — **không** publish dmg công khai nếu có secret
+- Harness / signing / auto-update: bước sau
+
 ## Kiểm tra nhanh (tự tắt sau khi OK)
 
 Chỉ dùng để verify CI / máy local — **không** dùng để làm việc hàng ngày. Smoke **requires** Bendo already up and **does not spawn** Next or harness:
@@ -81,9 +99,13 @@ desktop/
 ├── src/platform/          # Cross-platform OS helpers (npm/pnpm binary, kill tree)
 ├── src/preload/           # Narrow bridge (platform, reload, getAppUrl)
 ├── static/offline.html    # Shown when Bendo URL is down
+├── resources/bendo-app/   # Next standalone staging (gitignored; from build:bendo)
+├── electron-builder.yml   # Packaging (shell + extraResources bendo-app)
+├── release/               # electron-builder output (gitignored)
 ├── scripts/run-app.mjs    # npm start — real app
+├── scripts/prepare-bendo-resource.mjs
 ├── scripts/smoke.mjs      # npm run test:smoke — auto quit (no spawn)
-├── prompts/               # Implementation prompts
+├── prompts/               # Implementation prompts (gitignored)
 ├── skills-lock.json       # Locked skill install sources
 └── package.json
 ```
@@ -94,10 +116,12 @@ desktop/
 - `nodeIntegration: false`
 - `sandbox: true`
 - No chat-bridge secret or service role in preload/renderer
-- Spawn commands are fixed (`npm run dev`, `pnpm dsh web …`) — no shell strings from IPC
+- Spawn commands are fixed (`npm run dev` / packaged `server.js`, `pnpm dsh web …`) — no shell strings from IPC
+- Do not commit `resources/` or `.env`; treat baked secrets in a public dmg as unsafe
 
 ## Not in this skeleton
 
 - Spawning Docker Compose from Electron
-- Packaging `.exe` / `.dmg` / bundling Next or dsh into asar
+- Bundling harness/Doro into the installer
+- Code signing / notarization / auto-update
 - Discord bot

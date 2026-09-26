@@ -9,15 +9,17 @@ import {
   killProcessTree,
   shouldDetachChild,
   spawnCommand,
+  spawnExecutable,
 } from "../platform/process";
-import { getBendoHealthUrl, isSmokeMode } from "./bendo-url";
+import { getBendoAppUrl, getBendoHealthUrl, isSmokeMode } from "./bendo-url";
 import { isHealthy, waitForHealthy } from "./check-bendo";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
+const DEFAULT_BRIDGE_URL = "http://127.0.0.1:3080/bendo-chat";
 
 let ownedChild: ChildProcess | null = null;
-/** Once true, `startNextDev` refuses new spawns (quit / stopRuntimes). */
+/** Once true, spawn helpers refuse new spawns (quit / stopRuntimes). */
 let shuttingDown = false;
 
 export type EnsureBendoResult =
@@ -39,20 +41,63 @@ function spawnTimeoutMs(): number {
   return n;
 }
 
+function portFromAppUrl(): string {
+  try {
+    const port = new URL(getBendoAppUrl()).port;
+    return port || "3000";
+  } catch {
+    return "3000";
+  }
+}
+
+/** Minimal KEY=VALUE loader for packaged Next (no dependency). */
+function loadEnvFile(filePath: string): NodeJS.ProcessEnv {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+  const out: NodeJS.ProcessEnv = {};
+  const text = fs.readFileSync(filePath, "utf8");
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) {
+      continue;
+    }
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 /**
- * Resolve the Next app directory: `BENDO_APP_DIR` or sibling `../bendo-app`
- * relative to the desktop package root.
+ * Resolve the Next app directory.
+ * Packaged: `Resources/bendo-app`. Dev: `BENDO_APP_DIR` or sibling `../bendo-app`.
  */
 export function resolveBendoAppDir():
   | { ok: true; dir: string }
   | { ok: false; reason: string } {
   const raw = process.env.BENDO_APP_DIR?.trim();
-  const desktopRoot = app.getAppPath();
-  const candidate = raw
-    ? path.isAbsolute(raw)
+  let candidate: string;
+
+  if (raw) {
+    candidate = path.isAbsolute(raw)
       ? raw
-      : path.resolve(process.cwd(), raw)
-    : path.resolve(desktopRoot, "..", "bendo-app");
+      : path.resolve(process.cwd(), raw);
+  } else if (app.isPackaged) {
+    candidate = path.join(process.resourcesPath, "bendo-app");
+  } else {
+    candidate = path.resolve(app.getAppPath(), "..", "bendo-app");
+  }
 
   let st: fs.Stats;
   try {
@@ -71,18 +116,27 @@ export function resolveBendoAppDir():
     };
   }
 
-  const packageJson = path.join(candidate, "package.json");
-  if (!fs.existsSync(packageJson)) {
-    return {
-      ok: false,
-      reason: `Missing package.json in ${candidate}`,
-    };
+  if (app.isPackaged) {
+    const serverJs = path.join(candidate, "server.js");
+    if (!fs.existsSync(serverJs)) {
+      return {
+        ok: false,
+        reason: `Packaged Bendo missing server.js: ${serverJs}`,
+      };
+    }
+  } else {
+    const packageJson = path.join(candidate, "package.json");
+    if (!fs.existsSync(packageJson)) {
+      return {
+        ok: false,
+        reason: `Missing package.json in ${candidate}`,
+      };
+    }
   }
 
   return { ok: true, dir: candidate };
 }
 
-// Log the output of the Next child process to the console.
 function pipeChildOutput(child: ChildProcess): void {
   const forward = (text: string, stream: "stdout" | "stderr") => {
     for (const line of text.split(/\r?\n/)) {
@@ -97,9 +151,6 @@ function pipeChildOutput(child: ChildProcess): void {
     }
   };
 
-  // Next prints normal text logs. Tell Node to decode stdout/stderr as UTF-8
-  // *before* we listen, so each "data" event gives us a string we can print.
-  // If we skip this, Node gives raw bytes (Buffer) instead.
   if (child.stdout) {
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => forward(chunk, "stdout"));
@@ -110,16 +161,12 @@ function pipeChildOutput(child: ChildProcess): void {
   }
 }
 
-/**
- * Format child "error" into an offline reason.
- * Missing `npm` is ENOENT — spawn() does not throw for that; it emits "error" later.
- */
 function spawnErrorReason(
   error: NodeJS.ErrnoException,
-  npmCommand: string
+  command: string
 ): string {
   if (error.code === "ENOENT") {
-    return `Missing executable "${npmCommand}" (ENOENT). Is Node.js/npm on PATH?`;
+    return `Missing executable "${command}" (ENOENT).`;
   }
   const message = error.message || String(error);
   return `Failed to spawn Next: ${message}`;
@@ -131,6 +178,89 @@ function clearOwnedChild(child: ChildProcess): void {
   }
 }
 
+function trackChild(
+  child: ChildProcess,
+  commandLabel: string,
+  errorCommand: string
+): void {
+  ownedChild = child;
+  pipeChildOutput(child);
+
+  child.on("error", (error: NodeJS.ErrnoException) => {
+    clearOwnedChild(child);
+    console.error(`[next] ${spawnErrorReason(error, errorCommand)}`);
+  });
+
+  child.on("exit", (code, signal) => {
+    clearOwnedChild(child);
+    const detail =
+      signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
+    console.log(`[next] Process exited (${detail})`);
+  });
+
+  console.log(`[next] Spawned ${commandLabel} (pid ${child.pid})`);
+}
+
+function packagedNextEnv(appDir: string): NodeJS.ProcessEnv {
+  const fromEnvFile = {
+    ...loadEnvFile(path.join(appDir, ".env")),
+    ...loadEnvFile(path.join(appDir, ".env.production")),
+  };
+
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...fromEnvFile,
+    ELECTRON_RUN_AS_NODE: "1",
+    NODE_ENV: "production",
+    PORT: portFromAppUrl(),
+    // Next 16 standalone: HOSTNAME=127.0.0.1 breaks internal proxy → /api/health hangs.
+    // Bind all interfaces; BrowserWindow still loads http://127.0.0.1:<port>.
+    HOSTNAME: "0.0.0.0",
+  };
+
+  if (!env.DSH_CHAT_BRIDGE_URL?.trim()) {
+    env.DSH_CHAT_BRIDGE_URL = DEFAULT_BRIDGE_URL;
+  }
+
+  return env;
+}
+
+/** Production standalone server from extraResources (packaged app). */
+function startNextStandalone(appDir: string):
+  | { ok: true; child: ChildProcess }
+  | { ok: false; reason: string } {
+  if (shuttingDown) {
+    return {
+      ok: false,
+      reason: "Shutdown in progress; refusing to spawn Next",
+    };
+  }
+  if (ownedChild) {
+    return { ok: true, child: ownedChild };
+  }
+
+  const serverJs = path.join(appDir, "server.js");
+  const electronBin = process.execPath;
+
+  let child: ChildProcess;
+  try {
+    child = spawnExecutable(electronBin, [serverJs], {
+      cwd: appDir,
+      env: packagedNextEnv(appDir),
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: shouldDetachChild(),
+      windowsHide: true,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: `Failed to spawn Next: ${message}` };
+  }
+
+  trackChild(child, `standalone server.js in ${appDir}`, electronBin);
+  return { ok: true, child };
+}
+
+/** Dev: `npm run dev` in sibling bendo-app. */
 function startNextDev(appDir: string):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
@@ -160,29 +290,18 @@ function startNextDev(appDir: string):
     return { ok: false, reason: `Failed to spawn Next: ${message}` };
   }
 
-  ownedChild = child;
-  pipeChildOutput(child);
-
-  // spawn() returns immediately even when the binary is missing. That failure
-  // arrives here as "error" (often ENOENT), not as a throw in the try/catch above.
-  // Clear ownedChild so we do not try to tear down a process that never started.
-  child.on("error", (error: NodeJS.ErrnoException) => {
-    clearOwnedChild(child);
-    console.error(`[next] ${spawnErrorReason(error, npm)}`);
-  });
-
-  child.on("exit", (code, signal) => {
-    clearOwnedChild(child);
-    const detail =
-      signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
-    console.log(`[next] Process exited (${detail})`);
-  });
-
-  console.log(`[next] Spawned \`npm run dev\` in ${appDir} (pid ${child.pid})`);
+  trackChild(child, `\`npm run dev\` in ${appDir}`, npm);
   return { ok: true, child };
 }
 
-/** Block further Next spawns (call before tearing down owned children). */
+function startNext(appDir: string):
+  | { ok: true; child: ChildProcess }
+  | { ok: false; reason: string } {
+  return app.isPackaged
+    ? startNextStandalone(appDir)
+    : startNextDev(appDir);
+}
+
 export function beginNextShutdown(): void {
   shuttingDown = true;
 }
@@ -199,8 +318,9 @@ export function stopSpawnedNext(): void {
 }
 
 /**
- * If Bendo is already up, attach. Otherwise spawn local `npm run dev` and wait.
- * Smoke mode never spawns. Readiness = 2xx on health URL (`/api/health` by default).
+ * If Bendo is already up, attach. Otherwise spawn Next and wait for health.
+ * Packaged → standalone server.js; dev → `npm run dev`.
+ * Smoke mode never spawns.
  */
 export async function ensureBendoServer(
   url: string
@@ -228,13 +348,12 @@ export async function ensureBendoServer(
     return resolved;
   }
 
-  const started = startNextDev(resolved.dir);
+  const started = startNext(resolved.dir);
   if (!started.ok) {
     return started;
   }
 
   const child = started.child;
-  const npm = getNpmCommand();
   const timeoutMs = spawnTimeoutMs();
   console.log(
     `[next] Waiting for health ${healthUrl} (timeout ${timeoutMs}ms)…`
@@ -252,11 +371,12 @@ export async function ensureBendoServer(
     child.once("exit", onExit);
   });
 
-  // Same async launch failure as above — surface it as offline instead of hanging
-  // on the HTTP wait (or risking an uncaught "error" with no listener here).
   const spawnFailed = new Promise<EnsureBendoResult>((resolve) => {
     child.once("error", (error: NodeJS.ErrnoException) => {
-      resolve({ ok: false, reason: spawnErrorReason(error, npm) });
+      resolve({
+        ok: false,
+        reason: spawnErrorReason(error, app.isPackaged ? "electron" : "npm"),
+      });
     });
   });
 
