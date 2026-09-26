@@ -151,18 +151,22 @@ function startHarness(
 ):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
-  if (shuttingDown) {
+    // Check flag shuttingDown first child kill -> prevent new spawns (startup, reload, active) after shutdown.
+    if (shuttingDown) {
     return {
       ok: false,
       reason: "Shutdown in progress; refusing to spawn harness",
     };
   }
+  // Check if the harness child process is already running.
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
 
+  // Get the pnpm command.
   const pnpm = getPnpmCommand();
 
+  // Spawn the harness child process.
   let child: ChildProcess;
   try {
     child = spawnCommand(pnpm, DSH_ARGS, {
@@ -198,7 +202,7 @@ function startHarness(
   return { ok: true, child };
 }
 
-/** Block further harness spawns (call before tearing down owned children). */
+// Flag to prevent new spawns (startup, reload, active) after shutdown.
 export function beginHarnessShutdown(): void {
   shuttingDown = true;
 }

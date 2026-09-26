@@ -1,0 +1,52 @@
+appId: app.bendo.desktop
+productName: Bendo
+copyright: Copyright © Bendo
+
+# Shell + embedded Bendo (Next standalone). Harness not bundled yet.
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - static/**/*
+  - package.json
+
+extraResources:
+  # Standalone Next needs its node_modules; electron-builder's default FileSet
+  # ignore drops **/node_modules/** when nested under `from`, so copy deps separately.
+  - from: resources/bendo-app
+    to: bendo-app
+    filter:
+      - "**/*"
+      - "!node_modules"
+      - "!node_modules/**"
+  - from: resources/bendo-app/node_modules
+    to: bendo-app/node_modules
+    filter:
+      - "**/*"
+
+asar: true
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - dir
+  # Local MVP: unsigned. Distribution signing / notarize comes later.
+  identity: null
+  hardenedRuntime: false
+
+dmg:
+  artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+linux:
+  target:
+    - AppImage
+  category: Office
