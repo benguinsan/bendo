@@ -32,7 +32,9 @@ function stripEnvFiles(dir) {
     if (fs.existsSync(target)) {
       fs.rmSync(target, { force: true });
       removed += 1;
-      console.log(`[strip-standalone-env] Removed ${path.relative(root, target)}`);
+      console.log(
+        `[strip-standalone-env] Removed ${path.relative(root, target)}`
+      );
     }
   }
   return removed;
