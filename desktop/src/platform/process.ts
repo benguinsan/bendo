@@ -132,3 +132,15 @@ export const getPnpmCommand = target.getPnpmCommand;
 export const shouldDetachChild = target.shouldDetachChild;
 export const killProcessTree = target.killProcessTree;
 export const spawnCommand = target.spawnCommand;
+
+/**
+ * Spawn a real executable (not a `.cmd` shim) with fixed argv.
+ * Used for Electron-as-Node / node binaries.
+ */
+export function spawnExecutable(
+  command: string,
+  args: readonly string[],
+  options: SpawnFixedOptions
+): ChildProcess {
+  return spawnDirect(command, args, options);
+}

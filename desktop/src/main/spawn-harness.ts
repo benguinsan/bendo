@@ -11,6 +11,7 @@ import {
   spawnCommand,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
+import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
 import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
 
@@ -142,6 +143,9 @@ function harnessChildEnv(bendoAppUrl: string): NodeJS.ProcessEnv {
   if (!env.BENDO_API_BASE_URL?.trim()) {
     env.BENDO_API_BASE_URL = bendoAppUrl;
   }
+  // Same secret as Next (env wins over cordis.yml). Force so Electron-managed
+  // runs do not keep a stale cordis default when parent env is empty.
+  applyBridgeCredentialsToEnv(env, { force: true });
   return env;
 }
 
@@ -151,18 +155,22 @@ function startHarness(
 ):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
-  if (shuttingDown) {
+    // Check flag shuttingDown first child kill -> prevent new spawns (startup, reload, active) after shutdown.
+    if (shuttingDown) {
     return {
       ok: false,
       reason: "Shutdown in progress; refusing to spawn harness",
     };
   }
+  // Check if the harness child process is already running.
   if (ownedChild) {
     return { ok: true, child: ownedChild };
   }
 
+  // Get the pnpm command.
   const pnpm = getPnpmCommand();
 
+  // Spawn the harness child process.
   let child: ChildProcess;
   try {
     child = spawnCommand(pnpm, DSH_ARGS, {
@@ -198,7 +206,7 @@ function startHarness(
   return { ok: true, child };
 }
 
-/** Block further harness spawns (call before tearing down owned children). */
+// Flag to prevent new spawns (startup, reload, active) after shutdown.
 export function beginHarnessShutdown(): void {
   shuttingDown = true;
 }

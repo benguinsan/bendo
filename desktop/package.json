@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "Bendo Electron shell — loads local Bendo (Docker/Next); does not embed the web UI",
+  "author": "Bendo",
   "main": "dist/main/main.js",
   "engines": {
     "node": ">=22"
@@ -10,16 +11,20 @@
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
     "build": "tsc",
+    "build:bendo": "node scripts/prepare-bendo-resource.mjs",
     "app": "npm run build && node scripts/run-app.mjs",
     "dev": "npm run app",
     "start": "npm run app",
     "typecheck": "tsc --noEmit",
     "test:smoke": "npm run build && node scripts/smoke.mjs",
-    "smoke": "npm run test:smoke"
+    "smoke": "npm run test:smoke",
+    "pack": "npm run build:bendo && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "dist": "npm run build:bendo && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
     "electron": "^39.2.7",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.9.3"
   }
 }
