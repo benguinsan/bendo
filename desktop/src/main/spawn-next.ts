@@ -12,11 +12,11 @@ import {
   spawnExecutable,
 } from "../platform/process";
 import { getBendoAppUrl, getBendoHealthUrl, isSmokeMode } from "./bendo-url";
+import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
-const DEFAULT_BRIDGE_URL = "http://127.0.0.1:3080/bendo-chat";
 
 let ownedChild: ChildProcess | null = null;
 /** Once true, spawn helpers refuse new spawns (quit / stopRuntimes). */
@@ -48,35 +48,6 @@ function portFromAppUrl(): string {
   } catch {
     return "3000";
   }
-}
-
-/** Minimal KEY=VALUE loader for packaged Next (no dependency). */
-function loadEnvFile(filePath: string): NodeJS.ProcessEnv {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-  const out: NodeJS.ProcessEnv = {};
-  const text = fs.readFileSync(filePath, "utf8");
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) {
-      continue;
-    }
-    const eq = trimmed.indexOf("=");
-    if (eq <= 0) {
-      continue;
-    }
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    out[key] = value;
-  }
-  return out;
 }
 
 /**
@@ -201,15 +172,13 @@ function trackChild(
   console.log(`[next] Spawned ${commandLabel} (pid ${child.pid})`);
 }
 
-function packagedNextEnv(appDir: string): NodeJS.ProcessEnv {
-  const fromEnvFile = {
-    ...loadEnvFile(path.join(appDir, ".env")),
-    ...loadEnvFile(path.join(appDir, ".env.production")),
-  };
-
+/**
+ * Env for packaged Next. Bridge credentials from Electron resolve (env session /
+ * userData JSON) — never from files baked into Resources.
+ */
+function packagedNextEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    ...fromEnvFile,
     ELECTRON_RUN_AS_NODE: "1",
     NODE_ENV: "production",
     PORT: portFromAppUrl(),
@@ -218,10 +187,14 @@ function packagedNextEnv(appDir: string): NodeJS.ProcessEnv {
     HOSTNAME: "0.0.0.0",
   };
 
-  if (!env.DSH_CHAT_BRIDGE_URL?.trim()) {
-    env.DSH_CHAT_BRIDGE_URL = DEFAULT_BRIDGE_URL;
-  }
+  applyBridgeCredentialsToEnv(env, { force: true });
+  return env;
+}
 
+/** Dev Next: inject bridge creds only when unset (bendo-app `.env` may already set them). */
+function nextDevEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  applyBridgeCredentialsToEnv(env);
   return env;
 }
 
@@ -246,7 +219,7 @@ function startNextStandalone(appDir: string):
   try {
     child = spawnExecutable(electronBin, [serverJs], {
       cwd: appDir,
-      env: packagedNextEnv(appDir),
+      env: packagedNextEnv(),
       stdio: ["ignore", "pipe", "pipe"],
       detached: shouldDetachChild(),
       windowsHide: true,
@@ -280,7 +253,7 @@ function startNextDev(appDir: string):
   try {
     child = spawnCommand(npm, ["run", "dev"], {
       cwd: appDir,
-      env: { ...process.env },
+      env: nextDevEnv(),
       stdio: ["ignore", "pipe", "pipe"],
       detached: shouldDetachChild(),
       windowsHide: true,

@@ -50,8 +50,17 @@ export function getHarnessUrl(): string {
 }
 
 /**
+ * Chat-bridge POST URL for Next → harness.
+ * Always `{BENDO_HARNESS_URL origin}/bendo-chat` (ignores BENDO_HARNESS_HEALTH_URL).
+ */
+export function getBridgeChatUrl(): string {
+  const harnessUrl = new URL(getHarnessUrl());
+  return new URL(DEFAULT_BRIDGE_HEALTH_PATH, harnessUrl.origin).toString();
+}
+
+/**
  * Health probe URL for harness spawn/attach. Override with `BENDO_HARNESS_HEALTH_URL`,
- * otherwise `{BENDO_HARNESS_URL origin}/bendo-chat`.
+ * otherwise same as {@link getBridgeChatUrl}.
  */
 export function getHarnessHealthUrl(): string {
   const raw = process.env.BENDO_HARNESS_HEALTH_URL?.trim();
@@ -66,8 +75,7 @@ export function getHarnessHealthUrl(): string {
     }
   }
 
-  const harnessUrl = new URL(getHarnessUrl());
-  return new URL(DEFAULT_BRIDGE_HEALTH_PATH, harnessUrl.origin).toString();
+  return getBridgeChatUrl();
 }
 
-export { DEFAULT_HARNESS_URL };
+export { DEFAULT_HARNESS_URL, DEFAULT_BRIDGE_HEALTH_PATH };

@@ -11,6 +11,7 @@ import {
   spawnCommand,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
+import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
 import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
 
@@ -142,6 +143,9 @@ function harnessChildEnv(bendoAppUrl: string): NodeJS.ProcessEnv {
   if (!env.BENDO_API_BASE_URL?.trim()) {
     env.BENDO_API_BASE_URL = bendoAppUrl;
   }
+  // Same secret as Next (env wins over cordis.yml). Force so Electron-managed
+  // runs do not keep a stale cordis default when parent env is empty.
+  applyBridgeCredentialsToEnv(env, { force: true });
   return env;
 }
 

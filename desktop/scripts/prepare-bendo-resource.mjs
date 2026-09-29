@@ -66,6 +66,29 @@ if (fs.existsSync(nestedServer)) {
 
 console.log(`[build:bendo] Using standalone server dir: ${serverDir}`);
 
+// Defense in depth: strip env from standalone source before syncing resources.
+const envNames = [
+  ".env",
+  ".env.local",
+  ".env.development",
+  ".env.development.local",
+  ".env.production",
+  ".env.production.local",
+  ".env.test",
+  ".env.test.local",
+];
+for (const dir of new Set([standaloneRoot, serverDir])) {
+  for (const name of envNames) {
+    const baked = path.join(dir, name);
+    if (fs.existsSync(baked)) {
+      fs.rmSync(baked, { force: true });
+      console.log(
+        `[build:bendo] Removed ${name} from ${path.relative(bendoAppRoot, dir)}`
+      );
+    }
+  }
+}
+
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(path.dirname(outDir), { recursive: true });
 fs.cpSync(serverDir, outDir, { recursive: true });
@@ -84,12 +107,12 @@ if (fs.existsSync(publicSrc)) {
   fs.cpSync(publicSrc, path.join(outDir, "public"), { recursive: true });
 }
 
-// Optional: bake local env into the resource for unsigned developer dmgs (gitignored).
-for (const name of [".env", ".env.production"]) {
-  const src = path.join(bendoAppRoot, name);
-  if (fs.existsSync(src)) {
-    fs.copyFileSync(src, path.join(outDir, name));
-    console.log(`[build:bendo] Copied ${name} into resources (do not publish casually)`);
+// Never bake secrets into installer resources (in case any .env* reappears).
+for (const name of envNames) {
+  const baked = path.join(outDir, name);
+  if (fs.existsSync(baked)) {
+    fs.rmSync(baked, { force: true });
+    console.log(`[build:bendo] Removed ${name} from resources`);
   }
 }
 

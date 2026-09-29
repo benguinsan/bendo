@@ -229,6 +229,7 @@ Desktop shell / Electron packaging is **out of scope** for this file — see rep
 - Keep the Agent boundary in `lib/agent/*` (adapter + runtime interface). Pages must not import harness process code.
 - Without a reachable bridge, Agent UI may still render but chat stays offline / unavailable.
 - Local Docker Compose may reach a harness on the host via `host.docker.internal` (see `.env.example`); that is an env wiring detail for this app, not a desktop shell rule.
+- `DSH_CHAT_BRIDGE_*` is **local machine-only** (localhost Agent path). It is not part of the cloud (Vercel) secret set and must not be fetched from or stored on Vercel. Cloud secrets (`CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, …) are unrelated to the chat-bridge contract — see section 16.
 
 ## Discord identity vs Agent chat
 
@@ -356,24 +357,39 @@ There is no stored `pending` → `expired` transition. Expiration is a display-o
 
 Never expose to browser / Client Component code:
 - Supabase service role key
+- `CLERK_SECRET_KEY`
 - `DSH_CHAT_BRIDGE_SECRET`
 - Discord bot tokens and harness model API keys
+
+## Credential tiers (product distribution)
+
+**Local `.env` / `.env.local` (and Docker) stay the full set for development** — public + cloud secrets + bridge vars. That is expected for `next dev` and local Compose. Never commit real secrets.
+
+The tiers below govern **Electron resource / installer packaging** (and what may be returned to clients). They do not require removing secrets from local dev `.env`. See repo-root [`../AGENTS.md`](../AGENTS.md) → Product credentials.
+
+1. **Public** — `NEXT_PUBLIC_*` (and publishable / anon equivalents). Allowed in browser and may appear in shipped client or Electron-packaged artifacts.
+2. **Cloud server-only** — `CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and similar god-mode keys. On the deployed host (Vercel or equivalent) for shipped-product privileged work. Used only inside server handlers. Never returned to clients. Never packaged into the desktop installer or standalone resources copied for Electron.
+3. **Local machine-only** — `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SECRET` (and timeout). Localhost Agent path between this app’s server and the harness. Not fetched from Vercel. Not shipped in the installer.
+
+**Pattern (shipped product):** a privileged route authenticates the Clerk session, performs work with server-side secrets, and returns domain results (tasks, categories, status, …).
+
+**Anti-pattern:** any API or bootstrap flow that returns secret key material to desktop or browser (“lend keys from Vercel”).
 
 ## Environment variables
 
 Canonical list lives in `.env.example`. Only `NEXT_PUBLIC_*` values may reach browser code; everything else is server-only.
 
-| Variable                                                                      | Purpose                                                                                        | Exposure        |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------- |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                                           | Clerk publishable key                                                                          | client + server |
-| `CLERK_SECRET_KEY`                                                            | Clerk server-side key                                                                          | server only     |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `_SIGN_UP_URL` / `_*_FALLBACK_REDIRECT_URL` | Clerk auth route config                                                                        | client + server |
-| `NEXT_PUBLIC_SUPABASE_URL`                                                    | Supabase project URL                                                                           | client + server |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                               | Supabase anon key                                                                              | client + server |
-| `SUPABASE_SERVICE_ROLE_KEY`                                                   | Service-role DB access for writes and pipeline reads                                           | server only     |
-| `DSH_CHAT_BRIDGE_URL`                                                         | dsh Doro chat-bridge URL (see section 10)                                                      | server only     |
-| `DSH_CHAT_BRIDGE_SECRET`                                                      | Shared secret for `x-bendo-chat-secret` (must match cordis bridge `secret`)                    | server only     |
-| `DSH_CHAT_TIMEOUT_MS`                                                         | Max wait for one agent turn in ms (default `120000`)                                           | server only     |
+| Variable                                                                      | Purpose                                                                                        | Exposure        | Distribution                                      |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                                           | Clerk publishable key                                                                          | client + server | Public — may ship / inline in client artifacts    |
+| `CLERK_SECRET_KEY`                                                            | Clerk server-side key                                                                          | server only     | Cloud server-only (Vercel); never ship            |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `_SIGN_UP_URL` / `_*_FALLBACK_REDIRECT_URL` | Clerk auth route config                                                                        | client + server | Public — may ship / inline                        |
+| `NEXT_PUBLIC_SUPABASE_URL`                                                    | Supabase project URL                                                                           | client + server | Public — may ship / inline                        |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                               | Supabase anon key                                                                              | client + server | Public — may ship / inline                        |
+| `SUPABASE_SERVICE_ROLE_KEY`                                                   | Service-role DB access for writes and pipeline reads                                           | server only     | Cloud server-only (Vercel); never ship            |
+| `DSH_CHAT_BRIDGE_URL`                                                         | dsh Doro chat-bridge URL (see section 10)                                                      | server only     | Local machine-only; not from Vercel; not in installer |
+| `DSH_CHAT_BRIDGE_SECRET`                                                      | Shared secret for `x-bendo-chat-secret` (must match cordis bridge `secret`)                    | server only     | Local machine-only; not from Vercel; not in installer |
+| `DSH_CHAT_TIMEOUT_MS`                                                         | Max wait for one agent turn in ms (default `120000`)                                           | server only     | Local / server config; not a cloud secret         |
 
 Keep this table and `.env.example` in sync when variables change.
 

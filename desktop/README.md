@@ -55,7 +55,16 @@ BENDO_HARNESS_DIR=../deepseek-harness npm start
 BENDO_HARNESS_SPAWN_TIMEOUT_MS=120000 npm start
 ```
 
-Point `bendo-app` at the bridge with `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SECRET` (see `bendo-app/.env.example`). Desktop does not inject those secrets.
+### Chat bridge credentials (local)
+
+Electron injects `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SECRET` into **spawned** Next and harness children:
+
+- **Env first (session-only):** if set on the Electron process, used for this run; **not** written to disk
+- Else **`userData/bridge-credentials.json`** (generate / reuse / rotate every 30 days by default)
+- Default URL = `{BENDO_HARNESS_URL origin}/bendo-chat` (change harness port via `BENDO_HARNESS_URL`; do not hardcode a second port for Next)
+- Optional TTL override: `BENDO_BRIDGE_SECRET_TTL_MS`
+- **Attach caveat:** a harness already running outside Electron must use the same secret (env or matching cordis); after rotation, restart that external harness
+- Host-only `bendo-app` `.env` still works for `next dev` without Electron
 
 If the Next.js **dev** server logs blocked HMR from `127.0.0.1`, ensure `bendo-app/next.config.ts` includes `allowedDevOrigins: ["127.0.0.1"]` and restart the web server (or rebuild Docker).
 
@@ -74,7 +83,7 @@ npm run pack
 
 - Packaged app spawn: `server.js` qua Electron-as-Node (`ELECTRON_RUN_AS_NODE=1`)
 - Dev `npm start`: vẫn sibling `bendo-app` + `npm run dev`
-- `build:bendo` có thể copy `bendo-app/.env` vào resources (gitignore) — **không** publish dmg công khai nếu có secret
+- Packaged credentials: public via Next build inline; bridge secret via Electron inject / `userData` (không bake `.env` vào `resources/` / `.dmg`)
 - Harness / signing / auto-update: bước sau
 
 ## Kiểm tra nhanh (tự tắt sau khi OK)
@@ -117,7 +126,9 @@ desktop/
 - `sandbox: true`
 - No chat-bridge secret or service role in preload/renderer
 - Spawn commands are fixed (`npm run dev` / packaged `server.js`, `pnpm dsh web …`) — no shell strings from IPC
-- Do not commit `resources/` or `.env`; treat baked secrets in a public dmg as unsafe
+- Do not commit `resources/` or `.env`; installer resources must not contain Clerk/Supabase/bridge secrets
+- Bridge secret: machine-local inject + `userData/bridge-credentials.json` (not installer); env overrides are session-only
+- Cloud secrets stay on Vercel (results-only APIs); do not download keys into the desktop app — see `AGENTS.md` and repo-root `AGENTS.md` → Product credentials
 
 ## Not in this skeleton
 
