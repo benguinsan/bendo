@@ -2,6 +2,7 @@
   "name": "bendo",
   "version": "0.1.2",
   "private": true,
+  "type": "module",
   "description": "A project created with create-benguin-app",
   "engines": {
     "node": ">=22"
