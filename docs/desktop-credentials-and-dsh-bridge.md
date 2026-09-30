@@ -62,7 +62,9 @@ Sau:
 3. **`packagedNextEnv()`** không còn `loadEnvFile` từ resources; chỉ inherit process env + **inject DSH** từ Electron.
 4. **Rule AGENTS:** local `.env` full vẫn OK cho dev; phân bố public/secret chỉ bắt buộc khi dựng Electron resources / installer. Cloud secret thuộc host deploy (Vercel hoặc tương đương) — trả **kết quả**, không cho mượn key.
 
-**Chưa xong trong commit packaging này:** cutover packaged Next sang gọi API cloud cho tasks/DB (packaged vẫn cần chiến lược runtime riêng cho `CLERK_SECRET` / service role). Strip + inject chỉ **chặn bake secret vào installer** và **làm Agent bridge local hoạt động không cần `.env` trong resources**.
+**Cloud proxy (Electron spawn):** `BENDO_CLOUD_API_URL` trong `desktop/.env` (hoặc bake `bendo-public-config.json`) → Electron inject vào Next child; **xóa** `SUPABASE_SERVICE_ROLE_KEY` + `CLERK_SECRET_KEY` → privileged API (`/api/tasks`, categories, notifications, discord-identity) và `GET /api/me` proxy sang Vercel (Bearer session JWT; Vercel gọi `auth()` / service role). **Agent chat + `/api/health` không proxy.** Không có `CLERK_SECRET_KEY` → middleware passthrough; không dùng JWT-PEM local.
+
+Review workflow + ma trận file: [`cloud-secret-proxy-workflow.md`](./cloud-secret-proxy-workflow.md).
 
 ---
 
@@ -262,10 +264,11 @@ User mở Bendo.app
 
 ## 6. Bước tiếp theo (ngoài phạm vi doc này)
 
-1. Deploy API/UI privileged lên Vercel (hoặc host tương đương) với cloud secrets.
-2. Wire desktop packaged: request cần secret → cloud (session → kết quả).
-3. Rebuild resources / installer sau khi wire xong.
-4. Bundle harness runtime vào Electron (sau); model API key do user cung cấp.
+1. ~~Deploy API privileged lên Vercel~~ (done).
+2. ~~Wire desktop: privileged request → cloud~~ (`lib/api/cloud-privilege.ts`, `BENDO_CLOUD_API_URL`).
+3. ~~Cloud auth: `/api/me` + strip `CLERK_SECRET_KEY` on spawn~~ (`lib/api/cloud-auth.ts`, `isCloudAuthMode`).
+4. Rebuild resources / installer; set `BENDO_CLOUD_API_URL` trên máy pack (bake `bendo-public-config.json`).
+5. Bundle harness runtime vào Electron (sau); model API key do user cung cấp.
 
 ---
 

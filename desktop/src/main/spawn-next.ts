@@ -58,9 +58,11 @@ export function resolveBendoAppDir():
   | { ok: true; dir: string }
   | { ok: false; reason: string } {
   const raw = process.env.BENDO_APP_DIR?.trim();
+  const useExplicitDir =
+    Boolean(raw) && !raw!.includes("/absolute/path/to/") && !raw!.includes("path/to/");
   let candidate: string;
 
-  if (raw) {
+  if (useExplicitDir && raw) {
     candidate = path.isAbsolute(raw)
       ? raw
       : path.resolve(process.cwd(), raw);
@@ -176,7 +178,7 @@ function trackChild(
  * Env for packaged Next. Bridge credentials from Electron resolve (env session /
  * userData JSON) — never from files baked into Resources.
  */
-function packagedNextEnv(): NodeJS.ProcessEnv {
+function packagedNextEnv(appDir: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ELECTRON_RUN_AS_NODE: "1",
@@ -188,6 +190,7 @@ function packagedNextEnv(): NodeJS.ProcessEnv {
   };
 
   applyBridgeCredentialsToEnv(env, { force: true });
+  applyCloudApiUrlToEnv(env, appDir);
   return env;
 }
 
@@ -195,7 +198,43 @@ function packagedNextEnv(): NodeJS.ProcessEnv {
 function nextDevEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   applyBridgeCredentialsToEnv(env);
+  applyCloudApiUrlToEnv(env);
   return env;
+}
+
+/**
+ * Cloud privilege host (Vercel). Prefer packaged `bendo-public-config.json`,
+ * else desktop/.env. Strips Clerk + Supabase secrets so end-user Next cannot
+ * perform secret-key work locally (proxies to Vercel instead).
+ */
+function applyCloudApiUrlToEnv(
+  env: NodeJS.ProcessEnv,
+  packagedAppDir?: string
+): void {
+  let cloudUrl = process.env.BENDO_CLOUD_API_URL?.trim();
+
+  if (packagedAppDir) {
+    const configPath = path.join(packagedAppDir, "bendo-public-config.json");
+    try {
+      const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
+        bendoCloudApiUrl?: string;
+      };
+      const fromFile = cfg.bendoCloudApiUrl?.trim();
+      if (fromFile) {
+        cloudUrl = fromFile;
+      }
+    } catch {
+      // optional file
+    }
+  }
+
+  if (!cloudUrl) {
+    return;
+  }
+
+  env.BENDO_CLOUD_API_URL = cloudUrl.replace(/\/$/u, "");
+  delete env.SUPABASE_SERVICE_ROLE_KEY;
+  delete env.CLERK_SECRET_KEY;
 }
 
 /** Production standalone server from extraResources (packaged app). */
@@ -219,7 +258,7 @@ function startNextStandalone(appDir: string):
   try {
     child = spawnExecutable(electronBin, [serverJs], {
       cwd: appDir,
-      env: packagedNextEnv(),
+      env: packagedNextEnv(appDir),
       stdio: ["ignore", "pipe", "pipe"],
       detached: shouldDetachChild(),
       windowsHide: true,

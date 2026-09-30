@@ -1,3 +1,4 @@
+import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud-privilege";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import { fromServiceResult, unauthorized } from "@/lib/api/respond";
 import { markNotificationRead } from "@/lib/notifications/notification-service";
@@ -7,10 +8,15 @@ type NotificationRouteContext = {
 };
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   context: NotificationRouteContext
 ) {
-  const authResult = await requireApiUser();
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
