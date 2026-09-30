@@ -42,11 +42,32 @@ export async function fetchCloudMe(
     return null;
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    // Vercel often returns HTML 200 /_not-found when /api/me is missing or
+    // Clerk rewrote an invalid session — never parse as JSON (crashes the page).
+    throw new Error(
+      `Cloud /api/me returned non-JSON (HTTP ${response.status}). Deploy /api/me to Vercel and confirm CLERK_SECRET_KEY there.`
+    );
+  }
+
+  let payload: MeSuccessBody;
+  try {
+    payload = (await response.json()) as MeSuccessBody;
+  } catch {
+    throw new Error(
+      `Cloud /api/me returned invalid JSON (HTTP ${response.status}).`
+    );
+  }
+
   if (!response.ok) {
     throw new Error(`Cloud /api/me failed with HTTP ${response.status}`);
   }
 
-  const payload = (await response.json()) as MeSuccessBody;
+  if (!payload?.data?.id) {
+    return null;
+  }
+
   return payload.data;
 }
 
