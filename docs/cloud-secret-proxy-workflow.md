@@ -251,6 +251,8 @@ Pattern: `const proxied = await maybeProxyPrivilegedRequest(request); if (proxie
 ## 6. Giới hạn & rủi ro
 
 - Clerk trên Vercel phải chấp nhận Bearer session cùng Clerk application với publishable key trên desktop.
+- **Không dùng preview URL có Vercel Deployment Protection** — browser web login được, nhưng Next desktop `fetch` server-to-server không có cookie Vercel → 302/HTML → app crash. Dùng production domain (vd. `https://bendo-psi.vercel.app`) hoặc tắt Protection / bypass token cho API.
+- Middleware Vercel: `/api/*` không `auth.protect()` (tránh rewrite HTML); auth JSON qua `requireApiUser`.
 - Vercel down → privileged API / `/api/me` lỗi; Agent chat vẫn gọi được DSH nếu session token còn đọc được từ cookie (userId cần `/api/me` thành công).
 - Không CORS client-direct: mọi privileged call same-origin qua Next local rồi proxy.
 - Packaged build **bắt buộc** `BENDO_CLOUD_API_URL` trước `build:bendo`.

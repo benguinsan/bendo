@@ -9,11 +9,19 @@ import { NextResponse } from "next/server";
 const hasClerkSecret = Boolean(process.env.CLERK_SECRET_KEY?.trim());
 
 const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
+/**
+ * Pages: auth.protect() (HTML redirect/sign-in).
+ * API: do not protect() — desktop forwards Bearer only; protect() can
+ * rewrite to HTML (/_not-found, dev-browser-missing). Handlers use
+ * requireApiUser() → JSON 401.
+ */
 const clerkProtected = clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  if (isPublicRoute(req) || isApiRoute(req)) {
+    return;
   }
+  await auth.protect();
 });
 
 export default hasClerkSecret
