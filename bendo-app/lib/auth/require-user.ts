@@ -1,13 +1,20 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
-export const requireUser = cache(async () => {
-  const { userId } = await auth();
-  if (!userId) {
-    redirect("/sign-in");
-  }
-  const user = await currentUser();
+import {
+  resolveCurrentUserForApp,
+  type CloudMeUser,
+} from "@/lib/api/cloud-auth";
+
+export type AppUser = CloudMeUser;
+
+/**
+ * Authenticated user for RSC pages.
+ * Local full secrets: Clerk `currentUser()`.
+ * Cloud privilege mode: Vercel `GET /api/me` (Clerk secret stays on cloud).
+ */
+export const requireUser = cache(async (): Promise<AppUser> => {
+  const user = await resolveCurrentUserForApp();
   if (!user) {
     redirect("/sign-in");
   }

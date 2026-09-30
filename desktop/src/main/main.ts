@@ -3,8 +3,12 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
+import { loadDesktopEnv } from "./load-desktop-env";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
+
+// Before any spawn / URL resolution — desktop/.env (dev) or userData/desktop.env.
+loadDesktopEnv();
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;

@@ -1,4 +1,9 @@
 import "server-only";
+import { isCloudPrivilegeMode } from "@/lib/api/cloud-privilege";
+import {
+  cloudDeleteDiscordIdentity,
+  cloudUpsertDiscordIdentity,
+} from "@/lib/api/cloud-privilege-loaders";
 import type { DiscordConnection } from "@/lib/auth/discord-connection";
 import type { Tables } from "@/lib/supabase/database.types";
 import {
@@ -86,6 +91,27 @@ export function syncDiscordIdentityForSettings(
   clerkUserId: string,
   connection: DiscordConnection
 ): Promise<ServiceResult<DiscordIdentity | { deleted: boolean } | null>> {
+  if (isCloudPrivilegeMode()) {
+    void clerkUserId;
+    if (connection.status === "connected") {
+      if (!connection.discordUserId) {
+        return Promise.resolve(
+          fail(
+            "VALIDATION",
+            "Connected Discord account is missing a Discord user id."
+          )
+        );
+      }
+      return cloudUpsertDiscordIdentity(connection.discordUserId);
+    }
+
+    if (connection.status === "not_connected") {
+      return cloudDeleteDiscordIdentity();
+    }
+
+    return Promise.resolve(ok(null));
+  }
+
   if (connection.status === "connected") {
     if (!connection.discordUserId) {
       return Promise.resolve(

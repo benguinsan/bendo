@@ -1,3 +1,4 @@
+import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud-privilege";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import {
   fromServiceResult,
@@ -7,8 +8,13 @@ import {
 } from "@/lib/api/respond";
 import { createTask, listTasks } from "@/lib/tasks/task-service";
 
-export async function GET() {
-  const authResult = await requireApiUser();
+export async function GET(request: Request) {
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
@@ -17,7 +23,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const authResult = await requireApiUser();
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }

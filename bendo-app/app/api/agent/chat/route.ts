@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { getAgentRuntime } from "@/lib/agent/agent-runtime";
 import { AGENT_CHAT_MESSAGE_MAX } from "@/lib/agent/types";
+import { resolveSessionTokenForCloud } from "@/lib/api/cloud-auth";
+import { isCloudAuthMode } from "@/lib/api/cloud-mode";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import {
   fromServiceResult,
@@ -27,7 +29,7 @@ const chatTurnBodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const authResult = await requireApiUser();
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
@@ -43,8 +45,13 @@ export async function POST(request: Request) {
     return fromServiceResult(result);
   }
 
-  const { getToken } = await auth();
-  const clerkToken = (await getToken()) ?? "";
+  let clerkToken = "";
+  if (isCloudAuthMode()) {
+    clerkToken = (await resolveSessionTokenForCloud(request)) ?? "";
+  } else {
+    const { getToken } = await auth();
+    clerkToken = (await getToken()) ?? "";
+  }
 
   const runtime = getAgentRuntime();
   const result = await runtime.sendTurn({

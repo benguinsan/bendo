@@ -4,8 +4,16 @@ import { z } from "zod";
 export const env = createEnv({
   server: {
     NODE_ENV: z.enum(["development", "test", "production"]),
-    CLERK_SECRET_KEY: z.string().min(1),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    /**
+     * Required for Vercel and local `next dev` with full secrets.
+     * Optional on packaged desktop when `BENDO_CLOUD_API_URL` is set — then
+     * Clerk `auth()` / service role run on Vercel only.
+     */
+    CLERK_SECRET_KEY: z.string().min(1).optional(),
+    /** Local Supabase admin; omit on Electron-spawned Next when using cloud proxy. */
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    /** Vercel origin for privileged API + `/api/me` (Electron inject / public config). */
+    BENDO_CLOUD_API_URL: z.string().url().optional(),
     /** dsh chat-bridge URL, e.g. http://127.0.0.1:3080/bendo-chat */
     DSH_CHAT_BRIDGE_URL: z.string().url().optional(),
     /** Shared secret for x-bendo-chat-secret (must match cordis bridge config). */
@@ -32,6 +40,7 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    BENDO_CLOUD_API_URL: process.env.BENDO_CLOUD_API_URL,
     DSH_CHAT_BRIDGE_URL: process.env.DSH_CHAT_BRIDGE_URL,
     DSH_CHAT_BRIDGE_SECRET: process.env.DSH_CHAT_BRIDGE_SECRET,
     DSH_CHAT_TIMEOUT_MS: process.env.DSH_CHAT_TIMEOUT_MS,
@@ -47,3 +56,21 @@ export const env = createEnv({
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
 });
+
+if (process.env.NODE_ENV !== "test") {
+  const hasCloud = Boolean(env.BENDO_CLOUD_API_URL);
+  const hasClerk = Boolean(env.CLERK_SECRET_KEY);
+  const hasSupabase = Boolean(env.SUPABASE_SERVICE_ROLE_KEY);
+
+  if (!hasClerk && !hasCloud) {
+    throw new Error(
+      "Invalid environment: set CLERK_SECRET_KEY, or BENDO_CLOUD_API_URL for desktop cloud privilege mode."
+    );
+  }
+
+  if (!hasSupabase && !hasCloud) {
+    throw new Error(
+      "Invalid environment: set SUPABASE_SERVICE_ROLE_KEY and/or BENDO_CLOUD_API_URL."
+    );
+  }
+}

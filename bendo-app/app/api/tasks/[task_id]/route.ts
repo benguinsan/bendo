@@ -1,3 +1,4 @@
+import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud-privilege";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import {
   fromServiceResult,
@@ -11,8 +12,13 @@ type TaskRouteContext = {
   params: Promise<{ task_id: string }>;
 };
 
-export async function GET(_request: Request, context: TaskRouteContext) {
-  const authResult = await requireApiUser();
+export async function GET(request: Request, context: TaskRouteContext) {
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
@@ -22,7 +28,12 @@ export async function GET(_request: Request, context: TaskRouteContext) {
 }
 
 export async function PATCH(request: Request, context: TaskRouteContext) {
-  const authResult = await requireApiUser();
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
@@ -38,8 +49,13 @@ export async function PATCH(request: Request, context: TaskRouteContext) {
   );
 }
 
-export async function DELETE(_request: Request, context: TaskRouteContext) {
-  const authResult = await requireApiUser();
+export async function DELETE(request: Request, context: TaskRouteContext) {
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }

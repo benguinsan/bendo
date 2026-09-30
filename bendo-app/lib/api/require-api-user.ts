@@ -1,10 +1,10 @@
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
+import { resolveAuthedUserId } from "@/lib/api/cloud-auth";
 
-export async function requireApiUser() {
-  const { isAuthenticated, userId } = await auth();
+export async function requireApiUser(request?: Request) {
+  const userId = await resolveAuthedUserId(request);
 
-  if (!isAuthenticated || !userId) {
+  if (!userId) {
     return { ok: false as const };
   }
 

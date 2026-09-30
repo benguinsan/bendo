@@ -1,3 +1,4 @@
+import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud-privilege";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import {
   fromServiceResult,
@@ -15,7 +16,12 @@ type CategoryRouteContext = {
 };
 
 export async function PATCH(request: Request, context: CategoryRouteContext) {
-  const authResult = await requireApiUser();
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
@@ -31,8 +37,13 @@ export async function PATCH(request: Request, context: CategoryRouteContext) {
   );
 }
 
-export async function DELETE(_request: Request, context: CategoryRouteContext) {
-  const authResult = await requireApiUser();
+export async function DELETE(request: Request, context: CategoryRouteContext) {
+  const proxied = await maybeProxyPrivilegedRequest(request);
+  if (proxied) {
+    return proxied;
+  }
+
+  const authResult = await requireApiUser(request);
   if (!authResult.ok) {
     return unauthorized();
   }
