@@ -60,15 +60,6 @@ export async function waitForHealthy(
     await new Promise((resolve) => setTimeout(resolve, sleep));
   }
 
-  // Prefer the last probe failure (e.g. HTTP 500) over a generic "Timed out" —
-  // the wait loop often expires while Next is up but unhealthy.
-  if (lastReason.startsWith("Health check returned HTTP")) {
-    return {
-      ok: false,
-      reason: `${lastReason} (still failing after ${options.timeoutMs}ms)`,
-    };
-  }
-
   return {
     ok: false,
     reason: `Timed out after ${options.timeoutMs}ms waiting for ${url} (${lastReason})`,

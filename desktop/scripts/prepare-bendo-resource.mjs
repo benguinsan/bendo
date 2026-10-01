@@ -16,41 +16,6 @@ const desktopRoot = path.join(__dirname, "..");
 const bendoAppRoot = path.resolve(desktopRoot, "..", "bendo-app");
 const outDir = path.join(desktopRoot, "resources", "bendo-app");
 
-
-function loadDesktopDotEnv() {
-  const filePath = path.join(desktopRoot, ".env");
-  let text;
-  try {
-    text = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return;
-  }
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-    if (process.env[key] !== undefined) continue;
-    let value = line.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (value.includes("/absolute/path/to/") || value.includes("path/to/")) {
-      continue;
-    }
-    // Unescape common \n in PEM single-line env values
-    process.env[key] = value.replace(/\\n/g, "\n");
-  }
-}
-
-loadDesktopDotEnv();
-
-
 function fail(message) {
   console.error(`[build:bendo] ${message}`);
   process.exit(1);
@@ -155,9 +120,7 @@ if (!fs.existsSync(path.join(outDir, "server.js"))) {
   fail(`server.js missing after sync: ${outDir}`);
 }
 
-
-
-// Public Vercel origin for secret-key proxy (not a secret). Required for packaged desktop.
+// Public Vercel origin for future privileged API cutover (not a secret).
 const cloudUrl = process.env.BENDO_CLOUD_API_URL?.trim();
 if (!cloudUrl) {
   fail(

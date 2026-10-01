@@ -4,24 +4,16 @@ import { NextResponse } from "next/server";
 /**
  * Without CLERK_SECRET_KEY (packaged desktop → Vercel for auth), Clerk
  * middleware cannot run. Sign-in uses ClerkProvider + publishable key;
- * privileged routes forward the session JWT to Vercel which calls auth().
+ * `/api/me` and privileged routes forward the session JWT to Vercel.
  */
 const hasClerkSecret = Boolean(process.env.CLERK_SECRET_KEY?.trim());
 
 const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
-const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
-/**
- * Pages: auth.protect() (HTML redirect/sign-in).
- * API: do not protect() — desktop forwards Bearer only; protect() can
- * rewrite to HTML (/_not-found, dev-browser-missing). Handlers use
- * requireApiUser() → JSON 401.
- */
 const clerkProtected = clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req) || isApiRoute(req)) {
-    return;
+  if (!isPublicRoute(req)) {
+    await auth.protect();
   }
-  await auth.protect();
 });
 
 export default hasClerkSecret

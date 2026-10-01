@@ -1,5 +1,5 @@
 import "server-only";
-import { resolveAuthedUserId } from "@/lib/api/cloud-auth";
+import { resolveAuthedUserId } from "@/lib/api/cloud";
 
 export async function requireApiUser(request?: Request) {
   const userId = await resolveAuthedUserId(request);

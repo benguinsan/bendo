@@ -1,6 +1,6 @@
 import "server-only";
-import { resolveSessionTokenForCloud } from "@/lib/api/cloud-auth";
-import { getCloudApiOrigin, isCloudPrivilegeMode } from "@/lib/api/cloud-mode";
+import { resolveSessionTokenForCloud } from "@/lib/api/cloud/auth";
+import { getCloudApiOrigin, isCloudSupabaseMode } from "@/lib/api/cloud/mode";
 import { unauthorized } from "@/lib/api/respond";
 
 const PRIVILEGED_API_PREFIXES = [
@@ -31,12 +31,6 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "upgrade",
 ]);
 
-export {
-  getCloudApiOrigin,
-  hasLocalSupabaseAdmin,
-  isCloudPrivilegeMode,
-} from "@/lib/api/cloud-mode";
-
 function isAllowlistedPrivilegedPath(pathname: string): boolean {
   return PRIVILEGED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -46,13 +40,11 @@ function isAllowlistedPrivilegedPath(pathname: string): boolean {
 function forwardRequestHeaders(request: Request): Headers {
   const headers = new Headers();
   for (const [key, value] of request.headers.entries()) {
-    if (HOP_BY_HOP_REQUEST_HEADERS.has(key.toLowerCase())) {
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP_REQUEST_HEADERS.has(lower)) {
       continue;
     }
-    if (key.toLowerCase() === "cookie") {
-      continue;
-    }
-    if (key.toLowerCase() === "authorization") {
+    if (lower === "cookie" || lower === "authorization") {
       continue;
     }
     headers.set(key, value);
@@ -72,15 +64,15 @@ function forwardResponseHeaders(upstream: Headers): Headers {
 }
 
 /**
- * Server-side fetch to the cloud API (RSC loaders, settings sync, /api/me).
+ * Server-side fetch to the cloud API (RSC loaders, settings sync).
  * Forwards Clerk session as Bearer; never sends cookies. Vercel verifies.
  */
 export async function fetchCloudApi(
   pathWithQuery: string,
   init: RequestInit = {}
 ): Promise<Response> {
-  if (!isCloudPrivilegeMode()) {
-    throw new Error("fetchCloudApi called outside cloud privilege mode.");
+  if (!isCloudSupabaseMode()) {
+    throw new Error("fetchCloudApi called outside cloud Supabase mode.");
   }
 
   const token = await resolveSessionTokenForCloud();
@@ -108,13 +100,13 @@ export async function fetchCloudApi(
 }
 
 /**
- * Proxy an incoming API request to Vercel when in cloud privilege mode.
- * Auth is enforced on Vercel (secret keys). Local only forwards the session JWT.
+ * Proxy an incoming API request to Vercel when in cloud Supabase mode.
+ * Auth is enforced on Vercel. Local only forwards the session JWT.
  */
 export async function maybeProxyPrivilegedRequest(
   request: Request
 ): Promise<Response | null> {
-  if (!isCloudPrivilegeMode()) {
+  if (!isCloudSupabaseMode()) {
     return null;
   }
 

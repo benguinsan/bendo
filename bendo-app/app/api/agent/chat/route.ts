@@ -1,11 +1,9 @@
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 
 import { getAgentRuntime } from "@/lib/agent/agent-runtime";
 import { AGENT_CHAT_MESSAGE_MAX } from "@/lib/agent/types";
-import { resolveSessionTokenForCloud } from "@/lib/api/cloud-auth";
-import { isCloudAuthMode } from "@/lib/api/cloud-mode";
+import { resolveSessionTokenForCloud } from "@/lib/api/cloud";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import {
   fromServiceResult,
@@ -45,13 +43,7 @@ export async function POST(request: Request) {
     return fromServiceResult(result);
   }
 
-  let clerkToken = "";
-  if (isCloudAuthMode()) {
-    clerkToken = (await resolveSessionTokenForCloud(request)) ?? "";
-  } else {
-    const { getToken } = await auth();
-    clerkToken = (await getToken()) ?? "";
-  }
+  const clerkToken = (await resolveSessionTokenForCloud(request)) ?? "";
 
   const runtime = getAgentRuntime();
   const result = await runtime.sendTurn({

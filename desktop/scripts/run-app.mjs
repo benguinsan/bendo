@@ -8,7 +8,6 @@
  *   BENDO_APP_URL=http://127.0.0.1:3000 npm start
  */
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,42 +17,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
 const DEFAULT_BENDO_APP_URL = "http://127.0.0.1:3000";
-
-/** Load desktop/.env into process.env when keys are unset (skip path placeholders). */
-function loadDesktopDotEnv() {
-  const filePath = path.join(root, ".env");
-  let text;
-  try {
-    text = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return;
-  }
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-    if (process.env[key] !== undefined) continue;
-    let value = line.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (
-      value.includes("/absolute/path/to/") ||
-      value.includes("path/to/")
-    ) {
-      continue;
-    }
-    process.env[key] = value;
-  }
-}
-
-loadDesktopDotEnv();
 
 /**
  * @param {string | undefined} raw
