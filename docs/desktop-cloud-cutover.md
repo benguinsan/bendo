@@ -61,7 +61,7 @@ Local `next dev` / Docker / Vercel host: giữ full secrets → cả hai mode **
 
 JWT lấy từ đâu: sau sign-in, Clerk set cookie `__session` trên origin desktop. Packaged **đọc** (Bearer hoặc cookie) và forward — **không** verify local.
 
-**Race sau sign-in:** client Clerk có thể đã “signed-in” trong khi RSC chưa đọc được cookie → `requireUser` đá `/sign-in` và Clerk đá lại `/` (reload loop). Handle: `components/auth/post-sign-in-bridge.tsx` — khi `SignedIn`, poll `GET /api/me` (credentials) đến khi OK rồi `location.replace("/")`.
+**Race sau sign-in:** client Clerk có thể đã “signed-in” trong khi RSC chưa đọc được cookie → `requireUser` đá `/sign-in` và Clerk đá lại `/` (reload loop). Handle: `components/auth/post-sign-in-bridge.tsx` — khi `SignedIn`, poll `GET /api/me` với retry có giới hạn + delay tăng dần; hết hạn thì dừng và cho Sign out.
 
 ---
 

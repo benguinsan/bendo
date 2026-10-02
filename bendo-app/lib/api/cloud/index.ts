@@ -14,7 +14,11 @@ export {
   resolveCurrentUserForApp,
   resolveSessionTokenForCloud,
 } from "@/lib/api/cloud/auth";
-export { type MeUser, toMeUser } from "@/lib/api/cloud/me-user";
+export {
+  type MeUser,
+  parseMeSuccessBody,
+  toMeUser,
+} from "@/lib/api/cloud/me-user";
 export { getForwardableSessionToken } from "@/lib/api/cloud/session-token";
 export {
   fetchCloudApi,

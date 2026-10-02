@@ -1,11 +1,13 @@
 import "server-only";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
-import { type MeUser, toMeUser } from "@/lib/api/cloud/me-user";
+import {
+  type MeUser,
+  parseMeSuccessBody,
+  toMeUser,
+} from "@/lib/api/cloud/me-user";
 import { getCloudApiOrigin, isCloudClerkMode } from "@/lib/api/cloud/mode";
 import { getForwardableSessionToken } from "@/lib/api/cloud/session-token";
-
-type MeSuccessBody = { data: MeUser };
 
 /**
  * Resolve the signed-in user via Vercel `/api/me` (Clerk secret stays on cloud).
@@ -34,8 +36,18 @@ export async function fetchCloudMe(request?: Request): Promise<MeUser | null> {
     throw new Error(`Cloud /api/me failed with HTTP ${response.status}`);
   }
 
-  const payload = (await response.json()) as MeSuccessBody;
-  return payload.data;
+  // Guard: do not `as MeSuccessBody` — HTML/plain text throws here with a clear
+  // message; wrong JSON shape fails in parseMeSuccessBody (avoids undefined MeUser).
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(
+      `Cloud /api/me returned non-JSON body (HTTP ${response.status}).`
+    );
+  }
+
+  return parseMeSuccessBody(payload);
 }
 
 /** Local Clerk userId when secret exists; otherwise cloud `/api/me`. */
