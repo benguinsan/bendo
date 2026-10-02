@@ -1,6 +1,6 @@
 "use client";
 
-import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
+import { Show, useClerk } from "@clerk/nextjs";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 /** Cap total polls so a stuck handoff cannot spin forever. */
@@ -119,10 +119,13 @@ export function PostSignInBridge({
 }>) {
   return (
     <>
-      <SignedOut>{children}</SignedOut>
-      <SignedIn>
+      <Show when="signed-out">{children}</Show>
+      {/* If user is signed in, wait until the server can read the session (cookie → /api/me, possibly via Vercel proxy) before leaving /sign-in. */}
+      {/* Avoids / ↔ /sign-in reload loops when RSC requireUser races the cookie write. */}
+      {/* Clerk client (signed-in) and Server (requireUser) race to set the session cookie.*/}
+      <Show when="signed-in">
         <SessionHandoff />
-      </SignedIn>
+      </Show>
     </>
   );
 }
