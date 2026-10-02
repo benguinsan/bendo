@@ -1,5 +1,5 @@
 import "server-only";
-import { fetchCloudApi } from "@/lib/api/cloud-privilege";
+import { fetchCloudApi } from "@/lib/api/cloud/privilege";
 import type { DiscordIdentity } from "@/lib/discord/discord-identity-service";
 import { fail, ok, type ServiceResult } from "@/lib/supabase/errors";
 import type { PersistedCategory } from "@/lib/task-categories/persisted-category";

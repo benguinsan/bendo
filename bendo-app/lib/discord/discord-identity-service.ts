@@ -1,9 +1,9 @@
 import "server-only";
-import { isCloudPrivilegeMode } from "@/lib/api/cloud-privilege";
 import {
   cloudDeleteDiscordIdentity,
   cloudUpsertDiscordIdentity,
-} from "@/lib/api/cloud-privilege-loaders";
+  isCloudSupabaseMode,
+} from "@/lib/api/cloud";
 import type { DiscordConnection } from "@/lib/auth/discord-connection";
 import type { Tables } from "@/lib/supabase/database.types";
 import {
@@ -35,7 +35,7 @@ export async function upsertDiscordIdentity(
   const clerkId = clerkUserId.trim();
   const discordId = discordUserId.trim();
 
-  if (!clerkId || !discordId) {
+  if (!(clerkId && discordId)) {
     return fail("VALIDATION", "Clerk and Discord ids are required.");
   }
 
@@ -91,7 +91,7 @@ export function syncDiscordIdentityForSettings(
   clerkUserId: string,
   connection: DiscordConnection
 ): Promise<ServiceResult<DiscordIdentity | { deleted: boolean } | null>> {
-  if (isCloudPrivilegeMode()) {
+  if (isCloudSupabaseMode()) {
     void clerkUserId;
     if (connection.status === "connected") {
       if (!connection.discordUserId) {

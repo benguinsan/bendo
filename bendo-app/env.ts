@@ -7,7 +7,7 @@ export const env = createEnv({
     /**
      * Required for Vercel and local `next dev` with full secrets.
      * Optional on packaged desktop when `BENDO_CLOUD_API_URL` is set — then
-     * Clerk `auth()` / service role run on Vercel only.
+     * Clerk `auth()` / profile run on Vercel (`/api/me`).
      */
     CLERK_SECRET_KEY: z.string().min(1).optional(),
     /** Local Supabase admin; omit on Electron-spawned Next when using cloud proxy. */
@@ -62,13 +62,13 @@ if (process.env.NODE_ENV !== "test") {
   const hasClerk = Boolean(env.CLERK_SECRET_KEY);
   const hasSupabase = Boolean(env.SUPABASE_SERVICE_ROLE_KEY);
 
-  if (!hasClerk && !hasCloud) {
+  if (!(hasClerk || hasCloud)) {
     throw new Error(
-      "Invalid environment: set CLERK_SECRET_KEY, or BENDO_CLOUD_API_URL for desktop cloud privilege mode."
+      "Invalid environment: set CLERK_SECRET_KEY, or BENDO_CLOUD_API_URL for desktop cloud mode."
     );
   }
 
-  if (!hasSupabase && !hasCloud) {
+  if (!(hasSupabase || hasCloud)) {
     throw new Error(
       "Invalid environment: set SUPABASE_SERVICE_ROLE_KEY and/or BENDO_CLOUD_API_URL."
     );

@@ -1,4 +1,4 @@
-import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud-privilege";
+import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import { fromServiceResult, unauthorized } from "@/lib/api/respond";
 import { markNotificationRead } from "@/lib/notifications/notification-service";

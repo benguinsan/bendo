@@ -8,7 +8,7 @@ export function getSupabaseAdmin() {
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!serviceRoleKey) {
     throw new Error(
-      "Supabase service role is not configured. Use cloud API proxy or set SUPABASE_SERVICE_ROLE_KEY."
+      "SUPABASE_SERVICE_ROLE_KEY is not configured. Use cloud Supabase mode or set the service role key."
     );
   }
 

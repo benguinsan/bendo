@@ -1,4 +1,4 @@
-import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud-privilege";
+import { maybeProxyPrivilegedRequest } from "@/lib/api/cloud";
 import { requireApiUser } from "@/lib/api/require-api-user";
 import {
   fromServiceResult,

@@ -1,7 +1,7 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 
-import { hasClerkSecret } from "@/lib/api/cloud-mode";
+import { hasClerkSecret } from "@/lib/api/cloud";
 
 export type DiscordConnectionStatus =
   | "connected"
@@ -25,7 +25,7 @@ type DiscordExternalAccount = {
 
 type DiscordConnectionUser = {
   id: string;
-  externalAccounts?: DiscordExternalAccount[];
+  externalAccounts: DiscordExternalAccount[];
 };
 
 type OauthTokenLookup = "present" | "absent" | "error";
@@ -79,7 +79,7 @@ async function lookupDiscordOauthToken(
 export async function getDiscordConnectionStatus(
   user: DiscordConnectionUser
 ): Promise<DiscordConnection> {
-  const discordAccount = (user.externalAccounts ?? []).find((account) =>
+  const discordAccount = user.externalAccounts.find((account) =>
     isDiscordProvider(account.provider)
   );
   const identity = discordIdentity(discordAccount);

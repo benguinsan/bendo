@@ -58,11 +58,9 @@ export function resolveBendoAppDir():
   | { ok: true; dir: string }
   | { ok: false; reason: string } {
   const raw = process.env.BENDO_APP_DIR?.trim();
-  const useExplicitDir =
-    Boolean(raw) && !raw!.includes("/absolute/path/to/") && !raw!.includes("path/to/");
   let candidate: string;
 
-  if (useExplicitDir && raw) {
+  if (raw) {
     candidate = path.isAbsolute(raw)
       ? raw
       : path.resolve(process.cwd(), raw);
@@ -203,9 +201,10 @@ function nextDevEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * Cloud privilege host (Vercel). Prefer packaged `bendo-public-config.json`,
- * else desktop/.env. Strips Clerk + Supabase secrets so end-user Next cannot
- * perform secret-key work locally (proxies to Vercel instead).
+ * Inject public Vercel origin into Next child env.
+ * Prefer packaged `bendo-public-config.json`, else `BENDO_CLOUD_API_URL` from Electron.
+ * When cloud URL is set, strip Clerk + Supabase secrets so cloud Clerk/Supabase modes activate
+ * (secrets stay on Vercel; never inherit from the Electron parent process).
  */
 function applyCloudApiUrlToEnv(
   env: NodeJS.ProcessEnv,
@@ -233,8 +232,8 @@ function applyCloudApiUrlToEnv(
   }
 
   env.BENDO_CLOUD_API_URL = cloudUrl.replace(/\/$/u, "");
-  delete env.SUPABASE_SERVICE_ROLE_KEY;
   delete env.CLERK_SECRET_KEY;
+  delete env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 /** Production standalone server from extraResources (packaged app). */

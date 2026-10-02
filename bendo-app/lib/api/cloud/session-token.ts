@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
  * Read Clerk session JWT from Authorization Bearer or `__session` cookie.
  * Does not verify locally — Vercel `auth()` verifies when the token is forwarded.
  */
+
+// Function to get the forwardable session token for the request
 export async function getForwardableSessionToken(
   request?: Request
 ): Promise<string | null> {

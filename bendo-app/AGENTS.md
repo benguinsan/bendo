@@ -288,6 +288,7 @@ Use GET only for read or status operations:
 - GET /api/tasks
 - GET /api/categories
 - GET /api/notifications
+- GET /api/me — signed-in Clerk profile JSON for desktop → Vercel identity cutover (not used by local UI when `CLERK_SECRET_KEY` is present)
 
 Use PATCH for partial updates to existing resources:
 - PATCH /api/tasks/:task_id
@@ -368,17 +369,12 @@ Never expose to browser / Client Component code:
 The tiers below govern **Electron resource / installer packaging** (and what may be returned to clients). They do not require removing secrets from local dev `.env`. See repo-root [`../AGENTS.md`](../AGENTS.md) → Product credentials.
 
 1. **Public** — `NEXT_PUBLIC_*` (and publishable / anon equivalents). Allowed in browser and may appear in shipped client or Electron-packaged artifacts.
-2. **Cloud server-only** — `CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and similar god-mode keys. Live only on the deployed host (Vercel). Never returned to clients. Never packaged into the desktop installer or standalone resources copied for Electron.
+2. **Cloud server-only** — `CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and similar god-mode keys. On the deployed host (Vercel or equivalent) for shipped-product privileged work. Used only inside server handlers. Never returned to clients. Never packaged into the desktop installer or standalone resources copied for Electron.
 3. **Local machine-only** — `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SECRET` (and timeout). Localhost Agent path between this app’s server and the harness. Not fetched from Vercel. Not shipped in the installer.
 
-**Pattern (shipped desktop):** requests that need a secret key (Supabase service role, Clerk `auth()` / `currentUser()` / `clerkClient()` / protected session) are executed on Vercel. Local Next may proxy the session and must return domain results only (tasks, categories, status, …). End users do not configure those secrets.
+**Pattern (shipped product):** a privileged route authenticates the Clerk session, performs work with server-side secrets, and returns domain results (tasks, categories, status, …).
 
-**Stay local:** `/api/agent/chat` and `/api/health` — not part of the secret-key → Vercel group.
-
-**Anti-patterns:**
-- An API or bootstrap flow that returns secret key material to desktop or browser (“lend keys from Vercel”).
-- Shipping `CLERK_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` so desktop can call Clerk/Supabase itself.
-- Local JWT public-key verification as a substitute for moving Clerk `auth()` to Vercel.
+**Anti-pattern:** any API or bootstrap flow that returns secret key material to desktop or browser (“lend keys from Vercel”).
 
 ## Environment variables
 
@@ -387,12 +383,12 @@ Canonical list lives in `.env.example`. Only `NEXT_PUBLIC_*` values may reach br
 | Variable                                                                      | Purpose                                                                                        | Exposure        | Distribution                                      |
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------- |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                                           | Clerk publishable key                                                                          | client + server | Public — may ship / inline in client artifacts    |
-| `CLERK_SECRET_KEY`                                                            | Clerk server-side key                                                                          | server only     | Cloud server-only (Vercel); never ship            |
+| `CLERK_SECRET_KEY`                                                            | Clerk server-side key; optional on packaged Next if `BENDO_CLOUD_API_URL` set                  | server only     | Cloud server-only (Vercel); never ship            |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `_SIGN_UP_URL` / `_*_FALLBACK_REDIRECT_URL` | Clerk auth route config                                                                        | client + server | Public — may ship / inline                        |
 | `NEXT_PUBLIC_SUPABASE_URL`                                                    | Supabase project URL                                                                           | client + server | Public — may ship / inline                        |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`                                               | Supabase anon key                                                                              | client + server | Public — may ship / inline                        |
-| `SUPABASE_SERVICE_ROLE_KEY`                                                   | Service-role DB access for writes and pipeline reads                                           | server only     | Cloud server-only (Vercel); never ship            |
-| `BENDO_CLOUD_API_URL`                                                         | Vercel origin for privileged API + `/api/me` when desktop Next has no cloud secrets            | server only     | `desktop/.env` / bake public config; inject at spawn; not on Vercel |
+| `SUPABASE_SERVICE_ROLE_KEY`                                                   | Service-role DB access; optional on packaged Next if `BENDO_CLOUD_API_URL` set                 | server only     | Cloud server-only (Vercel); never ship            |
+| `BENDO_CLOUD_API_URL`                                                         | Vercel origin; enables `lib/api/cloud` when secrets omitted (Electron inject)                  | server only     | `desktop/.env` / bake public config; not on Vercel |
 | `DSH_CHAT_BRIDGE_URL`                                                         | dsh Doro chat-bridge URL (see section 10)                                                      | server only     | Local machine-only; not from Vercel; not in installer |
 | `DSH_CHAT_BRIDGE_SECRET`                                                      | Shared secret for `x-bendo-chat-secret` (must match cordis bridge `secret`)                    | server only     | Local machine-only; not from Vercel; not in installer |
 | `DSH_CHAT_TIMEOUT_MS`                                                         | Max wait for one agent turn in ms (default `120000`)                                           | server only     | Local / server config; not a cloud secret         |
