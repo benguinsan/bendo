@@ -3,6 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
+import { initRuntimeLog } from "./runtime-log";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
 
@@ -117,6 +118,9 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 }
 
 app.whenReady().then(() => {
+  // One-session note file: release/bendo-runtime.log (dev) or userData/logs (packaged).
+  initRuntimeLog();
+
   registerIpc();
   const win = createWindow();
 
