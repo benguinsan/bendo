@@ -19,17 +19,17 @@ function ensureHarnessInBackground(bendoUrl: string): Promise<void> {
   if (harnessEnsureInFlight) {
     return harnessEnsureInFlight;
   }
-  
+
   const attempt = (async () => {
-      const harness = await ensureHarnessServer(bendoUrl);
-      if (!harness.ok) {
-        console.warn(
-          `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
-        );
-      }
-    })().finally(() => {
-      harnessEnsureInFlight = undefined;
-    });
+    const harness = await ensureHarnessServer(bendoUrl);
+    if (!harness.ok) {
+      console.warn(
+        `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
+      );
+    }
+  })().finally(() => {
+    harnessEnsureInFlight = undefined;
+  });
   harnessEnsureInFlight = attempt;
   return attempt;
 }
