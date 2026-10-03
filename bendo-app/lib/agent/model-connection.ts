@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  isAbsoluteHttpUrl,
+  isAllowedModelEndpoint,
   joinEndpointPath,
   type ModelApiProvider,
 } from "@/lib/agent/model-api-key";
@@ -26,6 +26,7 @@ const ERROR_RATE_LIMIT = "Đang bị giới hạn tốc độ, thử lại sau";
 const ERROR_PROVIDER = "Provider đang lỗi, thử lại sau";
 const ERROR_UNREACHABLE = "Không kết nối được tới endpoint";
 const ERROR_REJECTED = "Yêu cầu bị từ chối bởi provider";
+const ERROR_ENDPOINT_NOT_ALLOWED = "Endpoint không được phép";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -72,6 +73,38 @@ async function readBodyText(response: Response): Promise<string> {
   }
 }
 
+function parseJsonObject(bodyText: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(bodyText);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** OpenAI-compatible chat/completions success shape. */
+function isOpenAiChatCompletionBody(bodyText: string): boolean {
+  const parsed = parseJsonObject(bodyText);
+  return parsed !== null && Array.isArray(parsed.choices);
+}
+
+/** Gemini generateContent success shape. */
+function isGeminiGenerateContentBody(bodyText: string): boolean {
+  const parsed = parseJsonObject(bodyText);
+  return parsed !== null && Array.isArray(parsed.candidates);
+}
+
+function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status < 400;
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
@@ -85,11 +118,26 @@ async function fetchWithTimeout(
   try {
     return await fetch(url, {
       ...init,
+      redirect: "manual",
       signal: controller.signal,
     });
   } finally {
     clearTimeout(timer);
   }
+}
+
+function assertAllowedProbeUrl(
+  provider: ModelApiProvider,
+  url: string
+): ModelConnectionResult | null {
+  if (!isAllowedModelEndpoint(provider, url)) {
+    return {
+      ok: false,
+      error: ERROR_ENDPOINT_NOT_ALLOWED,
+      code: "ENDPOINT_NOT_ALLOWED",
+    };
+  }
+  return null;
 }
 
 function openAiCompatibleHeaders(apiKey: string): HeadersInit {
@@ -100,11 +148,16 @@ function openAiCompatibleHeaders(apiKey: string): HeadersInit {
 }
 
 async function listContainsModel(input: {
+  provider: ModelApiProvider;
   endpoint: string;
   apiKey: string;
   model: string;
 }): Promise<"yes" | "no" | "skip" | ModelConnectionResult> {
   const url = joinEndpointPath(input.endpoint, "models");
+  const hostError = assertAllowedProbeUrl(input.provider, url);
+  if (hostError) {
+    return hostError;
+  }
 
   try {
     const response = await fetchWithTimeout(
@@ -115,6 +168,14 @@ async function listContainsModel(input: {
       },
       MODEL_LIST_TIMEOUT_MS
     );
+
+    if (isRedirectStatus(response.status)) {
+      return {
+        ok: false,
+        error: ERROR_ENDPOINT_NOT_ALLOWED,
+        code: "ENDPOINT_NOT_ALLOWED",
+      };
+    }
 
     if (response.status === 401) {
       return { ok: false, error: ERROR_INVALID_KEY, code: "INVALID_API_KEY" };
@@ -169,6 +230,10 @@ async function probeOpenAiCompatible(
   input: ModelConnectionInput
 ): Promise<ModelConnectionResult> {
   const url = joinEndpointPath(input.endpoint, "chat/completions");
+  const hostError = assertAllowedProbeUrl(input.provider, url);
+  if (hostError) {
+    return hostError;
+  }
 
   let response: Response;
   try {
@@ -192,15 +257,28 @@ async function probeOpenAiCompatible(
     return { ok: false, error: ERROR_UNREACHABLE, code: "UNREACHABLE" };
   }
 
-  if (response.ok) {
-    return { ok: true };
+  if (isRedirectStatus(response.status)) {
+    return {
+      ok: false,
+      error: ERROR_ENDPOINT_NOT_ALLOWED,
+      code: "ENDPOINT_NOT_ALLOWED",
+    };
   }
 
   const bodyText = await readBodyText(response);
+
+  if (response.ok) {
+    if (isOpenAiChatCompletionBody(bodyText)) {
+      return { ok: true };
+    }
+    return { ok: false, error: ERROR_REJECTED, code: "PROVIDER_REJECTED" };
+  }
+
   const mapped = mapStatusToError(response.status);
 
   if (response.status === 404 || bodySuggestsMissingModel(bodyText)) {
     const listed = await listContainsModel({
+      provider: input.provider,
       endpoint: input.endpoint,
       apiKey: input.apiKey,
       model: input.model,
@@ -240,6 +318,10 @@ async function probeGemini(
   input: ModelConnectionInput
 ): Promise<ModelConnectionResult> {
   const url = geminiGenerateUrl(input.endpoint, input.model);
+  const hostError = assertAllowedProbeUrl(input.provider, url);
+  if (hostError) {
+    return hostError;
+  }
 
   let response: Response;
   try {
@@ -265,11 +347,23 @@ async function probeGemini(
     return { ok: false, error: ERROR_UNREACHABLE, code: "UNREACHABLE" };
   }
 
-  if (response.ok) {
-    return { ok: true };
+  if (isRedirectStatus(response.status)) {
+    return {
+      ok: false,
+      error: ERROR_ENDPOINT_NOT_ALLOWED,
+      code: "ENDPOINT_NOT_ALLOWED",
+    };
   }
 
   const bodyText = await readBodyText(response);
+
+  if (response.ok) {
+    if (isGeminiGenerateContentBody(bodyText)) {
+      return { ok: true };
+    }
+    return { ok: false, error: ERROR_REJECTED, code: "PROVIDER_REJECTED" };
+  }
+
   if (response.status === 404 || bodySuggestsMissingModel(bodyText)) {
     return { ok: false, error: ERROR_MODEL_MISSING, code: "MODEL_NOT_FOUND" };
   }
@@ -290,11 +384,19 @@ export function probeModelConnection(
   const apiKey = input.apiKey.trim();
   const model = input.model.trim();
 
-  if (!endpoint || !apiKey || !model || !isAbsoluteHttpUrl(endpoint)) {
+  if (!endpoint || !apiKey || !model) {
     return Promise.resolve({
       ok: false,
       error: "Provider, endpoint, API key, and model are required.",
       code: "VALIDATION",
+    });
+  }
+
+  if (!isAllowedModelEndpoint(input.provider, endpoint)) {
+    return Promise.resolve({
+      ok: false,
+      error: ERROR_ENDPOINT_NOT_ALLOWED,
+      code: "ENDPOINT_NOT_ALLOWED",
     });
   }
 

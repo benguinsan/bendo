@@ -246,6 +246,7 @@ There is a button on Agent chat that opens the UI for the user to add their own 
 - Instructions are per provider (console/dashboard, which key to copy, and that the key is the user’s and billed by that provider).
 - The value is a user-owned credential. Do not prefill it from server env, harness env, or Vercel. Do not log the raw key, echo it back in full after entry, or return it from an API. Mask the key field while typing.
 - **Test connection** runs on the Next server (`POST /api/agent/model-connection`): a minimal chat ping to the user’s endpoint (15s timeout) and optional `/models` lookup (5s). It does **not** go through the harness chat-bridge. Map upstream failures to classified Vietnamese messages (`API key không hợp lệ`, `Tài khoản hết credit`, `Model không tồn tại`, `Đang bị giới hạn tốc độ, thử lại sau`, `Provider đang lỗi, thử lại sau`). Passing the saved config into harness chat turns is a separate follow-up.
+- Probe SSRF guards: only `https` endpoints whose hostname is in the per-provider allowlist (`openrouter.ai`, `api.vilao.ai`, `api.openai.com`, `generativelanguage.googleapis.com`); do not follow redirects; clear the API key from the form when the selected provider changes so a key is not sent to another provider.
 
 ---
 

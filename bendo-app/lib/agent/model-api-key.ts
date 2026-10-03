@@ -50,6 +50,17 @@ export const MODEL_API_PROVIDER_DEFAULTS: Record<
   },
 };
 
+/** Exact HTTPS hostnames the connection probe may call per provider (SSRF guard). */
+export const MODEL_API_PROVIDER_ALLOWED_HOSTS: Record<
+  ModelApiProvider,
+  readonly string[]
+> = {
+  openrouter: ["openrouter.ai"],
+  vilao: ["api.vilao.ai"],
+  gpt: ["api.openai.com"],
+  gemini: ["generativelanguage.googleapis.com"],
+};
+
 export type ModelApiProviderInstructions = {
   summary: string;
   steps: readonly string[];
@@ -128,11 +139,38 @@ export function isAbsoluteHttpUrl(value: string): boolean {
   }
 }
 
+/**
+ * True when the endpoint is https, has no userinfo, uses default/443 port,
+ * and its hostname is in the provider allowlist.
+ */
+export function isAllowedModelEndpoint(
+  provider: ModelApiProvider,
+  endpoint: string
+): boolean {
+  try {
+    const url = new URL(endpoint.trim());
+    if (url.protocol !== "https:") {
+      return false;
+    }
+    if (url.username || url.password) {
+      return false;
+    }
+    if (url.port && url.port !== "443") {
+      return false;
+    }
+
+    const hostname = url.hostname.toLowerCase();
+    return MODEL_API_PROVIDER_ALLOWED_HOSTS[provider].includes(hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Join base endpoint with a path without duplicating a trailing segment. */
 export function joinEndpointPath(endpoint: string, path: string): string {
   const base = endpoint.trim().replace(/\/+$/u, "");
   const suffix = path.replace(/^\/+/u, "");
-  if (base.endsWith(`/${suffix}`) || base.endsWith(suffix)) {
+  if (base.endsWith(`/${suffix}`)) {
     return base;
   }
   return `${base}/${suffix}`;
@@ -170,7 +208,7 @@ function parseStoredValue(raw: string): StoredModelApiKey | null {
       !trimmedEndpoint ||
       !trimmedKey ||
       !trimmedModel ||
-      !isAbsoluteHttpUrl(trimmedEndpoint)
+      !isAllowedModelEndpoint(provider, trimmedEndpoint)
     ) {
       return null;
     }
@@ -217,7 +255,7 @@ export function writeStoredModelApiKey(value: StoredModelApiKey): void {
     !apiKey ||
     !model ||
     !isModelApiProvider(value.provider) ||
-    !isAbsoluteHttpUrl(endpoint)
+    !isAllowedModelEndpoint(value.provider, endpoint)
   ) {
     return;
   }

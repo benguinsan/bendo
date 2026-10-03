@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
-  isAbsoluteHttpUrl,
+  isAllowedModelEndpoint,
   isModelApiProvider,
   maskModelApiKey,
   MODEL_API_PROVIDER_DEFAULTS,
@@ -124,8 +124,8 @@ function ModelApiKeyForm({
 
     if (!trimmedEndpoint) {
       next.endpoint = "API endpoint is required.";
-    } else if (!isAbsoluteHttpUrl(trimmedEndpoint)) {
-      next.endpoint = "API endpoint must be an http(s) URL.";
+    } else if (!isAllowedModelEndpoint(provider, trimmedEndpoint)) {
+      next.endpoint = "Endpoint không được phép.";
     }
 
     if (!trimmedModel) {
@@ -147,18 +147,25 @@ function ModelApiKeyForm({
     setProvider(next);
     const defaults = MODEL_API_PROVIDER_DEFAULTS[next];
     const stored = readStoredModelApiKey();
+
+    // Always clear the typed key when switching providers so a key is never
+    // sent to a different provider host.
+    setApiKey("");
+    setErrors({});
+    setTestStatus(null);
+
     if (stored?.provider === next) {
       setEndpoint(stored.endpoint);
       setModel(stored.model);
       setSavedMask(maskModelApiKey(stored.apiKey));
       setSavedApiKey(stored.apiKey);
-      setApiKey("");
-    } else {
-      setEndpoint(defaults.endpoint);
-      setModel(defaults.model);
+      return;
     }
-    setErrors({});
-    setTestStatus(null);
+
+    setEndpoint(defaults.endpoint);
+    setModel(defaults.model);
+    setSavedMask(null);
+    setSavedApiKey(null);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -374,7 +381,7 @@ function ModelApiKeyForm({
               {savedMask && !apiKey ? (
                 <FieldDescription>
                   A key is set for this session ({savedMask}). Enter a new key
-                  to replace it, or clear below.
+                  to replace it.
                 </FieldDescription>
               ) : null}
               <FieldError>{errors.apiKey}</FieldError>

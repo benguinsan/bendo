@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 
 import {
-  isAbsoluteHttpUrl,
+  isAllowedModelEndpoint,
   MODEL_API_PROVIDERS,
 } from "@/lib/agent/model-api-key";
 import { probeModelConnection } from "@/lib/agent/model-connection";
@@ -15,16 +15,22 @@ import {
 } from "@/lib/api/respond";
 import { fromZodError, ok } from "@/lib/supabase/errors";
 
-const bodySchema = z.object({
-  provider: z.enum(MODEL_API_PROVIDERS),
-  endpoint: z
-    .string()
-    .trim()
-    .min(1, "API endpoint is required.")
-    .refine(isAbsoluteHttpUrl, "API endpoint must be an http(s) URL."),
-  apiKey: z.string().trim().min(1, "API key is required."),
-  model: z.string().trim().min(1, "Model name is required."),
-});
+const bodySchema = z
+  .object({
+    provider: z.enum(MODEL_API_PROVIDERS),
+    endpoint: z.string().trim().min(1, "API endpoint is required."),
+    apiKey: z.string().trim().min(1, "API key is required."),
+    model: z.string().trim().min(1, "Model name is required."),
+  })
+  .superRefine((data, ctx) => {
+    if (!isAllowedModelEndpoint(data.provider, data.endpoint)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endpoint"],
+        message: "Endpoint không được phép.",
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   const authResult = await requireApiUser(request);
