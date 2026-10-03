@@ -236,6 +236,18 @@ Desktop shell / Electron packaging is **out of scope** for this file — see rep
 - Settings **Connect Discord** and `discord_identities` support a future Discord channel. They are not required for Agent chat through the chat-bridge.
 - Discord Gateway / public bot hosting is deferred; see repo-root `AGENTS.md` for product priority. Do not couple page components to Discord bot code.
 
+## Agent chat — user model API key
+
+There is a button on Agent chat that opens the UI for the user to add their own model configuration. Bendo does not ship a provider key in the client, the installer, or `NEXT_PUBLIC_*`.
+
+- The button lives on Agent chat (`components/agent/`, page `app/(app)/agent`) — an added control, not a replacement for the composer or other existing controls.
+- The UI (modal/dialog) opened by that button collects **Provider**, **API endpoint**, **API key**, and **Model name**, with complete per-provider instructions (where to create the key, what endpoint/model id to use, where to paste).
+- Supported providers: **OpenRouter**, **Vilao**, **GPT**, **Gemini**. The user chooses one of these; do not accept a free-form provider name outside this set.
+- Instructions are per provider (console/dashboard, which key to copy, and that the key is the user’s and billed by that provider).
+- The value is a user-owned credential. Do not prefill it from server env, harness env, or Vercel. Do not log the raw key, echo it back in full after entry, or return it from an API. Mask the key field while typing.
+- **Test connection** runs on the Next server (`POST /api/agent/model-connection`): a minimal chat ping to the user’s endpoint (15s timeout) and optional `/models` lookup (5s). It does **not** go through the harness chat-bridge. Map upstream failures to classified Vietnamese messages (`API key không hợp lệ`, `Tài khoản hết credit`, `Model không tồn tại`, `Đang bị giới hạn tốc độ, thử lại sau`, `Provider đang lỗi, thử lại sau`). Passing the saved config into harness chat turns is a separate follow-up.
+- Probe SSRF guards: only `https` endpoints whose hostname is in the per-provider allowlist (`openrouter.ai`, `api.vilao.ai`, `api.openai.com`, `generativelanguage.googleapis.com`); do not follow redirects; clear the API key from the form when the selected provider changes so a key is not sent to another provider.
+
 ---
 
 # 11. Discord identity mapping rules
@@ -360,7 +372,9 @@ Never expose to browser / Client Component code:
 - Supabase service role key
 - `CLERK_SECRET_KEY`
 - `DSH_CHAT_BRIDGE_SECRET`
-- Discord bot tokens and harness model API keys
+- Discord bot tokens and Bendo-owned or harness-owned model API keys
+
+The Agent chat UI (section 10) has a button that opens the flow for the **user** to add their own OpenRouter, Vilao, GPT, or Gemini model configuration (endpoint, key, model) and to test connectivity via Next. That is not a license to embed, prefetch, or return a provider key the app owns.
 
 ## Credential tiers (product distribution)
 

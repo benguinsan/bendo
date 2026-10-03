@@ -5,7 +5,9 @@ export const DORO_DISPLAY_NAME = "Doro";
 export const DORO_SUBTITLE = "Task assistant";
 
 const DORO_WELCOME_BODY =
-  "Xin chào mình là Doro, trợ lý viên hỗ trợ cho ứng dụng Bendo";
+  "Hé lô! Mình là Doro, trợ lý nhỏ xíu đồng hành cùng bạn trong Bendo ✨\n\n" +
+  "Để mình bắt đầu hoạt động, bạn chỉ cần cung cấp API key " +
+  "và endpoint của model mà bạn muốn sử dụng nhé! 🚀";
 
 /** Local welcome bubble until chat history is persisted. */
 export function createDoroWelcomeMessage(now = new Date()): ChatMessage {

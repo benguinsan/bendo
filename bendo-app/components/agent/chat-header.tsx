@@ -1,5 +1,9 @@
-import { EllipsisVerticalIcon } from "lucide-react";
+"use client";
 
+import { KeyRoundIcon } from "lucide-react";
+import { useState } from "react";
+
+import { ModelApiKeyDialog } from "@/components/agent/model-api-key-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +13,8 @@ import {
 } from "@/lib/agent/chat";
 
 export function ChatHeader() {
+  const [apiKeyOpen, setApiKeyOpen] = useState(false);
+
   return (
     <header className="border-border/60 flex shrink-0 items-center justify-between gap-3 border-b px-1 pb-4">
       <div className="flex min-w-0 items-center gap-3">
@@ -25,15 +31,19 @@ export function ChatHeader() {
           </p>
         </div>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="text-muted-foreground size-10 shrink-0"
-        aria-label="Conversation options"
-      >
-        <EllipsisVerticalIcon />
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground size-10"
+          aria-label="Model configuration"
+          onClick={() => setApiKeyOpen(true)}
+        >
+          <KeyRoundIcon />
+        </Button>
+      </div>
+      <ModelApiKeyDialog open={apiKeyOpen} onOpenChange={setApiKeyOpen} />
     </header>
   );
 }
