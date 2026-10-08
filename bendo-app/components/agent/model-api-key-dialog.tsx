@@ -199,9 +199,6 @@ function ModelApiKeyForm({
     setSaveError(null);
     setTestStatus(null);
 
-    // Interim client cache for this browser session (durable userData later).
-    writeStoredModelApiKey(payload);
-
     const applyResult = await applyModelConfigViaApi(payload);
     setSaving(false);
 
@@ -210,6 +207,8 @@ function ModelApiKeyForm({
       return;
     }
 
+    // Interim client cache only after harness apply succeeds (durable userData later).
+    writeStoredModelApiKey(payload);
     setSavedMask(maskModelApiKey(keyToSave));
     setSavedApiKey(keyToSave);
     setApiKey("");
