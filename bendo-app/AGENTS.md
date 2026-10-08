@@ -245,8 +245,19 @@ There is a button on Agent chat that opens the UI for the user to add their own 
 - Supported providers: **OpenRouter**, **Vilao**, **GPT**, **Gemini**. The user chooses one of these; do not accept a free-form provider name outside this set.
 - Instructions are per provider (console/dashboard, which key to copy, and that the key is the user’s and billed by that provider).
 - The value is a user-owned credential. Do not prefill it from server env, harness env, or Vercel. Do not log the raw key, echo it back in full after entry, or return it from an API. Mask the key field while typing.
-- **Test connection** runs on the Next server (`POST /api/agent/model-connection`): a minimal chat ping to the user’s endpoint (15s timeout) and optional `/models` lookup (5s). It does **not** go through the harness chat-bridge. Map upstream failures to classified Vietnamese messages (`API key không hợp lệ`, `Tài khoản hết credit`, `Model không tồn tại`, `Đang bị giới hạn tốc độ, thử lại sau`, `Provider đang lỗi, thử lại sau`). Passing the saved config into harness chat turns is a separate follow-up.
+- **Test connection** runs on the Next server (`POST /api/agent/model-connection`): a minimal chat ping to the user’s endpoint (15s timeout) and optional `/models` lookup (5s). It does **not** go through the harness chat-bridge. Map upstream failures to classified Vietnamese messages (`API key không hợp lệ`, `Tài khoản hết credit`, `Model không tồn tại`, `Đang bị giới hạn tốc độ, thử lại sau`, `Provider đang lỗi, thử lại sau`).
 - Probe SSRF guards: only `https` endpoints whose hostname is in the per-provider allowlist (`openrouter.ai`, `api.vilao.ai`, `api.openai.com`, `generativelanguage.googleapis.com`); do not follow redirects; clear the API key from the form when the selected provider changes so a key is not sent to another provider.
+- **Save / apply** runs on the Next server (`POST /api/agent/model-config`): Clerk + Zod + same endpoint allowlist, then forwards `{ action: "applyModelConfig", provider, endpoint, apiKey, model }` to the localhost DSH chat-bridge (shared secret). Harness applies in-process (and updates `agentDefaultModel` / credentials when available). Chat turns **require** that apply first — the bridge does not fall back to cordis `agent-default-model` for Bendo chat (no shipped provider key). Do **not** attach model secrets to chat-turn bodies. Durable `userData` / Electron `safeStorage` persist is still planned (sessionStorage remains the interim browser cache).
+
+### Plan — save model config before use (no per-turn attach)
+
+Product path for user-owned model credentials (desktop-first Agent):
+
+1. **Configure then use:** The user enters Provider / endpoint / API key / model name in the Agent modal, optionally **Test connection**, then **Save**. Save calls `POST /api/agent/model-config` so Harness/Doro receives and applies that config **before** chat, not by reading credentials off each chat message.
+2. **Local persist on the user machine:** Survives app quit/reopen. Preferred shape: a small **local JSON** (or equivalent) under desktop `userData` / harness local data — fields only: `provider`, `endpoint`, `apiKey`, `model`. Prefer encrypting or OS-backed protection for the key (e.g. Electron `safeStorage`) when available. Do **not** store this in Supabase, Vercel, or ship it inside the installer. *(Not shipped yet — apply is in-process on harness + sessionStorage interim.)*
+3. **Apply to harness without chat payload:** Save pushes config to the local harness over the localhost DSH bridge so Doro replaces hardcoding in `agent-default-model` / cordis with the user config. Chat turns keep the existing bridge body (`message`, `sessionId`, `clerkToken`, …) and **must not** attach `apiKey`, endpoint, or full model config on every turn.
+4. **Chat path stays thin:** Browser → Next `/api/agent/chat` → DSH bridge → harness uses the **already applied** model config. Do not send the raw key from the browser on each send.
+5. **Out of scope for this plan:** SQLite unless multiple profiles later require it; cloud sync of provider keys; attaching model secrets to chat-turn requests.
 
 ---
 

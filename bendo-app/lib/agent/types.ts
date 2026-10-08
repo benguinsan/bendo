@@ -35,3 +35,16 @@ export type SendChatTurnResult = {
   sessionId: string;
   reply: ChatMessage;
 };
+
+/** User model config applied to the local harness once (not per chat turn). */
+export type ApplyModelConfigInput = {
+  provider: "openrouter" | "vilao" | "gpt" | "gemini";
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  signal?: AbortSignal;
+};
+
+export type ApplyModelConfigResult = {
+  ok: true;
+};

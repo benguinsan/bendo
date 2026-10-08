@@ -31,6 +31,7 @@ import {
   writeStoredModelApiKey,
   type ModelApiProvider,
 } from "@/lib/agent/model-api-key";
+import { applyModelConfigViaApi } from "@/lib/agent/model-config-api-client";
 import { testModelConnectionViaApi } from "@/lib/agent/model-connection-api-client";
 import { cn } from "@/lib/utils";
 
@@ -102,9 +103,11 @@ function ModelApiKeyForm({
   );
   const [errors, setErrors] = useState<FormErrors>({});
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [testStatus, setTestStatus] = useState<
     { kind: "success" } | { kind: "error"; message: string } | null
   >(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const instructions = MODEL_API_PROVIDER_INSTRUCTIONS[provider];
 
@@ -153,6 +156,7 @@ function ModelApiKeyForm({
     setApiKey("");
     setErrors({});
     setTestStatus(null);
+    setSaveError(null);
 
     if (stored?.provider === next) {
       setEndpoint(stored.endpoint);
@@ -168,11 +172,12 @@ function ModelApiKeyForm({
     setSavedApiKey(null);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateFields(true);
     if (nextErrors.endpoint || nextErrors.model || nextErrors.apiKey) {
       setErrors(nextErrors);
+      setSaveError(null);
       return;
     }
 
@@ -189,12 +194,25 @@ function ModelApiKeyForm({
       model: model.trim(),
     };
 
+    setSaving(true);
+    setErrors({});
+    setSaveError(null);
+    setTestStatus(null);
+
+    // Interim client cache for this browser session (durable userData later).
     writeStoredModelApiKey(payload);
+
+    const applyResult = await applyModelConfigViaApi(payload);
+    setSaving(false);
+
+    if (!applyResult.ok) {
+      setSaveError(applyResult.error);
+      return;
+    }
+
     setSavedMask(maskModelApiKey(keyToSave));
     setSavedApiKey(keyToSave);
     setApiKey("");
-    setErrors({});
-    setTestStatus(null);
     onOpenChange(false);
   }
 
@@ -245,7 +263,8 @@ function ModelApiKeyForm({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm">
             Add your own provider endpoint, model, and API key for Agent chat.
-            Saved values stay in this browser session only.
+            Save applies the config to the local Agent; values also stay in this
+            browser session until durable local persist ships.
           </DialogDescription>
         </div>
         <DialogClose
@@ -398,17 +417,27 @@ function ModelApiKeyForm({
               {testStatus.message}
             </p>
           ) : null}
+          {saveError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {saveError}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" size="lg" className="min-w-24 px-8">
-              Save
+            <Button
+              type="submit"
+              size="lg"
+              className="min-w-24 px-8"
+              disabled={saving || testing}
+            >
+              {saving ? "Saving…" : "Save"}
             </Button>
             <Button
               type="button"
               size="lg"
               variant="secondary"
               className="min-w-24 px-8"
-              disabled={testing}
+              disabled={testing || saving}
               onClick={() => {
                 void handleTestConnection();
               }}
