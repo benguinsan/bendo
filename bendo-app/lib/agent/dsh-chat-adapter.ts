@@ -3,13 +3,22 @@ import { randomUUID } from "node:crypto";
 
 import { env } from "@/env";
 import type { AgentRuntime } from "@/lib/agent/agent-runtime";
-import type { SendChatTurnInput, SendChatTurnResult } from "@/lib/agent/types";
+import type {
+  ApplyModelConfigInput,
+  ApplyModelConfigResult,
+  SendChatTurnInput,
+  SendChatTurnResult,
+} from "@/lib/agent/types";
 import { fail, ok, type ServiceResult } from "@/lib/supabase/errors";
+
+/** Apply is a config write, not a model turn — keep it short. */
+const APPLY_MODEL_CONFIG_TIMEOUT_MS = 15_000;
 
 type BridgeSuccess = {
   sessionId?: unknown;
   replyText?: unknown;
   error?: unknown;
+  ok?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,6 +78,18 @@ function mapBridgeSuccess(payload: unknown): ServiceResult<SendChatTurnResult> {
       body: body.replyText,
     },
   });
+}
+
+function mapApplySuccess(
+  payload: unknown
+): ServiceResult<ApplyModelConfigResult> {
+  if (!isRecord(payload) || payload.ok !== true) {
+    return fail(
+      "AGENT_UNAVAILABLE",
+      "Agent bridge did not confirm model config apply."
+    );
+  }
+  return ok({ ok: true });
 }
 
 function linkParentAbort(
@@ -167,6 +188,68 @@ export function createDshChatAdapter(): AgentRuntime | null {
             return fail("AGENT_UNAVAILABLE", "Agent request was cancelled.");
           }
           return fail("AGENT_TIMEOUT", "Agent turn timed out.");
+        }
+        const detail = error instanceof Error ? error.message : String(error);
+        return fail("AGENT_UNAVAILABLE", `Agent bridge unreachable: ${detail}`);
+      } finally {
+        clearTimeout(timer);
+        unlinkParent?.();
+      }
+    },
+
+    applyModelConfig: async (
+      input: ApplyModelConfigInput
+    ): Promise<ServiceResult<ApplyModelConfigResult>> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        controller.abort();
+      }, APPLY_MODEL_CONFIG_TIMEOUT_MS);
+      const unlinkParent = linkParentAbort(input.signal, controller);
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-bendo-chat-secret": secret,
+          },
+          body: JSON.stringify({
+            action: "applyModelConfig",
+            provider: input.provider,
+            endpoint: input.endpoint,
+            apiKey: input.apiKey,
+            model: input.model,
+          }),
+          signal: controller.signal,
+        });
+
+        const parsed = parseBridgeBody(await response.text());
+        if (!parsed.ok) {
+          return fail(
+            "AGENT_UNAVAILABLE",
+            `Agent bridge returned non-JSON (${response.status}).`
+          );
+        }
+        const { payload } = parsed;
+
+        if (!response.ok) {
+          const message = bridgeErrorMessage(
+            payload,
+            `Agent bridge failed (${response.status}).`
+          );
+          if (response.status === 400) {
+            return fail("VALIDATION", message);
+          }
+          return fail("AGENT_UNAVAILABLE", message);
+        }
+
+        return mapApplySuccess(payload);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") {
+          if (input.signal?.aborted) {
+            return fail("AGENT_UNAVAILABLE", "Agent request was cancelled.");
+          }
+          return fail("AGENT_TIMEOUT", "Applying model config timed out.");
         }
         const detail = error instanceof Error ? error.message : String(error);
         return fail("AGENT_UNAVAILABLE", `Agent bridge unreachable: ${detail}`);

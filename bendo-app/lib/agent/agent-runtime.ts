@@ -1,12 +1,20 @@
 import "server-only";
 import { createDshChatAdapter } from "@/lib/agent/dsh-chat-adapter";
-import type { SendChatTurnInput, SendChatTurnResult } from "@/lib/agent/types";
+import type {
+  ApplyModelConfigInput,
+  ApplyModelConfigResult,
+  SendChatTurnInput,
+  SendChatTurnResult,
+} from "@/lib/agent/types";
 import { fail, type ServiceResult } from "@/lib/supabase/errors";
 
 export type AgentRuntime = {
   sendTurn: (
     input: SendChatTurnInput
   ) => Promise<ServiceResult<SendChatTurnResult>>;
+  applyModelConfig: (
+    input: ApplyModelConfigInput
+  ) => Promise<ServiceResult<ApplyModelConfigResult>>;
 };
 
 /** How long a completed turn stays dedupable for the same clientRequestId. */
@@ -18,6 +26,9 @@ type IdempotencyEntry = {
 };
 
 const idempotencyCache = new Map<string, IdempotencyEntry>();
+
+const offlineMessage =
+  "Agent is offline. Set DSH_CHAT_BRIDGE_URL and DSH_CHAT_BRIDGE_SECRET.";
 
 function pruneIdempotencyCache(now: number) {
   for (const [key, entry] of idempotencyCache) {
@@ -33,6 +44,7 @@ function pruneIdempotencyCache(now: number) {
  */
 function withClientRequestIdempotency(runtime: AgentRuntime): AgentRuntime {
   return {
+    applyModelConfig: (input) => runtime.applyModelConfig(input),
     sendTurn: (input) => {
       const requestId = input.clientRequestId?.trim();
       if (!requestId) {
@@ -86,12 +98,9 @@ export function getAgentRuntime(): AgentRuntime {
   if (!adapter) {
     return {
       sendTurn: () =>
-        Promise.resolve(
-          fail(
-            "AGENT_UNAVAILABLE",
-            "Agent is offline. Set DSH_CHAT_BRIDGE_URL and DSH_CHAT_BRIDGE_SECRET."
-          )
-        ),
+        Promise.resolve(fail("AGENT_UNAVAILABLE", offlineMessage)),
+      applyModelConfig: () =>
+        Promise.resolve(fail("AGENT_UNAVAILABLE", offlineMessage)),
     };
   }
   return withClientRequestIdempotency(adapter);
