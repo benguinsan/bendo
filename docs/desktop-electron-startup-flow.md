@@ -64,8 +64,8 @@ flowchart TD
 | Ensure Bendo | `runtime-manager` → `spawn-next` | Health `BENDO_HEALTH_URL` (default `:3000/api/health`); spawn `npm run dev` (dev) hoặc standalone (packaged) |
 | Load UI | `main.ts` | `BrowserWindow.loadURL(BENDO_APP_URL)` hoặc `offline.html` nếu fail |
 | Bridge creds | `bridge-credentials.ts` | Env session hoặc `userData/bridge-credentials.json`; inject vào child Next + harness |
-| Ensure harness | `spawn-harness.ts` | Health `…/bendo-chat`; spawn `pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open` |
-| Chat | `bendo-app` + Doro | Thin path; Save applies user model config via bridge (`action: applyModelConfig`). Durable userData persist still planned. |
+| Ensure harness | `spawn-harness.ts` | Health `…/bendo-chat`; spawn `pnpm dsh web --patch …` with `DSH_HOME={userData}/dsh` (`BENDO_DSH_HOME` override; no migrate from `~/.dsh`) |
+| Chat | `bendo-app` + Doro | Thin path; Save → bridge `applyModelConfig` → credentials + `llm-pi-ai.providers` under that `DSH_HOME`. Bendo-side durable persist / re-apply (step C) still planned. |
 | Shutdown | `runtime-shutdown.ts` | Kill owned children only |
 
 ---

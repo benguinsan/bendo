@@ -19,6 +19,8 @@ const DEFAULT_SPAWN_TIMEOUT_MS = 90_000;
 const WAIT_INTERVAL_MS = 500;
 const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
 const DSH_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
+/** Harness settings/credentials home under Electron userData (not ~/.dsh). */
+const ELECTRON_DSH_HOME_DIRNAME = "dsh";
 
 let ownedChild: ChildProcess | null = null;
 /** Once true, `startHarness` refuses new spawns (quit / stopRuntimes). */
@@ -137,12 +139,50 @@ function clearOwnedChild(child: ChildProcess): void {
   }
 }
 
+/**
+ * Absolute path for the harness `$DSH_HOME` when Electron spawns dsh.
+ *
+ * Default: `{userData}/dsh` so settings.yaml / credentials stay app-local and
+ * do not share `~/.dsh` with a Models-page / CLI session. Override with
+ * `BENDO_DSH_HOME` (absolute or cwd-relative). No auto-migrate from `~/.dsh` —
+ * Save again in Bendo Agent after switching homes.
+ */
+export function resolveElectronDshHome(): string {
+  const raw = process.env.BENDO_DSH_HOME?.trim();
+  if (raw) {
+    return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+  }
+  return path.join(app.getPath("userData"), ELECTRON_DSH_HOME_DIRNAME);
+}
+
+/** Ensure the Electron-managed DSH home directory exists before spawn. */
+export function ensureElectronDshHome():
+  | { ok: true; dir: string }
+  | { ok: false; reason: string } {
+  const dir = resolveElectronDshHome();
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      reason: `Failed to create DSH_HOME directory ${dir}: ${message}`,
+    };
+  }
+  return { ok: true, dir };
+}
+
 // Set the environment variables for the harness child process.
-function harnessChildEnv(bendoAppUrl: string): NodeJS.ProcessEnv {
+function harnessChildEnv(
+  bendoAppUrl: string,
+  dshHome: string
+): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (!env.BENDO_API_BASE_URL?.trim()) {
     env.BENDO_API_BASE_URL = bendoAppUrl;
   }
+  // Force app-local harness data (settings.yaml, credentials) under userData.
+  env.DSH_HOME = dshHome;
   // Same secret as Next (env wins over cordis.yml). Force so Electron-managed
   // runs do not keep a stale cordis default when parent env is empty.
   applyBridgeCredentialsToEnv(env, { force: true });
@@ -155,8 +195,8 @@ function startHarness(
 ):
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
-    // Check flag shuttingDown first child kill -> prevent new spawns (startup, reload, active) after shutdown.
-    if (shuttingDown) {
+  // Check flag shuttingDown first child kill -> prevent new spawns (startup, reload, active) after shutdown.
+  if (shuttingDown) {
     return {
       ok: false,
       reason: "Shutdown in progress; refusing to spawn harness",
@@ -167,6 +207,11 @@ function startHarness(
     return { ok: true, child: ownedChild };
   }
 
+  const dshHome = ensureElectronDshHome();
+  if (!dshHome.ok) {
+    return dshHome;
+  }
+
   // Get the pnpm command.
   const pnpm = getPnpmCommand();
 
@@ -175,7 +220,7 @@ function startHarness(
   try {
     child = spawnCommand(pnpm, DSH_ARGS, {
       cwd: harnessDir,
-      env: harnessChildEnv(bendoAppUrl),
+      env: harnessChildEnv(bendoAppUrl, dshHome.dir),
       stdio: ["ignore", "pipe", "pipe"],
       detached: shouldDetachChild(),
       windowsHide: true,
@@ -201,7 +246,7 @@ function startHarness(
   });
 
   console.log(
-    `[harness] Spawned \`pnpm ${DSH_ARGS.join(" ")}\` in ${harnessDir} (pid ${child.pid})`
+    `[harness] Spawned \`pnpm ${DSH_ARGS.join(" ")}\` in ${harnessDir} (pid ${child.pid}; DSH_HOME=${dshHome.dir})`
   );
   return { ok: true, child };
 }
@@ -244,7 +289,7 @@ export async function ensureHarnessServer(
   const existing = await isHealthy(healthUrl);
   if (existing.ok) {
     console.log(
-      `[harness] Attaching to existing harness at ${url} (health ${healthUrl})`
+      `[harness] Attaching to existing harness at ${url} (health ${healthUrl}); DSH_HOME is that process's own home (Electron userData/dsh only applies when this app spawns harness)`
     );
     return { ok: true, spawned: false };
   }

@@ -2,7 +2,7 @@
 
 Tài liệu ghi các điều chỉnh **sau** khi ship modal model config + Test connection (`POST /api/agent/model-connection`). Không thay thế `bendo-app/AGENTS.md` §10 — rule ngắn vẫn nằm ở đó.
 
-**Phạm vi:** UI Agent chat model configuration, probe Next → provider. Không gồm đẩy config vào harness chat-bridge (follow-up riêng).
+**Phạm vi:** UI Agent chat model configuration, probe Next → provider. Apply vào harness đã ship (bridge `applyModelConfig` → credentials + `llm-pi-ai.providers` + selection; xem `bendo-agent(doro)/cordis.yml` và `bendo-app/AGENTS.md` §10). Persist durable `userData` vẫn follow-up.
 
 **Prompt gốc:** `bendo-app/prompts/agent-chat-model-config-fields.md`
 
@@ -135,4 +135,4 @@ Vẫn mở kỹ thuật:
 
 - Reject private IP sau DNS (defense-in-depth ngoài allowlist)
 - Nút Clear / xóa store từ UI
-- Thay `sessionStorage` MVP bằng persist `userData` + apply bridge
+- Thay `sessionStorage` MVP bằng persist `userData` + re-apply bridge khi harness ready (apply bridge đã có)

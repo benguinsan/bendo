@@ -26,7 +26,7 @@ npm start
 - If down: spawns `npm run dev` in sibling `bendo-app/` (or `BENDO_APP_DIR`), waits for health 2xx, then loads
 - After Bendo is up: checks harness health `http://127.0.0.1:3080/bendo-chat` (or `BENDO_HARNESS_HEALTH_URL`)
   - If healthy: attaches
-  - If down: spawns `pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open` in `deepseek-harness/` (or `BENDO_HARNESS_DIR`)
+  - If down: spawns `pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open` in `deepseek-harness/` (or `BENDO_HARNESS_DIR`) with `DSH_HOME={userData}/dsh` (not `~/.dsh`; override via `BENDO_DSH_HOME`). No copy from `~/.dsh` — Save again in Bendo Agent after the switch.
   - Harness failure is **soft** — Bendo still loads; Agent chat stays offline until the bridge is up
 - Quit Electron: stops **only** Next / harness processes this session spawned
 - If Next spawn fails / path missing: offline page with **Retry**
@@ -54,7 +54,17 @@ BENDO_HARNESS_URL=http://127.0.0.1:3080 npm start
 BENDO_HARNESS_HEALTH_URL=http://127.0.0.1:3080/bendo-chat npm start
 BENDO_HARNESS_DIR=../deepseek-harness npm start
 BENDO_HARNESS_SPAWN_TIMEOUT_MS=120000 npm start
+# Optional: override harness settings home (default: Electron userData/dsh)
+# BENDO_DSH_HOME=/absolute/path/to/dsh-home npm start
 ```
+
+### Harness `$DSH_HOME` (Electron-spawned)
+
+When Electron **spawns** harness, it sets `DSH_HOME` to `app.getPath("userData")/dsh` so `settings.yaml` / credentials from Bendo Save/apply live under the app, not shared `~/.dsh`.
+
+- Override: `BENDO_DSH_HOME`
+- **No migrate** from `~/.dsh` — after switching, open Agent → Save model config again
+- **Attach** to an already-running harness: that process keeps whatever `DSH_HOME` it started with
 
 ### Chat bridge credentials (local)
 
