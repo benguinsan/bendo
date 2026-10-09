@@ -2,7 +2,7 @@
 
 Tài liệu ghi các điều chỉnh **sau** khi ship modal model config + Test connection (`POST /api/agent/model-connection`). Không thay thế `bendo-app/AGENTS.md` §10 — rule ngắn vẫn nằm ở đó.
 
-**Phạm vi:** UI Agent chat model configuration, probe Next → provider. Không gồm đẩy config vào harness chat-bridge (follow-up riêng).
+**Phạm vi:** UI Agent chat model configuration, probe Next → provider. Apply / dynamic `llm-pi-ai` route (bước A–B): [`agent-model-dynamic-route-ab.md`](./agent-model-dynamic-route-ab.md). Persist durable Electron (bước C) đã ship — xem §8 trong doc A–B.
 
 **Prompt gốc:** `bendo-app/prompts/agent-chat-model-config-fields.md`
 
@@ -134,5 +134,4 @@ Quy định product trong `bendo-app/AGENTS.md` §10 (**Plan — save model conf
 Vẫn mở kỹ thuật:
 
 - Reject private IP sau DNS (defense-in-depth ngoài allowlist)
-- Nút Clear / xóa store từ UI
-- Thay `sessionStorage` MVP bằng persist `userData` + apply bridge
+- Nút Clear / xóa durable store từ UI

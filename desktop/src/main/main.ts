@@ -3,6 +3,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
+import {
+  loadModelConfig,
+  saveModelConfig,
+} from "./model-config-store";
 import { initRuntimeLog } from "./runtime-log";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
@@ -77,6 +81,12 @@ function registerIpc(): void {
     const ok = await loadBendo(win);
     return { ok };
   });
+
+  ipcMain.handle("bendo:model-config:save", async (_event, payload: unknown) =>
+    saveModelConfig(payload)
+  );
+
+  ipcMain.handle("bendo:model-config:load", () => loadModelConfig());
 }
 
 async function runSmoke(win: BrowserWindow): Promise<void> {

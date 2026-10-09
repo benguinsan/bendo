@@ -2,6 +2,8 @@
 
 Flow khi mở Electron shell (`desktop/`, `npm start`, không smoke). Không thay thế `desktop/README.md` hay root `AGENTS.md`.
 
+Dynamic model route + `DSH_HOME` (A–B): [`agent-model-dynamic-route-ab.md`](./agent-model-dynamic-route-ab.md).
+
 ---
 
 ## 1. Tổng quan
@@ -64,8 +66,8 @@ flowchart TD
 | Ensure Bendo | `runtime-manager` → `spawn-next` | Health `BENDO_HEALTH_URL` (default `:3000/api/health`); spawn `npm run dev` (dev) hoặc standalone (packaged) |
 | Load UI | `main.ts` | `BrowserWindow.loadURL(BENDO_APP_URL)` hoặc `offline.html` nếu fail |
 | Bridge creds | `bridge-credentials.ts` | Env session hoặc `userData/bridge-credentials.json`; inject vào child Next + harness |
-| Ensure harness | `spawn-harness.ts` | Health `…/bendo-chat`; spawn `pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open` |
-| Chat | `bendo-app` + Doro | Thin path; Save applies user model config via bridge (`action: applyModelConfig`). Durable userData persist still planned. |
+| Ensure harness | `spawn-harness.ts` | Health `…/bendo-chat`; spawn `pnpm dsh web --patch …` with `DSH_HOME={userData}/dsh` (`BENDO_DSH_HOME` override; no migrate from `~/.dsh`) |
+| Chat | `bendo-app` + Doro | Thin path; Save → bridge `applyModelConfig` → credentials + `llm-pi-ai.providers` under that `DSH_HOME`. Step C: durable `userData/model-config.json` + re-apply after harness ready. |
 | Shutdown | `runtime-shutdown.ts` | Kill owned children only |
 
 ---
@@ -83,5 +85,7 @@ flowchart TD
 - `desktop/src/main/spawn-next.ts`
 - `desktop/src/main/spawn-harness.ts`
 - `desktop/src/main/bridge-credentials.ts`
+- `desktop/src/main/model-config-store.ts`
+- `desktop/src/main/apply-persisted-model-config.ts`
 - `desktop/README.md`
 - Plan user model config (persist local, không đính kèm chat): `bendo-app/AGENTS.md` §10
