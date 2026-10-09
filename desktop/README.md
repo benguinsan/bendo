@@ -55,16 +55,21 @@ BENDO_HARNESS_HEALTH_URL=http://127.0.0.1:3080/bendo-chat npm start
 BENDO_HARNESS_DIR=../deepseek-harness npm start
 BENDO_HARNESS_SPAWN_TIMEOUT_MS=120000 npm start
 # Optional: override harness settings home (default: Electron userData/dsh)
-# BENDO_DSH_HOME=/absolute/path/to/dsh-home npm start
+# Leading ~ is expanded (e.g. BENDO_DSH_HOME=~/dsh → $HOME/dsh).
+# BENDO_DSH_HOME=~/dsh npm start
 ```
 
 ### Harness `$DSH_HOME` (Electron-spawned)
 
 When Electron **spawns** harness, it sets `DSH_HOME` to `app.getPath("userData")/dsh` so `settings.yaml` / credentials from Bendo Save/apply live under the app, not shared `~/.dsh`.
 
-- Override: `BENDO_DSH_HOME`
+- Override: `BENDO_DSH_HOME` (absolute, `~/…`, or cwd-relative; `~` → home)
 - **No migrate** from `~/.dsh` — after switching, open Agent → Save model config again
 - **Attach** to an already-running harness: that process keeps whatever `DSH_HOME` it started with
+
+### User model config (durable)
+
+After Agent **Save**, Electron main stores `{ provider, endpoint, model, apiKeyEncrypted }` in `userData/model-config.json` (`safeStorage` for the key). When harness is ready on startup, main re-applies that config to the localhost bridge. Save in the UI succeeds only when harness apply **and** this persist both succeed.
 
 ### Chat bridge credentials (local)
 

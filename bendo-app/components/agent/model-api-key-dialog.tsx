@@ -1,7 +1,7 @@
 "use client";
 
 import { ZapIcon } from "lucide-react";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +32,11 @@ import {
   type ModelApiProvider,
 } from "@/lib/agent/model-api-key";
 import { applyModelConfigViaApi } from "@/lib/agent/model-config-api-client";
+import {
+  hasDesktopModelConfigPersist,
+  loadDesktopModelConfig,
+  persistDesktopModelConfig,
+} from "@/lib/agent/model-config-desktop";
 import { testModelConnectionViaApi } from "@/lib/agent/model-connection-api-client";
 import { cn } from "@/lib/utils";
 
@@ -108,8 +113,29 @@ function ModelApiKeyForm({
     { kind: "success" } | { kind: "error"; message: string } | null
   >(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const isDesktop = hasDesktopModelConfigPersist();
 
   const instructions = MODEL_API_PROVIDER_INSTRUCTIONS[provider];
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const desktop = await loadDesktopModelConfig();
+      if (cancelled || !desktop) {
+        return;
+      }
+      setProvider(desktop.provider);
+      setEndpoint(desktop.endpoint);
+      setModel(desktop.model);
+      setSavedMask(maskModelApiKey(desktop.apiKey));
+      setSavedApiKey(desktop.apiKey);
+      setApiKey("");
+      writeStoredModelApiKey(desktop);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function resolveApiKeyForAction(): string | null {
     const typed = apiKey.trim();
@@ -200,15 +226,24 @@ function ModelApiKeyForm({
     setTestStatus(null);
 
     const applyResult = await applyModelConfigViaApi(payload);
-    setSaving(false);
-
     if (!applyResult.ok) {
+      setSaving(false);
       setSaveError(applyResult.error);
       return;
     }
 
-    // Interim client cache only after harness apply succeeds (durable userData later).
+    if (isDesktop) {
+      const persistResult = await persistDesktopModelConfig(payload);
+      if (!persistResult.ok) {
+        setSaving(false);
+        setSaveError(persistResult.error);
+        return;
+      }
+    }
+
+    // Session cache only after full Save success (apply ∧ persist on desktop).
     writeStoredModelApiKey(payload);
+    setSaving(false);
     setSavedMask(maskModelApiKey(keyToSave));
     setSavedApiKey(keyToSave);
     setApiKey("");
@@ -261,9 +296,9 @@ function ModelApiKeyForm({
             Model configuration
           </DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm">
-            Add your own provider endpoint, model, and API key for Agent chat.
-            Save applies the config to the local Agent; values also stay in this
-            browser session until durable local persist ships.
+            {isDesktop
+              ? "Add your own provider endpoint, model, and API key for Agent chat. Save applies the config to the local Agent and stores it on this machine across restarts (not synced to the cloud)."
+              : "Add your own provider endpoint, model, and API key for Agent chat. Save applies the config to the local Agent; values also stay in this browser session."}
           </DialogDescription>
         </div>
         <DialogClose
@@ -398,8 +433,9 @@ function ModelApiKeyForm({
               />
               {savedMask && !apiKey ? (
                 <FieldDescription>
-                  A key is set for this session ({savedMask}). Enter a new key
-                  to replace it.
+                  {isDesktop
+                    ? `A key is saved on this machine (${savedMask}). Enter a new key to replace it.`
+                    : `A key is set for this session (${savedMask}). Enter a new key to replace it.`}
                 </FieldDescription>
               ) : null}
               <FieldError>{errors.apiKey}</FieldError>

@@ -2,7 +2,7 @@
 
 Tài liệu giải thích **vì sao** cần đăng ký route động, **workflow** Save → apply → chat, và **chức năng** đã thêm/sửa trong bước **A** (harness) + **B** (Electron `DSH_HOME`). Không thay thế `bendo-app/AGENTS.md` §10.
 
-**Chưa làm (bước C):** persist durable phía Bendo + re-apply khi mở lại app (vẫn `sessionStorage` + apply in-process; mất sau quit/restart harness nếu chưa Save lại).
+**Bước C (đã ship):** persist durable Electron `userData` + `safeStorage`, Save = apply ∧ persist, startup re-apply khi harness ready. Non-Electron vẫn dùng `sessionStorage` sau apply.
 
 **Liên quan:**
 
@@ -12,6 +12,7 @@ Tài liệu giải thích **vì sao** cần đăng ký route động, **workflow
 | [`agent-model-connection-hardening.md`](./agent-model-connection-hardening.md) | Probe / SSRF / Test connection |
 | [`desktop-electron-startup-flow.md`](./desktop-electron-startup-flow.md) | Spawn Next + harness |
 | [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md) | Bridge secret inject |
+| [`agent-model-config-save-workflow.md`](./agent-model-config-save-workflow.md) | Save = apply ∧ persist + startup re-apply (sơ đồ + chuỗi function) |
 | Doro [`cordis.yml`](../deepseek-harness/bendo-agent(doro)/cordis.yml) comments | Contract apply ngắn trên overlay |
 
 ---
@@ -55,7 +56,7 @@ flowchart TD
   Chat[User gửi chat] --> AC[POST /api/agent/chat]
   AC --> BR[Bridge chat body<br/>message / sessionId / clerkToken<br/>không có apiKey]
   BR --> G{appliedModelConfig?}
-  G -->|no| E400[400 — Save trước]
+  G -->|no| Soft[200 replyText Doro<br/>chưa cấu hình model — không chạy turn]
   G -->|yes| AG[Agent dùng provider+model<br/>đã apply; route từ llm-pi-ai]
 ```
 
@@ -147,9 +148,9 @@ Chi tiết hành vi:
 
 ### 4.5 Gate chat (A3)
 
-- Chưa `applyModelConfig` thành công trong process harness → POST chat **400**  
+- Chưa `applyModelConfig` trong process harness → POST chat **200** với `replyText` giọng Doro (vd. chưa cấu hình model) — **không** chạy agent turn  
 - Không fallback sang cordis `agent-default-model` (không có key ship)  
-- Restart harness → mất `appliedModelConfig` in-memory → phải Save lại (cho đến khi có C)
+- Restart harness → mất `appliedModelConfig` in-memory → soft reply lại cho đến khi Save (hoặc có C)
 
 ### 4.6 Vì sao trước đó “default vẫn chat được”?
 
@@ -181,7 +182,7 @@ CLI / Models page mặc định `$DSH_HOME` → `~/.dsh`. Desktop spawn harness 
 | Trường hợp | `DSH_HOME` |
 | --- | --- |
 | Electron **spawn** harness | `{app.getPath("userData")}/dsh` (mkdir trước spawn) |
-| Override | `BENDO_DSH_HOME` (absolute hoặc relative cwd) |
+| Override | `BENDO_DSH_HOME` (absolute, `~/…` được expand về home, hoặc relative cwd) |
 | Electron **attach** harness đã chạy ngoài | Không đổi — process đó giữ home riêng (`~/.dsh` hoặc env lúc start) |
 | `pnpm dsh web` tay (không qua Electron) | Mặc định `~/.dsh` trừ khi export `DSH_HOME` |
 
@@ -221,13 +222,13 @@ Nếu Electron spawn với `userData/dsh` nhưng chat đang attach harness cũ t
 
 ---
 
-## 8. Bước C (chưa triển khai) — chỉ để định hướng
+## 8. Bước C (đã triển khai)
 
-1. Persist durable (JSON / `safeStorage` dưới desktop `userData`) — sống qua quit.  
-2. Startup: khi harness ready → đọc persist → gọi lại `applyModelConfig`.  
-3. (Tuỳ chọn) UI chỉ coi “đã lưu” khi apply + persist OK.
+1. Persist durable: `userData/model-config.json` + `safeStorage` cho API key (IPC `bendo:model-config:save` / `load`).  
+2. Startup: khi harness ready → đọc persist → bridge `applyModelConfig` (retry transient).  
+3. Save pass chỉ khi apply ∧ persist đều OK; persist fail → retry rồi mới fail UI.
 
-C **không** thay A–B: A vẫn là nguồn đăng ký route; B vẫn là chỗ harness ghi settings trên desktop.
+C không thay A–B. Chi tiết: `desktop/prompts/agent-model-config-persist-c.md`.
 
 ---
 

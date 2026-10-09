@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { app } from "electron";
@@ -140,17 +141,34 @@ function clearOwnedChild(child: ChildProcess): void {
 }
 
 /**
+ * Expand a leading `~`, `~/`, or `~\` to `os.homedir()` (Node does not).
+ * Named-user forms such as `~alice/...` are left unchanged.
+ */
+function expandLeadingTilde(input: string): string {
+  if (input === "~") {
+    return os.homedir();
+  }
+  if (input.startsWith("~/") || input.startsWith("~\\")) {
+    return path.join(os.homedir(), input.slice(2));
+  }
+  return input;
+}
+
+/**
  * Absolute path for the harness `$DSH_HOME` when Electron spawns dsh.
  *
  * Default: `{userData}/dsh` so settings.yaml / credentials stay app-local and
  * do not share `~/.dsh` with a Models-page / CLI session. Override with
- * `BENDO_DSH_HOME` (absolute or cwd-relative). No auto-migrate from `~/.dsh` —
- * Save again in Bendo Agent after switching homes.
+ * `BENDO_DSH_HOME` (absolute, `~/…`, or cwd-relative). No auto-migrate from
+ * `~/.dsh` — Save again in Bendo Agent after switching homes.
  */
 export function resolveElectronDshHome(): string {
   const raw = process.env.BENDO_DSH_HOME?.trim();
   if (raw) {
-    return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+    const expanded = expandLeadingTilde(raw);
+    return path.isAbsolute(expanded)
+      ? expanded
+      : path.resolve(process.cwd(), expanded);
   }
   return path.join(app.getPath("userData"), ELECTRON_DSH_HOME_DIRNAME);
 }

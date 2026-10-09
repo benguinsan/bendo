@@ -1,3 +1,4 @@
+import { reapplyPersistedModelConfig } from "./apply-persisted-model-config";
 import { ensureHarnessServer } from "./spawn-harness";
 import {
   ensureBendoServer,
@@ -14,6 +15,7 @@ let harnessEnsureInFlight: Promise<void> | undefined;
  * Soft-fail harness ensure: log failures; never throw to the UI path.
  * Deduplicate concurrent calls (e.g. repeated load/reload) via one shared in-flight
  * promise so parallel ensures do not conflict.
+ * On harness ready, re-apply durable model config (step C) without blocking Bendo load.
  */
 function ensureHarnessInBackground(bendoUrl: string): Promise<void> {
   if (harnessEnsureInFlight) {
@@ -26,7 +28,9 @@ function ensureHarnessInBackground(bendoUrl: string): Promise<void> {
       console.warn(
         `[harness] Not available (${harness.reason}). Bendo will load; Agent chat stays offline until the bridge is up.`
       );
+      return;
     }
+    await reapplyPersistedModelConfig();
   })().finally(() => {
     harnessEnsureInFlight = undefined;
   });
