@@ -12,7 +12,7 @@ type BendoDesktopApi = {
   reloadBendo: () => Promise<{ ok: boolean }>;
   saveModelConfig: (
     config: BendoDesktopModelConfig
-  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  ) => Promise<{ ok: true } | { ok: false; error: string; retryable: boolean }>;
   loadModelConfig: () => Promise<
     | { ok: true; config: BendoDesktopModelConfig }
     | { ok: true; config: null }

@@ -17,8 +17,9 @@ contextBridge.exposeInMainWorld("bendoDesktop", {
     ipcRenderer.invoke("bendo:reload"),
   saveModelConfig: (
     config: DesktopModelConfig
-  ): Promise<{ ok: true } | { ok: false; error: string }> =>
-    ipcRenderer.invoke("bendo:model-config:save", config),
+  ): Promise<
+    { ok: true } | { ok: false; error: string; retryable: boolean }
+  > => ipcRenderer.invoke("bendo:model-config:save", config),
   loadModelConfig: (): Promise<
     | { ok: true; config: DesktopModelConfig }
     | { ok: true; config: null }

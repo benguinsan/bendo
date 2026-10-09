@@ -40,7 +40,7 @@ const PROVIDER_ALLOWED_HOSTS: Record<ModelConfigProvider, readonly string[]> = {
 
 export type ModelConfigSaveResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: string; retryable: boolean };
 
 export type ModelConfigLoadResult =
   | { ok: true; config: ModelConfig }
@@ -176,16 +176,39 @@ function writeAtomic(filePath: string, payload: string): void {
   }
 }
 
+/** Hard FS failures that will not clear within a short renderer retry window. */
+function isRetryableFsError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error)) {
+    return true;
+  }
+  const code = (error as NodeJS.ErrnoException).code;
+  if (
+    code === "ENOSPC" ||
+    code === "EDQUOT" ||
+    code === "EACCES" ||
+    code === "EPERM" ||
+    code === "EROFS"
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Persist validated model config under userData. Encrypts apiKey via safeStorage.
  * Retries transient FS failures. Does not delete a prior good file on failure.
+ * Hard failures set retryable: false so the renderer does not re-IPC uselessly.
  */
 export async function saveModelConfig(
   input: unknown
 ): Promise<ModelConfigSaveResult> {
   const config = parseModelConfigPayload(input);
   if (!config) {
-    return { ok: false, error: "Invalid model config." };
+    return {
+      ok: false,
+      error: "Invalid model config.",
+      retryable: false,
+    };
   }
 
   const apiKeyEncrypted = encryptApiKey(config.apiKey);
@@ -193,6 +216,7 @@ export async function saveModelConfig(
     return {
       ok: false,
       error: "OS key encryption is unavailable; cannot persist API key.",
+      retryable: false,
     };
   }
 
@@ -206,6 +230,7 @@ export async function saveModelConfig(
   const filePath = configPath();
 
   let lastError = "Failed to write model config.";
+  let lastRetryable = true;
   for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
     try {
       writeAtomic(filePath, body);
@@ -214,14 +239,20 @@ export async function saveModelConfig(
     } catch (error: unknown) {
       lastError =
         error instanceof Error ? error.message : "Failed to write model config.";
-      if (attempt < WRITE_ATTEMPTS) {
-        await sleep(WRITE_BACKOFF_MS * attempt);
+      lastRetryable = isRetryableFsError(error);
+      if (!lastRetryable || attempt >= WRITE_ATTEMPTS) {
+        break;
       }
+      await sleep(WRITE_BACKOFF_MS * attempt);
     }
   }
 
   console.warn(`[model-config] persist failed: ${lastError}`);
-  return { ok: false, error: "Failed to persist model config." };
+  return {
+    ok: false,
+    error: "Failed to persist model config.",
+    retryable: lastRetryable,
+  };
 }
 
 /** Load and decrypt durable model config, or null if none. */

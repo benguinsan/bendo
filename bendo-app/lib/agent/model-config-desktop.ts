@@ -75,6 +75,10 @@ export type PersistDesktopModelConfigResult =
   | { ok: true }
   | { ok: false; error: string };
 
+type PersistOnceResult =
+  | { ok: true }
+  | { ok: false; error: string; retryable: boolean };
+
 async function persistOnce(
   api: NonNullable<Window["bendoDesktop"]>,
   payload: {
@@ -83,7 +87,7 @@ async function persistOnce(
     apiKey: string;
     model: string;
   }
-): Promise<PersistDesktopModelConfigResult> {
+): Promise<PersistOnceResult> {
   try {
     const result = await api.saveModelConfig(payload);
     if (result.ok) {
@@ -92,9 +96,15 @@ async function persistOnce(
     return {
       ok: false,
       error: result.error || "Không lưu được cấu hình trên máy.",
+      retryable: result.retryable,
     };
   } catch {
-    return { ok: false, error: "Không lưu được cấu hình trên máy." };
+    // IPC throw — may be transient; allow another attempt.
+    return {
+      ok: false,
+      error: "Không lưu được cấu hình trên máy.",
+      retryable: true,
+    };
   }
 }
 
@@ -109,14 +119,19 @@ async function persistWithRetry(
   attempt: number
 ): Promise<PersistDesktopModelConfigResult> {
   const result = await persistOnce(api, payload);
-  if (result.ok || attempt >= PERSIST_ATTEMPTS) {
-    return result;
+  if (result.ok) {
+    return { ok: true };
+  }
+  if (!result.retryable || attempt >= PERSIST_ATTEMPTS) {
+    return { ok: false, error: result.error };
   }
   return persistWithRetry(api, payload, attempt + 1);
 }
 
 /**
- * Persist after a successful harness apply. Bounded retries for transient IPC/FS failures.
+ * Persist after a successful harness apply. Retries only when main marks
+ * the failure retryable (transient FS / IPC). Hard validation / encryption /
+ * disk-full style errors fail immediately.
  */
 export async function persistDesktopModelConfig(
   config: StoredModelApiKey

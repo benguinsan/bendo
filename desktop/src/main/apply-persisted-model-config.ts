@@ -1,6 +1,6 @@
 import { isSmokeMode } from "./bendo-url";
 import { getBridgeCredentials } from "./bridge-credentials";
-import { loadModelConfig } from "./model-config-store";
+import { loadModelConfig, type ModelConfig } from "./model-config-store";
 
 const APPLY_TIMEOUT_MS = 15_000;
 const APPLY_ATTEMPTS = 3;
@@ -17,15 +17,11 @@ type BridgeApplyOutcome =
   | { kind: "validation"; detail: string }
   | { kind: "transient"; detail: string };
 
-async function postApplyOnce(): Promise<BridgeApplyOutcome> {
-  const loaded = loadModelConfig();
-  if (!loaded.ok) {
-    return { kind: "transient", detail: loaded.error };
-  }
-  if (!loaded.config) {
-    return { kind: "ok" };
-  }
-
+/**
+ * One bridge apply using an already-loaded config snapshot.
+ * Does not re-read or re-decrypt the durable file (keeps retry consistent).
+ */
+async function postApplyOnce(config: ModelConfig): Promise<BridgeApplyOutcome> {
   const { url, secret } = getBridgeCredentials();
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -41,10 +37,10 @@ async function postApplyOnce(): Promise<BridgeApplyOutcome> {
       },
       body: JSON.stringify({
         action: "applyModelConfig",
-        provider: loaded.config.provider,
-        endpoint: loaded.config.endpoint,
-        apiKey: loaded.config.apiKey,
-        model: loaded.config.model,
+        provider: config.provider,
+        endpoint: config.endpoint,
+        apiKey: config.apiKey,
+        model: config.model,
       }),
       signal: controller.signal,
     });
@@ -85,6 +81,7 @@ async function postApplyOnce(): Promise<BridgeApplyOutcome> {
 /**
  * After harness is ready: re-apply durable model config to the localhost bridge.
  * Soft-fail — never throws to the UI/load path. Skips smoke mode and missing file.
+ * Loads/decrypts once; retries only the bridge POST with that snapshot.
  */
 export async function reapplyPersistedModelConfig(): Promise<void> {
   if (isSmokeMode()) {
@@ -100,8 +97,10 @@ export async function reapplyPersistedModelConfig(): Promise<void> {
     return;
   }
 
+  const config = loaded.config;
+
   for (let attempt = 1; attempt <= APPLY_ATTEMPTS; attempt++) {
-    const outcome = await postApplyOnce();
+    const outcome = await postApplyOnce(config);
     if (outcome.kind === "ok") {
       console.log("[model-config] re-apply ok");
       return;

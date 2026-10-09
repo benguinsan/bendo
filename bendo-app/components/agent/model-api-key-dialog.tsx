@@ -1,7 +1,7 @@
 "use client";
 
 import { ZapIcon } from "lucide-react";
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -114,14 +114,20 @@ function ModelApiKeyForm({
   >(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isDesktop = hasDesktopModelConfigPersist();
+  /** Skip late desktop hydrate if the user already edited the form. */
+  const dirtyRef = useRef(false);
 
   const instructions = MODEL_API_PROVIDER_INSTRUCTIONS[provider];
+
+  function markDirty() {
+    dirtyRef.current = true;
+  }
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const desktop = await loadDesktopModelConfig();
-      if (cancelled || !desktop) {
+      if (cancelled || !desktop || dirtyRef.current) {
         return;
       }
       setProvider(desktop.provider);
@@ -173,6 +179,7 @@ function ModelApiKeyForm({
   }
 
   function handleProviderChange(next: ModelApiProvider) {
+    markDirty();
     setProvider(next);
     const defaults = MODEL_API_PROVIDER_DEFAULTS[next];
     const stored = readStoredModelApiKey();
@@ -371,6 +378,7 @@ function ModelApiKeyForm({
                 aria-invalid={Boolean(errors.endpoint)}
                 className="h-10"
                 onChange={(event) => {
+                  markDirty();
                   setEndpoint(event.target.value);
                   setTestStatus(null);
                   if (errors.endpoint) {
@@ -397,6 +405,7 @@ function ModelApiKeyForm({
                 aria-invalid={Boolean(errors.model)}
                 className="h-10"
                 onChange={(event) => {
+                  markDirty();
                   setModel(event.target.value);
                   setTestStatus(null);
                   if (errors.model) {
@@ -424,6 +433,7 @@ function ModelApiKeyForm({
                 aria-invalid={Boolean(errors.apiKey)}
                 className="h-10"
                 onChange={(event) => {
+                  markDirty();
                   setApiKey(event.target.value);
                   setTestStatus(null);
                   if (errors.apiKey) {
