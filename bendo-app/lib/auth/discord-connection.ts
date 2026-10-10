@@ -1,7 +1,8 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
+import { z } from "zod";
 
-import { hasClerkSecret } from "@/lib/api/cloud";
+import { hasClerkSecret } from "@/lib/api/cloud/mode";
 
 export type DiscordConnectionStatus =
   | "connected"
@@ -16,6 +17,42 @@ export type DiscordConnection = {
   discordUserId: string | null;
 };
 
+/** GET /api/discord-identity payload (Settings + cloud cutover). */
+export type DiscordIdentityStatus = DiscordConnection & {
+  clerkUserId: string;
+};
+
+const discordIdentityStatusSchema = z.object({
+  status: z.enum([
+    "connected",
+    "not_connected",
+    "needs_verification",
+    "lookup_failed",
+  ]),
+  clerkUserId: z.string().min(1),
+  discordUserId: z.string().min(1).nullable(),
+  discordUsername: z.string().min(1).nullable(),
+});
+
+const discordIdentityStatusBodySchema = z.object({
+  data: discordIdentityStatusSchema,
+});
+
+/**
+ * Validate `{ data: DiscordIdentityStatus }` from cloud GET /api/discord-identity.
+ */
+export function parseDiscordIdentityStatusBody(
+  payload: unknown
+): DiscordIdentityStatus {
+  const parsed = discordIdentityStatusBodySchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new Error(
+      "Cloud /api/discord-identity returned an unexpected body shape (expected { data: DiscordIdentityStatus })."
+    );
+  }
+  return parsed.data.data;
+}
+
 type DiscordExternalAccount = {
   provider: string;
   username: string | null;
@@ -23,7 +60,7 @@ type DiscordExternalAccount = {
   verification: { status: string } | null;
 };
 
-type DiscordConnectionUser = {
+export type DiscordConnectionUser = {
   id: string;
   externalAccounts: DiscordExternalAccount[];
 };

@@ -248,7 +248,7 @@ There is a button on Agent chat that opens the UI for the user to add their own 
 - **Test connection** runs on the Next server (`POST /api/agent/model-connection`): a minimal chat ping to the user’s endpoint (15s timeout) and optional `/models` lookup (5s). It does **not** go through the harness chat-bridge. Map upstream failures to classified Vietnamese messages (`API key không hợp lệ`, `Tài khoản hết credit`, `Model không tồn tại`, `Đang bị giới hạn tốc độ, thử lại sau`, `Provider đang lỗi, thử lại sau`).
 - Probe SSRF guards: only `https` endpoints whose hostname is in the per-provider allowlist (`openrouter.ai`, `api.vilao.ai`, `api.openai.com`, `generativelanguage.googleapis.com`); do not follow redirects; clear the API key from the form when the selected provider changes so a key is not sent to another provider.
 - **Save / apply** runs on the Next server (`POST /api/agent/model-config`): Clerk + Zod + same endpoint allowlist, then forwards `{ action: "applyModelConfig", provider, endpoint, apiKey, model }` to the localhost DSH chat-bridge (shared secret). Harness apply (see `bendo-agent(doro)/chat-bridge.ts` + `cordis.yml` comments) writes credentials, `$DSH_HOME/settings.yaml` → `llm-pi-ai.providers.<route>` (apiKeyEnv, baseURL, models; OpenAI-compat / vilao hand-declare `openai-completions`; gemini→google omits api), and `agent-default-model` selection — not selection alone. Chat turns **require** that apply first for a real agent turn — without apply the bridge returns a Doro soft chat reply (not a hard error UI) and does not fall back to cordis `agent-default-model` (no shipped provider key). Do **not** attach model secrets to chat-turn bodies. On **Electron desktop**, Save then persists via preload IPC to `userData/model-config.json` (`safeStorage` for the key); Electron main re-applies from that file when harness is ready. **sessionStorage** remains a same-tab cache and the only client store when not in Electron.
-- **Save pass = apply ∧ persist:** Treat Save as successful only when **both** harness apply **and** local durable persist succeed (on desktop). If persist fails after apply, **retry** persist (bounded; no retry on hard validation). Do not show “đã lưu” / close as success on partial success. Prefer apply then persist; do not leave a durable write that does not match a successful apply. Desktop owns durable JSON/`safeStorage` (see repo-root + `desktop/AGENTS.md`); web-without-Electron keeps sessionStorage only after apply OK.
+- **Save pass = apply ∧ persist:** Treat Save as successful only when **both** harness apply **and** local durable persist succeed (on desktop). On Save, apply is **single-shot** (no auto-retry — hard validation / provider rejects must not be looped); surface `saveError` and do not persist. If persist fails after apply, **retry** persist (bounded; no retry on hard validation). Do not show “đã lưu” / close as success on partial success. Prefer apply then persist; do not leave a durable write that does not match a successful apply. Desktop owns durable JSON/`safeStorage` (see repo-root + `desktop/AGENTS.md`); web-without-Electron keeps sessionStorage only after apply OK.
 
 ### Plan — save model config before use (no per-turn attach)
 
@@ -256,7 +256,7 @@ Product path for user-owned model credentials (desktop-first Agent):
 
 1. **Configure then use:** The user enters Provider / endpoint / API key / model name in the Agent modal, optionally **Test connection**, then **Save**. Save calls `POST /api/agent/model-config` so Harness/Doro receives and applies that config **before** chat, not by reading credentials off each chat message.
 2. **Local persist on the user machine:** Survives app quit/reopen on desktop. Shape: `userData/model-config.json` — fields `provider`, `endpoint`, `model`, plus `apiKeyEncrypted` (`safeStorage`). Do **not** store this in Supabase, Vercel, or ship it inside the installer. Non-Electron keeps sessionStorage only.
-3. **Apply ∧ persist, retry on partial failure:** On desktop, Save is not done until apply **and** persist both OK. Persist fail after apply → retry persist. Partial success must not be presented as saved.
+3. **Apply ∧ persist; retry persist only:** On desktop, Save is not done until apply **and** persist both OK. Apply fail → stop (no auto-retry). Persist fail after apply → retry persist. Partial success must not be presented as saved.
 4. **Apply to harness without chat payload:** Save pushes config to the local harness over the localhost DSH bridge so Doro registers the user route in `llm-pi-ai` settings and updates selection/credentials (not cordis `agent-default-model` alone — missing `llm-pi-ai.providers` → `UNKNOWN_MODEL`). Chat turns keep the existing bridge body (`message`, `sessionId`, `clerkToken`, …) and **must not** attach `apiKey`, endpoint, or full model config on every turn.
 5. **Chat path stays thin:** Browser → Next `/api/agent/chat` → DSH bridge → harness uses the **already applied** model config. Do not send the raw key from the browser on each send.
 6. **Out of scope for this plan:** SQLite unless multiple profiles later require it; cloud sync of provider keys; attaching model secrets to chat-turn requests.
@@ -280,7 +280,8 @@ Rules:
 - One Discord user id may map to at most one Clerk user (`discord_user_id` unique).
 - Both ids are required, non-empty text. Do not accept a user-typed Discord id from Settings UI.
 - Source of Discord id: Clerk Discord OAuth only (Settings Connect Discord / `externalAccounts` with `provider === "discord"` or `provider === "oauth_discord"`; connect flow uses strategy `oauth_discord`). Prefer verifying a usable link with server-only `getUserOauthAccessToken(userId, "discord")` before upserting.
-- On successful Connect: upsert the row for the authenticated Clerk user.
+- Settings status/sync (including desktop cloud cutover): `GET /api/discord-identity` — same pattern as `GET /api/me` (secret work on Vercel). Response is wrapped: `{ data: { status, clerkUserId, discordUserId, discordUsername } }` — not a top-level status object. Cloud clients must parse `data` (see `parseDiscordIdentityStatusBody`). Never returns OAuth tokens. Packaged Electron proxies this GET; do not call `getUserOauthAccessToken` on a process without `CLERK_SECRET_KEY`.
+- On successful Connect: upsert the row for the authenticated Clerk user (via GET sync and/or explicit POST).
 - On Disconnect: delete the row for that Clerk user (and never leave a stale Discord id pointing at them).
 - Do not store Discord OAuth access tokens, refresh tokens, or bot tokens in this table (or any other app table).
 - All reads and writes are server-only via the Supabase service role. Same RLS pattern as other public tables.
@@ -313,7 +314,8 @@ Use GET only for read or status operations:
 - GET /api/tasks
 - GET /api/categories
 - GET /api/notifications
-- GET /api/me — signed-in Clerk profile JSON for desktop → Vercel identity cutover (not used by local UI when `CLERK_SECRET_KEY` is present)
+- GET /api/me — signed-in Clerk profile JSON for desktop → Vercel identity cutover (not used by local UI when `CLERK_SECRET_KEY` is present); body `{ data: MeUser }`
+- GET /api/discord-identity — Discord link status + best-effort mapping sync for Settings / cloud cutover; body `{ data: DiscordIdentityStatus }` (`status`, `clerkUserId`, `discordUserId`, `discordUsername`). Same `{ data: … }` envelope as `/api/me`; clients must not expect a top-level status object.
 
 Use PATCH for partial updates to existing resources:
 - PATCH /api/tasks/:task_id
@@ -323,10 +325,11 @@ Use DELETE to delete resources:
 - DELETE /api/tasks/:task_id
 - DELETE /api/categories/:category_id
 
-When Discord identity routes are added, prefer:
-- POST or PUT to upsert the authenticated user's `discord_identities` row after Clerk Connect
+Discord identity routes:
+- GET `/api/discord-identity` — status + sync (see above)
+- POST to upsert the authenticated user's `discord_identities` row (explicit write; body includes `discordUserId`)
 - DELETE to remove it on Disconnect
-- GET (server/bot-facing, authenticated) to resolve `discord_user_id` → `clerk_user_id` when the Discord bot feature requires it
+- Future: GET (or dedicated resolve) for bot/harness `discord_user_id` → `clerk_user_id` when that feature requires it
 
 The routes above are preferred conventions, not an exhaustive API specification. Add or adjust routes when required by a feature or domain behavior.
 

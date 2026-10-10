@@ -116,7 +116,7 @@ Thứ tự gọi thực tế:
 
 | Bước fail | Hành vi |
 | --- | --- |
-| Validate / apply | Dừng; **không** gọi persist; hiện `saveError` |
+| Validate / apply | Dừng; **không** gọi persist; hiện `saveError`. **Không** auto-retry apply trên Save (tránh lặp lỗi cứng Zod / allowlist / harness 400) |
 | Persist (sau apply OK) | Retry tối đa 3 lần (`persistWithRetry`); vẫn fail → `saveError`, **không** đóng thành công, **không** ghi session như “đã lưu mới” |
 | Encryption unavailable | `saveModelConfig` trả lỗi; không ghi plaintext key |
 
