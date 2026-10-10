@@ -280,7 +280,7 @@ Rules:
 - One Discord user id may map to at most one Clerk user (`discord_user_id` unique).
 - Both ids are required, non-empty text. Do not accept a user-typed Discord id from Settings UI.
 - Source of Discord id: Clerk Discord OAuth only (Settings Connect Discord / `externalAccounts` with `provider === "discord"` or `provider === "oauth_discord"`; connect flow uses strategy `oauth_discord`). Prefer verifying a usable link with server-only `getUserOauthAccessToken(userId, "discord")` before upserting.
-- Settings status/sync (including desktop cloud cutover): `GET /api/discord-identity` — same pattern as `GET /api/me` (secret work on Vercel; returns `{ status, clerkUserId, discordUserId, discordUsername }`; never returns OAuth tokens). Packaged Electron proxies this GET; do not call `getUserOauthAccessToken` on a process without `CLERK_SECRET_KEY`.
+- Settings status/sync (including desktop cloud cutover): `GET /api/discord-identity` — same pattern as `GET /api/me` (secret work on Vercel). Response is wrapped: `{ data: { status, clerkUserId, discordUserId, discordUsername } }` — not a top-level status object. Cloud clients must parse `data` (see `parseDiscordIdentityStatusBody`). Never returns OAuth tokens. Packaged Electron proxies this GET; do not call `getUserOauthAccessToken` on a process without `CLERK_SECRET_KEY`.
 - On successful Connect: upsert the row for the authenticated Clerk user (via GET sync and/or explicit POST).
 - On Disconnect: delete the row for that Clerk user (and never leave a stale Discord id pointing at them).
 - Do not store Discord OAuth access tokens, refresh tokens, or bot tokens in this table (or any other app table).
@@ -314,7 +314,8 @@ Use GET only for read or status operations:
 - GET /api/tasks
 - GET /api/categories
 - GET /api/notifications
-- GET /api/me — signed-in Clerk profile JSON for desktop → Vercel identity cutover (not used by local UI when `CLERK_SECRET_KEY` is present)
+- GET /api/me — signed-in Clerk profile JSON for desktop → Vercel identity cutover (not used by local UI when `CLERK_SECRET_KEY` is present); body `{ data: MeUser }`
+- GET /api/discord-identity — Discord link status + best-effort mapping sync for Settings / cloud cutover; body `{ data: DiscordIdentityStatus }` (`status`, `clerkUserId`, `discordUserId`, `discordUsername`). Same `{ data: … }` envelope as `/api/me`; clients must not expect a top-level status object.
 
 Use PATCH for partial updates to existing resources:
 - PATCH /api/tasks/:task_id
@@ -324,10 +325,11 @@ Use DELETE to delete resources:
 - DELETE /api/tasks/:task_id
 - DELETE /api/categories/:category_id
 
-When Discord identity routes are added, prefer:
-- POST or PUT to upsert the authenticated user's `discord_identities` row after Clerk Connect
+Discord identity routes:
+- GET `/api/discord-identity` — status + sync (see above)
+- POST to upsert the authenticated user's `discord_identities` row (explicit write; body includes `discordUserId`)
 - DELETE to remove it on Disconnect
-- GET (server/bot-facing, authenticated) to resolve `discord_user_id` → `clerk_user_id` when the Discord bot feature requires it
+- Future: GET (or dedicated resolve) for bot/harness `discord_user_id` → `clerk_user_id` when that feature requires it
 
 The routes above are preferred conventions, not an exhaustive API specification. Add or adjust routes when required by a feature or domain behavior.
 

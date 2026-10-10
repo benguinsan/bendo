@@ -80,9 +80,9 @@ JWT lấy từ đâu: sau sign-in, Clerk set cookie `__session` trên origin des
 
 ### 3.1b `GET /api/discord-identity` (Discord link status + mapping sync)
 
-- `app/api/discord-identity/route.ts` — `GET`: verify Discord OAuth token (`getUserOauthAccessToken`), best-effort upsert/delete `discord_identities`, return `{ data: DiscordIdentityStatus }` (`status`, `clerkUserId`, `discordUserId`, `discordUsername`). Never returns the OAuth token.
+- `app/api/discord-identity/route.ts` — `GET`: verify Discord OAuth token (`getUserOauthAccessToken`), best-effort upsert/delete `discord_identities`, return **`{ data: DiscordIdentityStatus }`** (fields inside `data`: `status`, `clerkUserId`, `discordUserId`, `discordUsername`). Not a top-level status object. Cloud parse: `parseDiscordIdentityStatusBody`. Never returns the OAuth token.
 - Settings: `loadDiscordIdentityForSettings` — cloud mode `cloudGetDiscordIdentity()`; local secrets same resolve+sync in-process.
-- `POST` / `DELETE` unchanged (explicit write / Disconnect).
+- `POST` / `DELETE` unchanged (explicit write / Disconnect); success bodies also use `{ data: … }`.
 
 ### 3.2 Cloud mode flags
 
