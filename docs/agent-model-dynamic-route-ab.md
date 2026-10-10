@@ -226,7 +226,7 @@ Nếu Electron spawn với `userData/dsh` nhưng chat đang attach harness cũ t
 
 1. Persist durable: `userData/model-config.json` + `safeStorage` cho API key (IPC `bendo:model-config:save` / `load`).  
 2. Startup: khi harness ready → đọc persist → bridge `applyModelConfig` (retry transient).  
-3. Save pass chỉ khi apply ∧ persist đều OK; persist fail → retry rồi mới fail UI.
+3. Save pass chỉ khi apply ∧ persist đều OK; apply trên Save single-shot (không auto-retry); persist fail → retry rồi mới fail UI.
 
 C không thay A–B. Chi tiết: `desktop/prompts/agent-model-config-persist-c.md`.
 

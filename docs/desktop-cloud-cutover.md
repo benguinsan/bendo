@@ -47,13 +47,18 @@ Local `next dev` / Docker / Vercel host: giữ full secrets → cả hai mode **
        → GET {cloud}/api/me + Bearer(__session)
        → Vercel auth() + currentUser() → { data: MeUser }
 
+  Settings Discord
+       → isCloudSupabaseMode → GET {cloud}/api/discord-identity + Bearer
+       → Vercel: OAuth token verify + best-effort sync discord_identities
+       → { data: DiscordIdentityStatus }
+
   /api/tasks|categories|notifications|discord-identity|me
        → maybeProxyPrivilegedRequest (isCloudSupabaseMode + allowlist)
        → HTTPS Vercel + Bearer
        → Vercel auth() + Supabase service role → JSON
 
-  RSC loaders (load-tasks / load-categories)
-       → cloudList* via fetchCloudApi
+  RSC loaders (load-tasks / load-categories / loadDiscordIdentityForSettings)
+       → cloudList* / cloudGetDiscordIdentity via fetchCloudApi
 
   /api/agent/chat, /api/health
        → local only (không proxy)
@@ -72,6 +77,12 @@ JWT lấy từ đâu: sau sign-in, Clerk set cookie `__session` trên origin des
 - `app/api/me/route.ts` — trên host có Clerk secret: `requireApiUser` + `currentUser` → `{ data: MeUser }`
 - `lib/api/cloud/me-user.ts` — shape profile (id, name, email, externalAccounts, …)
 - Local/web UI ngày thường **không** bắt buộc gọi route này; dành cho desktop cutover (và smoke trên Vercel)
+
+### 3.1b `GET /api/discord-identity` (Discord link status + mapping sync)
+
+- `app/api/discord-identity/route.ts` — `GET`: verify Discord OAuth token (`getUserOauthAccessToken`), best-effort upsert/delete `discord_identities`, return `{ data: DiscordIdentityStatus }` (`status`, `clerkUserId`, `discordUserId`, `discordUsername`). Never returns the OAuth token.
+- Settings: `loadDiscordIdentityForSettings` — cloud mode `cloudGetDiscordIdentity()`; local secrets same resolve+sync in-process.
+- `POST` / `DELETE` unchanged (explicit write / Disconnect).
 
 ### 3.2 Cloud mode flags
 

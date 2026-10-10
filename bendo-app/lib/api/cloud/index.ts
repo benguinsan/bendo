@@ -26,6 +26,7 @@ export {
 } from "@/lib/api/cloud/privilege";
 export {
   cloudDeleteDiscordIdentity,
+  cloudGetDiscordIdentity,
   cloudGetTask,
   cloudListCategories,
   cloudListTasks,

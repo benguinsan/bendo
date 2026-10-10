@@ -1,6 +1,9 @@
 import "server-only";
 import { fetchCloudApi } from "@/lib/api/cloud/privilege";
-import type { DiscordIdentity } from "@/lib/discord/discord-identity-service";
+import {
+  type DiscordIdentityStatus,
+  parseDiscordIdentityStatusBody,
+} from "@/lib/auth/discord-connection";
 import { fail, ok, type ServiceResult } from "@/lib/supabase/errors";
 import type { PersistedCategory } from "@/lib/task-categories/persisted-category";
 import type { PersistedTask } from "@/lib/tasks/persisted-task";
@@ -8,6 +11,12 @@ import type { PersistedTask } from "@/lib/tasks/persisted-task";
 type ApiListBody<T> = { data: T[] };
 type ApiSingleBody<T> = { data: T };
 type ApiErrorBody = { error: string; code?: string };
+
+/** Mapping row shape from POST /api/discord-identity (avoid importing service → cycle). */
+type DiscordIdentityRow = {
+  clerkUserId: string;
+  discordUserId: string;
+};
 
 async function parseJsonResponse(response: Response): Promise<unknown> {
   try {
@@ -64,9 +73,26 @@ export async function cloudListCategories(): Promise<PersistedCategory[]> {
   return body.data;
 }
 
+/**
+ * Cloud cutover: GET /api/discord-identity on Vercel (verify OAuth + sync mapping).
+ */
+export async function cloudGetDiscordIdentity(): Promise<DiscordIdentityStatus> {
+  const response = await fetchCloudApi("/api/discord-identity");
+  const payload = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    const body = payload as ApiErrorBody | null;
+    throw new Error(
+      body?.error ?? "Could not load Discord identity from cloud API."
+    );
+  }
+
+  return parseDiscordIdentityStatusBody(payload);
+}
+
 export async function cloudUpsertDiscordIdentity(
   discordUserId: string
-): Promise<ServiceResult<DiscordIdentity>> {
+): Promise<ServiceResult<DiscordIdentityRow>> {
   const response = await fetchCloudApi("/api/discord-identity", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -79,7 +105,7 @@ export async function cloudUpsertDiscordIdentity(
     return fail("INTERNAL", body?.error ?? "Could not sync Discord identity.");
   }
 
-  const body = payload as ApiSingleBody<DiscordIdentity>;
+  const body = payload as ApiSingleBody<DiscordIdentityRow>;
   return ok(body.data);
 }
 
