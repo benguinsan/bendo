@@ -13,7 +13,12 @@ import { NextResponse } from "next/server";
  */
 const hasClerkSecret = Boolean(process.env.CLERK_SECRET_KEY?.trim());
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  // Local OAuth handoff → bendo:// (must be reachable from the system browser).
+  "/auth/desktop-handoff(.*)",
+]);
 const isApiRoute = createRouteMatcher(["/api(.*)"]);
 
 const clerkProtected = clerkMiddleware(async (auth, req) => {

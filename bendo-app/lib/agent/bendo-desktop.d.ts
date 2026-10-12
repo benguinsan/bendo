@@ -10,6 +10,10 @@ type BendoDesktopApi = {
   platform: string;
   getAppUrl: () => Promise<string>;
   reloadBendo: () => Promise<{ ok: boolean }>;
+  /** Open http(s) URL in the OS browser (validated in Electron main). */
+  openExternal: (
+    url: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   saveModelConfig: (
     config: BendoDesktopModelConfig
   ) => Promise<{ ok: true } | { ok: false; error: string; retryable: boolean }>;

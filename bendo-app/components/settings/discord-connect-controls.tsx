@@ -6,12 +6,26 @@ import type {
   ExternalAccountResource,
 } from "@clerk/nextjs/types";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { DiscordConnection } from "@/lib/auth/discord-connection";
-
-const SETTINGS_REDIRECT_URL = "/settings";
+import {
+  buildDesktopHandoffUrl,
+  resolveDesktopAppOrigin,
+} from "@/lib/desktop/desktop-handoff";
+import { tryOpenExternalUrl } from "@/lib/desktop/open-external";
+import { useDesktopFocusRefresh } from "@/lib/desktop/use-desktop-focus-refresh";
 
 type DiscordConnectControlsProps = {
   connection: DiscordConnection;
@@ -55,6 +69,8 @@ export function DiscordConnectControls({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [browserHint, setBrowserHint] = useState<string | null>(null);
+  const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
 
   const createExternalAccount = useReverification(
     (params: CreateExternalAccountParams) => user?.createExternalAccount(params)
@@ -75,6 +91,31 @@ export function DiscordConnectControls({
     !showDisconnect && connection.status === "needs_verification";
   const showConnect = !(showDisconnect || showReverify);
 
+  const refreshAfterBrowserOAuth = useCallback(() => {
+    void (async () => {
+      try {
+        await user?.reload();
+      } catch {
+        // ignore — router refresh still reloads server status
+      }
+      router.refresh();
+    })();
+  }, [router, user]);
+
+  useDesktopFocusRefresh(refreshAfterBrowserOAuth);
+
+  async function openOAuthUrl(redirectUrl: string): Promise<void> {
+    const openedExternal = await tryOpenExternalUrl(redirectUrl);
+    if (openedExternal) {
+      setBrowserHint(
+        "Complete Discord authorization in your browser, then return to Bendo."
+      );
+      setBusy(false);
+      return;
+    }
+    window.location.assign(redirectUrl);
+  }
+
   async function connectDiscord() {
     if (!user) {
       return;
@@ -89,16 +130,25 @@ export function DiscordConnectControls({
 
     setBusy(true);
     setError(null);
+    setBrowserHint(null);
 
     try {
+      // Electron: absolute local handoff → bendo:// (avoid Clerk landing on Vercel).
+      // Web: relative /settings is fine.
+      let clerkReturnUrl = "/settings";
+      const origin = await resolveDesktopAppOrigin();
+      if (origin) {
+        clerkReturnUrl = buildDesktopHandoffUrl(origin, "/settings");
+      }
+
       const result = await createExternalAccount({
         strategy: "oauth_discord",
-        redirectUrl: SETTINGS_REDIRECT_URL,
+        redirectUrl: clerkReturnUrl,
       });
-      const redirectUrl =
+      const providerOAuthUrl =
         result?.verification?.externalVerificationRedirectURL?.href;
-      if (redirectUrl) {
-        window.location.assign(redirectUrl);
+      if (providerOAuthUrl) {
+        await openOAuthUrl(providerOAuthUrl);
         return;
       }
       await user.reload();
@@ -112,11 +162,14 @@ export function DiscordConnectControls({
     }
   }
 
-  function reverifyDiscord() {
+  async function reverifyDiscord() {
     const redirectUrl =
       discordAccount?.verification?.externalVerificationRedirectURL?.href;
     if (redirectUrl) {
-      window.location.assign(redirectUrl);
+      setBusy(true);
+      setError(null);
+      setBrowserHint(null);
+      await openOAuthUrl(redirectUrl);
       return;
     }
     void connectDiscord();
@@ -125,6 +178,7 @@ export function DiscordConnectControls({
   async function disconnectDiscord() {
     setBusy(true);
     setError(null);
+    setBrowserHint(null);
 
     try {
       const account =
@@ -145,6 +199,7 @@ export function DiscordConnectControls({
           // keep default message
         }
         setError(message);
+        setConfirmDisconnectOpen(false);
         router.refresh();
         setBusy(false);
         return;
@@ -155,10 +210,12 @@ export function DiscordConnectControls({
         await user?.reload();
       }
 
+      setConfirmDisconnectOpen(false);
       router.refresh();
       setBusy(false);
     } catch {
       setError("Could not disconnect Discord. Try again.");
+      setConfirmDisconnectOpen(false);
       setBusy(false);
     }
   }
@@ -181,10 +238,10 @@ export function DiscordConnectControls({
             variant="outline"
             disabled={controlsDisabled}
             onClick={() => {
-              void disconnectDiscord();
+              setConfirmDisconnectOpen(true);
             }}
           >
-            {busy ? "Disconnecting…" : "Disconnect"}
+            Disconnect
           </Button>
         ) : null}
 
@@ -204,18 +261,59 @@ export function DiscordConnectControls({
           <Button
             type="button"
             disabled={controlsDisabled}
-            onClick={reverifyDiscord}
+            onClick={() => {
+              void reverifyDiscord();
+            }}
           >
             {busy ? "Opening Discord…" : "Reverify Discord"}
           </Button>
         ) : null}
       </div>
 
+      {browserHint ? (
+        <output className="text-muted-foreground block text-sm">
+          {browserHint}
+        </output>
+      ) : null}
+
       {error ? (
         <p className="text-destructive text-sm" role="alert">
           {error}
         </p>
       ) : null}
+
+      <AlertDialog
+        open={confirmDisconnectOpen}
+        onOpenChange={(nextOpen) => {
+          if (busy && !nextOpen) {
+            return;
+          }
+          setConfirmDisconnectOpen(nextOpen);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Discord?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bendo will unlink Discord from your account and clear the identity
+              mapping. You can connect again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busy}
+              onClick={(event) => {
+                event.preventDefault();
+                void disconnectDiscord();
+              }}
+            >
+              {busy ? "Disconnecting…" : "Disconnect"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

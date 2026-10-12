@@ -1,7 +1,16 @@
 "use client";
 
 import { Show, useClerk } from "@clerk/nextjs";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import { useDesktopFocusRefresh } from "@/lib/desktop/use-desktop-focus-refresh";
 
 /** Cap total polls so a stuck handoff cannot spin forever. */
 const MAX_ATTEMPTS = 24;
@@ -112,13 +121,26 @@ function SessionHandoff() {
   );
 }
 
+/**
+ * Electron: OAuth (Google, etc.) may finish in the OS browser. When the user
+ * returns to this window, refresh so Clerk client/session can catch up.
+ */
+function DesktopAuthFocusRefresh({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const onRefresh = useCallback(() => {
+    router.refresh();
+  }, [router]);
+  useDesktopFocusRefresh(onRefresh);
+  return children;
+}
+
 export function PostSignInBridge({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
   return (
-    <>
+    <DesktopAuthFocusRefresh>
       <Show when="signed-out">{children}</Show>
       {/* If user is signed in, wait until the server can read the session (cookie → /api/me, possibly via Vercel proxy) before leaving /sign-in. */}
       {/* Avoids / ↔ /sign-in reload loops when RSC requireUser races the cookie write. */}
@@ -126,6 +148,6 @@ export function PostSignInBridge({
       <Show when="signed-in">
         <SessionHandoff />
       </Show>
-    </>
+    </DesktopAuthFocusRefresh>
   );
 }

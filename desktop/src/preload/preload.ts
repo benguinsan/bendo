@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld("bendoDesktop", {
   getAppUrl: (): Promise<string> => ipcRenderer.invoke("bendo:get-url"),
   reloadBendo: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke("bendo:reload"),
+  openExternal: (
+    url: string
+  ): Promise<{ ok: true } | { ok: false; error: string }> =>
+    ipcRenderer.invoke("bendo:open-external", url),
   saveModelConfig: (
     config: DesktopModelConfig
   ): Promise<

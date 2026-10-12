@@ -28,6 +28,12 @@ extraResources:
 
 asar: true
 
+# OS opens Electron for OAuth handoff (bendo://auth/callback?target=…).
+protocols:
+  - name: Bendo
+    schemes:
+      - bendo
+
 mac:
   category: public.app-category.productivity
   target:
@@ -36,6 +42,11 @@ mac:
   # Local MVP: unsigned. Distribution signing / notarize comes later.
   identity: null
   hardenedRuntime: false
+  extendInfo:
+    CFBundleURLTypes:
+      - CFBundleURLName: app.bendo.desktop
+        CFBundleURLSchemes:
+          - bendo
 
 dmg:
   artifactName: ${productName}-${version}-${os}-${arch}.${ext}
