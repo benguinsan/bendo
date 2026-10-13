@@ -9,9 +9,20 @@ export const BENDO_PROTOCOL = "bendo";
 
 let mainWindowRef: BrowserWindow | null = null;
 let pendingProtocolUrl: string | null = null;
+/** False until the first `loadBendo` finishes — avoids racing protocol loadURL vs app boot. */
+let initialLoadComplete = false;
 
 export function setProtocolMainWindow(win: BrowserWindow | null): void {
   mainWindowRef = win;
+}
+
+/** Call after the first `loadBendo(win)` settles (ok or offline). */
+export function markProtocolInitialLoadComplete(): void {
+  initialLoadComplete = true;
+}
+
+function queueProtocolUrl(raw: string): void {
+  pendingProtocolUrl = raw;
 }
 
 export function registerBendoProtocolClient(): void {
@@ -101,11 +112,17 @@ function focusWindow(win: BrowserWindow): void {
 
 /**
  * Handle an incoming bendo:// URL: focus main window and load the local callback.
+ * Before initial load completes (or if no window yet), queue and wait for flush.
  */
 export async function handleBendoProtocolUrl(raw: string): Promise<void> {
   const target = parseBendoProtocolUrl(raw);
   if (!target) {
     console.warn(`[protocol] Ignored invalid URL: ${raw}`);
+    return;
+  }
+
+  if (!initialLoadComplete) {
+    queueProtocolUrl(raw);
     return;
   }
 
@@ -115,7 +132,7 @@ export async function handleBendoProtocolUrl(raw: string): Promise<void> {
       : BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
 
   if (!win) {
-    pendingProtocolUrl = raw;
+    queueProtocolUrl(raw);
     return;
   }
 
@@ -128,7 +145,10 @@ export async function handleBendoProtocolUrl(raw: string): Promise<void> {
   focusWindow(win);
 }
 
-/** Flush a protocol URL that arrived before the window existed. */
+/**
+ * Apply a protocol URL queued before the window existed or before initial load.
+ * Caller must `markProtocolInitialLoadComplete()` first.
+ */
 export async function flushPendingProtocolUrl(): Promise<void> {
   if (!pendingProtocolUrl) {
     return;

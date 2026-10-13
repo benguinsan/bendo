@@ -13,6 +13,7 @@ import {
   findProtocolUrlInArgv,
   flushPendingProtocolUrl,
   handleBendoProtocolUrl,
+  markProtocolInitialLoadComplete,
   registerBendoProtocolClient,
   setProtocolMainWindow,
 } from "./protocol";
@@ -190,11 +191,13 @@ if (gotTheLock) {
       return;
     }
 
-    void loadBendo(win).then(() => {
-      void flushPendingProtocolUrl();
+    // Queue launch / open-url callbacks until Bendo has loaded (avoids racing loadURL).
+    void loadBendo(win).then(async () => {
+      markProtocolInitialLoadComplete();
+      await flushPendingProtocolUrl();
     });
 
-    // Cold-start via protocol on Win/Linux: URL may be in argv.
+    // Cold-start via protocol on Win/Linux: URL may be in argv (queued until flush).
     const launchProtocol = findProtocolUrlInArgv(process.argv);
     if (launchProtocol) {
       void handleBendoProtocolUrl(launchProtocol);
@@ -203,7 +206,10 @@ if (gotTheLock) {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         const next = createWindow();
-        void loadBendo(next);
+        void loadBendo(next).then(async () => {
+          // Gate already open after first boot; flush only if something was queued.
+          await flushPendingProtocolUrl();
+        });
       }
     });
   });

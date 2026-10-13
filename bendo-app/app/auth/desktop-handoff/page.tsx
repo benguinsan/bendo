@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import {
   buildBendoProtocolCallbackUrl,
+  buildHandoffCallbackTargetHttpUrl,
   DESKTOP_HANDOFF_PATH,
 } from "@/lib/desktop/desktop-handoff";
 
@@ -11,22 +12,10 @@ function buildHandoffProtocolUrl():
   | { ok: true; protocolUrl: string }
   | { ok: false; error: string } {
   try {
-    const current = new URL(window.location.href);
-    const nextParam = current.searchParams.get("next") || "/";
-    const nextPath = nextParam.startsWith("/") ? nextParam : `/${nextParam}`;
-
-    const target = new URL(nextPath, current.origin);
-    for (const [key, value] of current.searchParams.entries()) {
-      if (key === "next") {
-        continue;
-      }
-      target.searchParams.set(key, value);
-    }
-    target.hash = current.hash;
-
+    const targetHttp = buildHandoffCallbackTargetHttpUrl(window.location.href);
     return {
       ok: true,
-      protocolUrl: buildBendoProtocolCallbackUrl(target.toString()),
+      protocolUrl: buildBendoProtocolCallbackUrl(targetHttp),
     };
   } catch {
     return {

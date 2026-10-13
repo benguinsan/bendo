@@ -169,7 +169,14 @@ export function DiscordConnectControls({
       setBusy(true);
       setError(null);
       setBrowserHint(null);
-      await openOAuthUrl(redirectUrl);
+      try {
+        await openOAuthUrl(redirectUrl);
+      } catch {
+        setError(
+          "Could not open Discord verification. Try again or reconnect Discord."
+        );
+        setBusy(false);
+      }
       return;
     }
     void connectDiscord();
