@@ -7,12 +7,50 @@ import {
   loadModelConfig,
   saveModelConfig,
 } from "./model-config-store";
+import { attachOAuthExternalNavigation } from "./oauth-navigation";
+import { openExternalUrl } from "./open-external";
+import {
+  findProtocolUrlInArgv,
+  flushPendingProtocolUrl,
+  handleBendoProtocolUrl,
+  markProtocolInitialLoadComplete,
+  registerBendoProtocolClient,
+  setProtocolMainWindow,
+} from "./protocol";
 import { initRuntimeLog } from "./runtime-log";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;
+
+// Single instance so bendo:// from the browser reaches this process (esp. Windows).
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, argv) => {
+    const protocolUrl = findProtocolUrlInArgv(argv);
+    if (protocolUrl) {
+      void handleBendoProtocolUrl(protocolUrl);
+      return;
+    }
+    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+    if (win) {
+      if (win.isMinimized()) {
+        win.restore();
+      }
+      win.show();
+      win.focus();
+    }
+  });
+}
+
+// macOS: protocol open may arrive before ready.
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  void handleBendoProtocolUrl(url);
+});
 
 // Load the offline page from the static folder.
 function offlinePagePath(): string {
@@ -37,6 +75,16 @@ function createWindow(): BrowserWindow {
   win.once("ready-to-show", () => {
     win.show();
   });
+
+  win.on("closed", () => {
+    if (BrowserWindow.getAllWindows().every((w) => w.isDestroyed())) {
+      setProtocolMainWindow(null);
+    }
+  });
+
+  // Discord / Google / Clerk OAuth → OS browser; keep Bendo shell on local app URL.
+  attachOAuthExternalNavigation(win);
+  setProtocolMainWindow(win);
 
   return win;
 }
@@ -87,6 +135,10 @@ function registerIpc(): void {
   );
 
   ipcMain.handle("bendo:model-config:load", () => loadModelConfig());
+
+  ipcMain.handle("bendo:open-external", async (_event, url: unknown) =>
+    openExternalUrl(url)
+  );
 }
 
 async function runSmoke(win: BrowserWindow): Promise<void> {
@@ -127,34 +179,48 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
   app.exit(0);
 }
 
-app.whenReady().then(() => {
-  // One-session note file: release/bendo-runtime.log (dev) or userData/logs (packaged).
-  initRuntimeLog();
+if (gotTheLock) {
+  app.whenReady().then(() => {
+    initRuntimeLog();
+    registerBendoProtocolClient();
+    registerIpc();
+    const win = createWindow();
 
-  registerIpc();
-  const win = createWindow();
+    if (isSmokeMode()) {
+      void runSmoke(win);
+      return;
+    }
 
-  if (isSmokeMode()) {
-    void runSmoke(win);
-    return;
-  }
+    // Queue launch / open-url callbacks until Bendo has loaded (avoids racing loadURL).
+    void loadBendo(win).then(async () => {
+      markProtocolInitialLoadComplete();
+      await flushPendingProtocolUrl();
+    });
 
-  void loadBendo(win);
+    // Cold-start via protocol on Win/Linux: URL may be in argv (queued until flush).
+    const launchProtocol = findProtocolUrlInArgv(process.argv);
+    if (launchProtocol) {
+      void handleBendoProtocolUrl(launchProtocol);
+    }
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      const next = createWindow();
-      void loadBendo(next);
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        const next = createWindow();
+        void loadBendo(next).then(async () => {
+          // Gate already open after first boot; flush only if something was queued.
+          await flushPendingProtocolUrl();
+        });
+      }
+    });
+  });
+
+  app.on("before-quit", () => {
+    stopRuntimes();
+  });
+
+  app.on("window-all-closed", () => {
+    if (!isMac) {
+      app.quit();
     }
   });
-});
-
-app.on("before-quit", () => {
-  stopRuntimes();
-});
-
-app.on("window-all-closed", () => {
-  if (!isMac) {
-    app.quit();
-  }
-});
+}

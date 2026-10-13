@@ -1,6 +1,6 @@
-import { SignUp } from "@clerk/nextjs";
 import type { Metadata } from "next";
 
+import { DesktopAwareSignUp } from "@/components/auth/desktop-aware-clerk";
 import { PostSignInBridge } from "@/components/auth/post-sign-in-bridge";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function SignUpPage() {
   return (
     <PostSignInBridge>
-      <SignUp />
+      <DesktopAwareSignUp />
     </PostSignInBridge>
   );
 }

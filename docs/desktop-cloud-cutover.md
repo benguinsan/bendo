@@ -7,6 +7,17 @@ Tóm tắt phần vừa triển khai: packaged / Electron-spawned Next **không*
 
 **Không trong phạm vi doc này:** Agent chat / DSH / bundle harness (vẫn local).
 
+**OAuth trên Electron (hướng A + `bendo://`):**
+
+1. OAuth mở **browser hệ thống** (`openExternal` + navigation intercept).
+2. Clerk `redirectUrl` / force redirect = **absolute local**  
+   `http://127.0.0.1:<port>/auth/desktop-handoff?next=…`  
+   (không dùng path tương đối — tránh Clerk đưa về Vercel).
+3. Trang handoff ngay lập tức mở `bendo://auth/callback?target=<encoded local URL>` → OS focus Electron → `loadURL` target (kèm query/hash Clerk).
+4. **Clerk Dashboard:** allow `http://127.0.0.1:3000` và  
+   `http://127.0.0.1:3000/auth/desktop-handoff` (thêm `localhost` nếu dùng).  
+   Custom scheme `bendo://` thường không cần (và thường không được) khai báo trong Clerk — chỉ http handoff.
+
 ---
 
 ## 1. Mục tiêu
