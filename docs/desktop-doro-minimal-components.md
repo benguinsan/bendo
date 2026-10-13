@@ -218,7 +218,8 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 
 - Perfect production `pnpm deploy` / rewrite CLI deps.  
 - First-run download vào `userData`.  
-- Smoke mục 5 trên máy sạch chỉ có installer (manual).
+- Smoke mục 5 trên máy sạch chỉ có installer (manual).  
+- Windows/Linux pack: Win-safe copy/hoist (không rsync/symlink); hiện `build:harness` fail sớm trên `win32`, NSIS/AppImage target comment out.
 
 Không copy nguyên checkout (`.git` / docs / python / website / snapshots) vào installer.
 

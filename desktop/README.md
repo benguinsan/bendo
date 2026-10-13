@@ -88,6 +88,8 @@ If the Next.js **dev** server logs blocked HMR from `127.0.0.1`, ensure `bendo-a
 
 Tạo `.dmg` gồm Electron shell, Next standalone (`Resources/bendo-app`), **và** slim harness (`Resources/harness` — Doro overlay + pruned `dsh web` runtime). Không ship nguyên checkout ~1.8 GB (docs/tests/python/website/` .git` bị prune).
 
+**macOS only for now:** `build:harness` cần `rsync` + symlink hoist; Windows installer target đã tắt. Pack trên Mac; Win-safe prepare = việc sau.
+
 ```bash
 # from desktop/
 npm install

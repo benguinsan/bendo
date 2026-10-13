@@ -16,6 +16,9 @@
  *
  * Skip smoke (faster iterate):
  *   BENDO_HARNESS_SKIP_SMOKE=1 npm run build:harness
+ *
+ * Platform: macOS first (rsync + symlink hoist). Windows packaging is out of
+ * scope until a Win-safe copy/hoist path exists — fail early on win32.
  */
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -36,6 +39,13 @@ const SMOKE_PORT = 13_080;
 const SMOKE_HEALTH_URL = `http://127.0.0.1:${SMOKE_PORT}/bendo-chat`;
 const SMOKE_TIMEOUT_MS = 90_000;
 const SMOKE_POLL_MS = 500;
+
+if (process.platform === "win32") {
+  console.error(
+    "[build:harness] Windows packaging is not supported yet (prepare uses rsync + symlinks). Pack on macOS for now; a Win-safe copy/hoist path comes later."
+  );
+  process.exit(1);
+}
 
 const ENV_NAMES = [
   ".env",

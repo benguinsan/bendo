@@ -62,13 +62,14 @@ mac:
 dmg:
   artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
-win:
-  target:
-    - target: nsis
-      arch:
-        - x64
-
-linux:
-  target:
-    - AppImage
-  category: Office
+# Windows / Linux installer targets deferred. Slim harness prepare (rsync +
+# symlink hoist) is macOS-first; re-enable when Win/Linux-safe prepare exists.
+# win:
+#   target:
+#     - target: nsis
+#       arch:
+#         - x64
+# linux:
+#   target:
+#     - AppImage
+#   category: Office
