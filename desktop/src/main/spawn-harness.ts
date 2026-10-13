@@ -10,6 +10,7 @@ import {
   killProcessTree,
   shouldDetachChild,
   spawnCommand,
+  spawnExecutable,
 } from "../platform/process";
 import { isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
@@ -19,7 +20,10 @@ import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
 const DEFAULT_SPAWN_TIMEOUT_MS = 90_000;
 const WAIT_INTERVAL_MS = 500;
 const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
-const DSH_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
+const DSH_PNPM_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
+/** Packaged slim tree: built CLI (no system pnpm / tsx). */
+const DSH_BIN_REL = path.join("apps", "cli", "lib", "bin.js");
+const DSH_WEB_ARGS = ["web", "--patch", DORO_PATCH, "--no-open"] as const;
 /** Harness settings/credentials home under Electron userData (not ~/.dsh). */
 const ELECTRON_DSH_HOME_DIRNAME = "dsh";
 
@@ -47,19 +51,25 @@ function spawnTimeoutMs(): number {
 }
 
 /**
- * Find and validate the harness directory: `BENDO_HARNESS_DIR` or sibling
- * `../deepseek-harness` relative to the desktop package root.
+ * Find and validate the harness directory.
+ * Env `BENDO_HARNESS_DIR` wins; packaged → `Resources/harness`;
+ * unpackaged → sibling `../deepseek-harness`.
  */
 export function resolveHarnessDir():
   | { ok: true; dir: string }
   | { ok: false; reason: string } {
   const raw = process.env.BENDO_HARNESS_DIR?.trim();
-  const desktopRoot = app.getAppPath();
-  const candidate = raw
-    ? path.isAbsolute(raw)
+  let candidate: string;
+
+  if (raw) {
+    candidate = path.isAbsolute(raw)
       ? raw
-      : path.resolve(process.cwd(), raw)
-    : path.resolve(desktopRoot, "..", "deepseek-harness");
+      : path.resolve(process.cwd(), raw);
+  } else if (app.isPackaged) {
+    candidate = path.join(process.resourcesPath, "harness");
+  } else {
+    candidate = path.resolve(app.getAppPath(), "..", "deepseek-harness");
+  }
 
   let st: fs.Stats;
   try {
@@ -67,7 +77,9 @@ export function resolveHarnessDir():
   } catch {
     return {
       ok: false,
-      reason: `deepseek-harness directory not found: ${candidate}`,
+      reason: app.isPackaged
+        ? `Packaged harness not found: ${candidate} (run npm run build:harness before pack/dist)`
+        : `deepseek-harness directory not found: ${candidate}`,
     };
   }
 
@@ -92,6 +104,16 @@ export function resolveHarnessDir():
       ok: false,
       reason: `Missing Doro overlay cordis.yml: ${cordis}`,
     };
+  }
+
+  if (app.isPackaged) {
+    const dshBin = path.join(candidate, DSH_BIN_REL);
+    if (!fs.existsSync(dshBin)) {
+      return {
+        ok: false,
+        reason: `Packaged harness missing dsh bin: ${dshBin}`,
+      };
+    }
   }
 
   return { ok: true, dir: candidate };
@@ -193,7 +215,8 @@ export function ensureElectronDshHome():
 // Set the environment variables for the harness child process.
 function harnessChildEnv(
   bendoAppUrl: string,
-  dshHome: string
+  dshHome: string,
+  options?: { electronAsNode?: boolean }
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (!env.BENDO_API_BASE_URL?.trim()) {
@@ -201,10 +224,106 @@ function harnessChildEnv(
   }
   // Force app-local harness data (settings.yaml, credentials) under userData.
   env.DSH_HOME = dshHome;
+  if (options?.electronAsNode) {
+    env.ELECTRON_RUN_AS_NODE = "1";
+  }
   // Same secret as Next (env wins over cordis.yml). Force so Electron-managed
   // runs do not keep a stale cordis default when parent env is empty.
   applyBridgeCredentialsToEnv(env, { force: true });
   return env;
+}
+
+function trackHarnessChild(
+  child: ChildProcess,
+  commandLabel: string,
+  errorCommand: string,
+  dshHomeDir: string
+): void {
+  ownedChild = child;
+  pipeChildOutput(child);
+
+  child.on("error", (error: NodeJS.ErrnoException) => {
+    clearOwnedChild(child);
+    console.error(`[harness] ${spawnErrorReason(error, errorCommand)}`);
+  });
+
+  child.on("exit", (code, signal) => {
+    clearOwnedChild(child);
+    const detail =
+      signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
+    console.log(`[harness] Process exited (${detail})`);
+  });
+
+  console.log(
+    `[harness] Spawned ${commandLabel} (pid ${child.pid}; DSH_HOME=${dshHomeDir})`
+  );
+}
+
+/** Packaged slim harness: Electron-as-Node → apps/cli/lib/bin.js (no system pnpm). */
+function startHarnessPackaged(
+  harnessDir: string,
+  bendoAppUrl: string,
+  dshHomeDir: string
+):
+  | { ok: true; child: ChildProcess }
+  | { ok: false; reason: string } {
+  const dshBin = path.join(harnessDir, DSH_BIN_REL);
+  const electronBin = process.execPath;
+
+  let child: ChildProcess;
+  try {
+    child = spawnExecutable(electronBin, [dshBin, ...DSH_WEB_ARGS], {
+      cwd: harnessDir,
+      env: harnessChildEnv(bendoAppUrl, dshHomeDir, { electronAsNode: true }),
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: shouldDetachChild(),
+      windowsHide: true,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: `Failed to spawn harness: ${message}` };
+  }
+
+  trackHarnessChild(
+    child,
+    `\`electron-as-node ${DSH_BIN_REL} ${DSH_WEB_ARGS.join(" ")}\` in ${harnessDir}`,
+    "electron",
+    dshHomeDir
+  );
+  return { ok: true, child };
+}
+
+/** Dev / unpackaged: `pnpm dsh web --patch …` in sibling (or BENDO_HARNESS_DIR). */
+function startHarnessDev(
+  harnessDir: string,
+  bendoAppUrl: string,
+  dshHomeDir: string
+):
+  | { ok: true; child: ChildProcess }
+  | { ok: false; reason: string } {
+  const pnpm = getPnpmCommand();
+
+  let child: ChildProcess;
+  try {
+    child = spawnCommand(pnpm, DSH_PNPM_ARGS, {
+      cwd: harnessDir,
+      env: harnessChildEnv(bendoAppUrl, dshHomeDir),
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: shouldDetachChild(),
+      windowsHide: true,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: `Failed to spawn harness: ${message}` };
+  }
+
+  trackHarnessChild(
+    child,
+    `\`pnpm ${DSH_PNPM_ARGS.join(" ")}\` in ${harnessDir}`,
+    pnpm,
+    dshHomeDir
+  );
+  return { ok: true, child };
 }
 
 function startHarness(
@@ -230,43 +349,9 @@ function startHarness(
     return dshHome;
   }
 
-  // Get the pnpm command.
-  const pnpm = getPnpmCommand();
-
-  // Spawn the harness child process.
-  let child: ChildProcess;
-  try {
-    child = spawnCommand(pnpm, DSH_ARGS, {
-      cwd: harnessDir,
-      env: harnessChildEnv(bendoAppUrl, dshHome.dir),
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: shouldDetachChild(),
-      windowsHide: true,
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, reason: `Failed to spawn harness: ${message}` };
-  }
-
-  ownedChild = child;
-  pipeChildOutput(child);
-
-  child.on("error", (error: NodeJS.ErrnoException) => {
-    clearOwnedChild(child);
-    console.error(`[harness] ${spawnErrorReason(error, pnpm)}`);
-  });
-
-  child.on("exit", (code, signal) => {
-    clearOwnedChild(child);
-    const detail =
-      signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
-    console.log(`[harness] Process exited (${detail})`);
-  });
-
-  console.log(
-    `[harness] Spawned \`pnpm ${DSH_ARGS.join(" ")}\` in ${harnessDir} (pid ${child.pid}; DSH_HOME=${dshHome.dir})`
-  );
-  return { ok: true, child };
+  return app.isPackaged
+    ? startHarnessPackaged(harnessDir, bendoAppUrl, dshHome.dir)
+    : startHarnessDev(harnessDir, bendoAppUrl, dshHome.dir);
 }
 
 // Flag to prevent new spawns (startup, reload, active) after shutdown.
@@ -323,7 +408,7 @@ export async function ensureHarnessServer(
   }
 
   const child = started.child;
-  const pnpm = getPnpmCommand();
+  const errorCommand = app.isPackaged ? "electron" : getPnpmCommand();
   const timeoutMs = spawnTimeoutMs();
   console.log(
     `[harness] Waiting for health ${healthUrl} (timeout ${timeoutMs}ms)…`
@@ -343,7 +428,7 @@ export async function ensureHarnessServer(
 
   const spawnFailed = new Promise<EnsureHarnessResult>((resolve) => {
     child.once("error", (error: NodeJS.ErrnoException) => {
-      resolve({ ok: false, reason: spawnErrorReason(error, pnpm) });
+      resolve({ ok: false, reason: spawnErrorReason(error, errorCommand) });
     });
   });
 

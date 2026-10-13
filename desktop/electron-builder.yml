@@ -2,7 +2,7 @@ appId: app.bendo.desktop
 productName: Bendo
 copyright: Copyright © Bendo
 
-# Shell + embedded Bendo (Next standalone). Harness not bundled yet.
+# Shell + embedded Bendo (Next standalone) + slim harness (Doro / dsh web).
 directories:
   output: release
   buildResources: build
@@ -23,6 +23,17 @@ extraResources:
       - "!node_modules/**"
   - from: resources/bendo-app/node_modules
     to: bendo-app/node_modules
+    filter:
+      - "**/*"
+  # Slim harness (build:harness). Same node_modules split as bendo-app.
+  - from: resources/harness
+    to: harness
+    filter:
+      - "**/*"
+      - "!node_modules"
+      - "!node_modules/**"
+  - from: resources/harness/node_modules
+    to: harness/node_modules
     filter:
       - "**/*"
 

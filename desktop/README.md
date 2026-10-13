@@ -84,23 +84,26 @@ Electron injects `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SECRET` into **spawned
 
 If the Next.js **dev** server logs blocked HMR from `127.0.0.1`, ensure `bendo-app/next.config.ts` includes `allowedDevOrigins: ["127.0.0.1"]` and restart the web server (or rebuild Docker).
 
-## Đóng gói (macOS) — shell + Bendo runtime
+## Đóng gói (macOS) — shell + Bendo + slim harness
 
-Tạo `.dmg` gồm Electron shell **và** Next standalone (`resources/bendo-app` → `Contents/Resources/bendo-app`). **Chưa** bundle harness — Agent vẫn cần dsh local hoặc soft-fail.
+Tạo `.dmg` gồm Electron shell, Next standalone (`Resources/bendo-app`), **và** slim harness (`Resources/harness` — Doro overlay + pruned `dsh web` runtime). Không ship nguyên checkout ~1.8 GB (docs/tests/python/website/` .git` bị prune).
 
 ```bash
 # from desktop/
 npm install
-npm run build:bendo   # next build (standalone) + sync → resources/bendo-app
-npm run dist           # build:bendo + tsc + .dmg → release/
+npm run build:bendo    # next build (standalone) + sync → resources/bendo-app
+npm run build:harness   # prune-copy sibling deepseek-harness → resources/harness
+npm run dist            # build:bendo + build:harness + tsc + .dmg → release/
 # thử nhanh không tạo dmg:
 npm run pack
 ```
 
-- Packaged app spawn: `server.js` qua Electron-as-Node (`ELECTRON_RUN_AS_NODE=1`)
-- Dev `npm start`: vẫn sibling `bendo-app` + `npm run dev`
+- Packaged Next: `server.js` qua Electron-as-Node (`ELECTRON_RUN_AS_NODE=1`)
+- Packaged harness: `apps/cli/lib/bin.js web --patch ./bendo-agent(doro)/cordis.yml --no-open` qua Electron-as-Node (không cần system `pnpm`)
+- Dev `npm start`: sibling `bendo-app` + `npm run dev`; sibling `deepseek-harness` + `pnpm dsh web …`
 - Packaged credentials: public via Next build inline; bridge secret via Electron inject / `userData` (không bake `.env` vào `resources/` / `.dmg`)
-- Harness / signing / auto-update: bước sau
+- Harness snapshot: `resources/harness/MANIFEST.json` sau `build:harness` (size, rev, MCP kept). Phase 2–3: hoist + cắt SDK/UI `.pnpm` + stub dsh web UI → ~**377 MB**; **giữ MCP** (cordis off). Skip smoke: `BENDO_HARNESS_SKIP_SMOKE=1`.
+- Signing / auto-update: bước sau
 
 ## Kiểm tra nhanh (tự tắt sau khi OK)
 
@@ -125,10 +128,12 @@ desktop/
 ├── src/preload/           # Narrow bridge (platform, reload, getAppUrl)
 ├── static/offline.html    # Shown when Bendo URL is down
 ├── resources/bendo-app/   # Next standalone staging (gitignored; from build:bendo)
-├── electron-builder.yml   # Packaging (shell + extraResources bendo-app)
+├── resources/harness/     # Slim dsh + Doro staging (gitignored; from build:harness)
+├── electron-builder.yml   # Packaging (shell + extraResources bendo-app + harness)
 ├── release/               # electron-builder output (gitignored)
 ├── scripts/run-app.mjs    # npm start — real app
 ├── scripts/prepare-bendo-resource.mjs
+├── scripts/prepare-harness-resource.mjs
 ├── scripts/smoke.mjs      # npm run test:smoke — auto quit (no spawn)
 ├── prompts/               # Implementation prompts (gitignored)
 ├── skills-lock.json       # Locked skill install sources
@@ -141,7 +146,7 @@ desktop/
 - `nodeIntegration: false`
 - `sandbox: true`
 - No chat-bridge secret or service role in preload/renderer
-- Spawn commands are fixed (`npm run dev` / packaged `server.js`, `pnpm dsh web …`) — no shell strings from IPC
+- Spawn commands are fixed (`npm run dev` / packaged `server.js`, `pnpm dsh web …` / packaged `apps/cli/lib/bin.js`) — no shell strings from IPC
 - Do not commit `resources/` or `.env`; installer resources must not contain Clerk/Supabase/bridge secrets
 - Bridge secret: machine-local inject + `userData/bridge-credentials.json` (not installer); env overrides are session-only
 - Cloud secrets stay on Vercel (results-only APIs); do not download keys into the desktop app — see `AGENTS.md` and repo-root `AGENTS.md` → Product credentials
@@ -149,6 +154,6 @@ desktop/
 ## Not in this skeleton
 
 - Spawning Docker Compose from Electron
-- Bundling harness/Doro into the installer
+- Perfect harness dependency-closure prune / first-run harness download
 - Code signing / notarization / auto-update
 - Discord bot
