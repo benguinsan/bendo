@@ -4,7 +4,7 @@ Inventory cho hướng **slim harness**: chỉ những gì Bendo Desktop cần �
 
 **Liên quan:** [`desktop-electron-startup-flow.md`](./desktop-electron-startup-flow.md), [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md), [`agent-model-config-save-workflow.md`](./agent-model-config-save-workflow.md).
 
-**Không phải** recipe prune/build cuối cùng — đây là checklist “cần / không cần” trước khi đóng gói.
+Checklist “cần / không cần”. **Packaging v1 (denylist prune + embed):** `desktop/scripts/prepare-harness-resource.mjs` → `resources/harness` → electron-builder `extraResources`. Perfect production-graph closure vẫn là bước sau.
 
 ---
 
@@ -101,7 +101,7 @@ Không chỉ overlay: cần binary/`pnpm` entry **`dsh`** và profile **`web`** 
 
 Thực tế hôm nay (dev): cả monorepo `deepseek-harness` + `pnpm install` + `apps/cli` (`bin: dsh`).
 
-**Hướng slim (chưa implement):** chỉ giữ closure runtime của `dsh web` + packages mà Doro patch + profile web kéo vào — không giữ docs/tests/snapshots/website/python gates.
+**Hướng slim:** chỉ giữ runtime đủ cho `dsh web` + Doro patch — không giữ docs/tests/snapshots/website/python gates. **v1:** denylist. **Phase 2:** hoist + prune SDK/tooling. **Phase 3:** stub dsh web UI (`apps/web/dist` chỉ `index.html`), bỏ `packages/client/**/src`, prune UI/build `.pnpm` (vite/shiki/react/esbuild/…); **giữ MCP trên đĩa** (cordis off). Perfect `pnpm deploy` = bước sau nếu còn cần.
 
 Checklist nhóm package (tên theo monorepo; prune cụ thể = bước sau):
 
@@ -151,7 +151,8 @@ An toàn loại khỏi artifact desktop (không ảnh hưởng Doro chat nếu p
 | `snapshots/`, vitest e2e / expected / web stress configs | Test-only |
 | `python/`, pytest | Không phục vụ `dsh web` Bendo |
 | Lefthook / CI scripts không cần runtime | Dev gates |
-| MCP / Exa / Perplexity plugins (nếu không bật) | Optional trong cordis |
+| Exa / Perplexity plugins (nếu không bật) | Optional trong cordis |
+| MCP packages | **Phase 2 giữ trên đĩa** (cordis mặc định off; bật sau khi product sẵn sàng) |
 | Experimental agent-team / webworker preview | Không dùng Bendo path |
 | Full git history / `.git` | Không cần trong resources |
 
@@ -179,30 +180,48 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 
 ---
 
-## 6. Validation Electron hiện tại
+## 6. Validation Electron
 
-`desktop/src/main/spawn-harness.ts` chỉ check:
+`desktop/src/main/spawn-harness.ts` check:
 
 1. Thư mục harness tồn tại  
 2. Có `package.json`  
 3. Có `bendo-agent(doro)/cordis.yml`  
-4. Spawn `pnpm dsh web --patch …` thành công + health bridge  
+4. Packaged: có thêm `apps/cli/lib/bin.js`  
+5. Spawn thành công + health bridge  
 
-Slim layout sau này phải thỏa 1–4 (có thể đổi lệnh spawn sang binary nhúng — khi đó cập nhật spawn + doc này).
+| Mode | Resolve | Spawn |
+| --- | --- | --- |
+| Dev / unpackaged | `BENDO_HARNESS_DIR` hoặc sibling `../deepseek-harness` | `pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open` |
+| Packaged | `BENDO_HARNESS_DIR` hoặc `Resources/harness` | Electron-as-Node → `apps/cli/lib/bin.js web --patch … --no-open` |
 
 ---
 
-## 7. Hướng đóng gói (chưa làm trong doc này)
+## 7. Đóng gói (v1 done; phase 2 còn lại)
 
-Thứ tự đề xuất:
+**Đã làm (v1):**
 
-1. **Giữ nguyên** overlay Doro (mục 3.1).  
-2. **Đo** production dependency closure của `dsh web` + patch.  
-3. Tạo artifact slim (embed `Resources/harness` **hoặc** download lần đầu vào `userData`).  
-4. Đổi `BENDO_HARNESS_DIR` / resolve path packaged khỏi sibling `../deepseek-harness`.  
-5. Smoke mục 5 trên máy sạch (không checkout monorepo).
+1. Giữ nguyên overlay Doro (mục 3.1).  
+2. `desktop/scripts/prepare-harness-resource.mjs` — rsync denylist prune → `desktop/resources/harness` + `MANIFEST.json` (size / rev).  
+3. Embed qua electron-builder `extraResources` → `Contents/Resources/harness`.  
+4. Packaged resolve + Electron-as-Node spawn (không system `pnpm`).  
+5. `pack` / `dist` chạy `build:harness` cùng `build:bendo`.
 
-Không copy nguyên checkout ~1.8 GB vào installer.
+**Đã làm (phase 2 + 3):**
+
+- Hoist `@deepseek-ai` cho Electron-as-Node; prune SDK/tooling + UI/build `.pnpm`.  
+- Stub web UI: giữ `@deepseek-ai/dsh-web-frontend` + `dist/index.html`, bỏ `dist/assets`.  
+- Exclude `packages/client/**/src`; giữ MCP trên đĩa (`mcpCordisEnabled: false`).  
+- Smoke port `13080` (skip: `BENDO_HARNESS_SKIP_SMOKE=1`). Artifact ~**377 MB** sau Phase 3.
+
+**Chưa làm (sau):**
+
+- Perfect production `pnpm deploy` / rewrite CLI deps.  
+- First-run download vào `userData`.  
+- Smoke mục 5 trên máy sạch chỉ có installer (manual).  
+- Windows/Linux pack: Win-safe copy/hoist (không rsync/symlink); hiện `build:harness` fail sớm trên `win32`, NSIS/AppImage target comment out.
+
+Không copy nguyên checkout (`.git` / docs / python / website / snapshots) vào installer.
 
 ---
 
