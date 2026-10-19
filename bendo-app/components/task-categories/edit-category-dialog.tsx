@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useId, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -36,17 +37,20 @@ type EditCategoryFormProps = {
   onUpdate: (category: PersistedCategory) => void;
 };
 
+/** Inner form that PATCHes an existing category name. */
 function EditCategoryForm({
   category,
   existingNames,
   onOpenChange,
   onUpdate,
 }: EditCategoryFormProps) {
+  const { getToken } = useAuth();
   const nameId = useId();
   const [name, setName] = useState(category.name);
   const [error, setError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /** Validate and PATCH the category with Clerk Bearer. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = validateUpdatedCategory({
@@ -61,10 +65,13 @@ function EditCategoryForm({
     }
 
     setIsSubmitting(true);
-    const updated = await updateCategoryViaApi({
-      categoryId: category.id,
-      name: result.data.name,
-    });
+    const updated = await updateCategoryViaApi(
+      {
+        categoryId: category.id,
+        name: result.data.name,
+      },
+      { getToken }
+    );
     setIsSubmitting(false);
 
     if (!updated.ok) {
@@ -142,6 +149,7 @@ function EditCategoryForm({
   );
 }
 
+/** Dialog wrapper that mounts `EditCategoryForm` when a category is selected. */
 export function EditCategoryDialog({
   category,
   existingNames,

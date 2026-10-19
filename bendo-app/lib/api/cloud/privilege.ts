@@ -24,19 +24,25 @@ const HOP_BY_HOP_REQUEST_HEADERS = new Set([
   "content-length",
 ]);
 
+// Drop encoding/length: undici `fetch` decompresses the body, but Vercel may
+// still send Content-Encoding. Forwarding that → browser ERR_CONTENT_DECODING_FAILED.
 const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "connection",
   "keep-alive",
   "transfer-encoding",
   "upgrade",
+  "content-encoding",
+  "content-length",
 ]);
 
+/** True when pathname is an allowlisted privileged API (or a nested path). */
 function isAllowlistedPrivilegedPath(pathname: string): boolean {
   return PRIVILEGED_API_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 }
 
+/** Copy request headers for upstream fetch; drop hop-by-hop, cookie, auth. */
 function forwardRequestHeaders(request: Request): Headers {
   const headers = new Headers();
   for (const [key, value] of request.headers.entries()) {
@@ -52,6 +58,10 @@ function forwardRequestHeaders(request: Request): Headers {
   return headers;
 }
 
+/**
+ * Copy upstream response headers for the client; drop hop-by-hop plus
+ * content-encoding/length (undici already decompressed the body).
+ */
 function forwardResponseHeaders(upstream: Headers): Headers {
   const headers = new Headers();
   for (const [key, value] of upstream.entries()) {
@@ -115,6 +125,7 @@ export async function maybeProxyPrivilegedRequest(
     return null;
   }
 
+  const method = request.method.toUpperCase();
   const token = await resolveSessionTokenForCloud(request);
   if (!token) {
     return unauthorized();
@@ -124,7 +135,6 @@ export async function maybeProxyPrivilegedRequest(
   const headers = forwardRequestHeaders(request);
   headers.set("Authorization", `Bearer ${token}`);
 
-  const method = request.method.toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD";
   const upstream = await fetch(target, {
     method,

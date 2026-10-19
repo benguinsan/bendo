@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
@@ -15,13 +16,16 @@ import { Input } from "@/components/ui/input";
 import { createCategoryViaApi } from "@/lib/task-categories/category-api-client";
 import { validateNewCategory } from "@/lib/task-categories/category-input";
 
+/** Form to create a task category and navigate back to the list. */
 export function CreateCategoryForm() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const nameId = useId();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /** Validate and POST a new category with Clerk Bearer. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = validateNewCategory(name);
@@ -32,7 +36,7 @@ export function CreateCategoryForm() {
     }
 
     setIsSubmitting(true);
-    const created = await createCategoryViaApi(result.data.name);
+    const created = await createCategoryViaApi(result.data.name, { getToken });
     setIsSubmitting(false);
 
     if (!created.ok) {

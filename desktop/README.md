@@ -30,7 +30,7 @@ npm start
   - Harness failure is **soft** — Bendo still loads; Agent chat stays offline until the bridge is up
 - Quit Electron: stops **only** Next / harness processes this session spawned
 - If Next spawn fails / path missing: offline page with **Retry**
-- Runtime note log (dev): `release/bendo-runtime.log` — main + `[next]` / `[harness]` console lines for the current session (recreated on each launch). Packaged apps write to `userData/logs/bendo-runtime.log` instead.
+- Runtime note log: `release/bendo-runtime.log` — main + `[next]` / `[harness]` for the current session (recreated each launch). Used by `npm start` and by the packaged app when launched from `release/mac-arm64/Bendo.app`. An installed app (`/Applications/Bendo.app`) writes to `~/Library/Application Support/bendo-desktop/logs/bendo-runtime.log` instead. Override with `BENDO_RUNTIME_LOG`.
 
 Optional: still run web / harness yourself in other terminals:
 
@@ -105,6 +105,7 @@ npm run pack
 - Dev `npm start`: sibling `bendo-app` + `npm run dev`; sibling `deepseek-harness` + `pnpm dsh web …`
 - Packaged credentials: public via Next build inline; bridge secret via Electron inject / `userData` (không bake `.env` vào `resources/` / `.dmg`)
 - Harness snapshot: `resources/harness/MANIFEST.json` sau `build:harness` (size, rev, MCP kept). Phase 2–3: hoist + cắt SDK/UI `.pnpm` + stub dsh web UI → ~**377 MB**; **giữ MCP** (cordis off). Skip smoke: `BENDO_HARNESS_SKIP_SMOKE=1`.
+- `build:harness` rebuilds ABI natives (`fs-ext`) with **`node-gyp`** (declared direct `devDependency` — not only transitive via `@electron/rebuild`) against desktop Electron.
 - Signing / auto-update: bước sau
 
 ## Kiểm tra nhanh (tự tắt sau khi OK)

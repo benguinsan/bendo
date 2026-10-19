@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -52,18 +53,22 @@ type TaxonomySectionProps = {
   hideTaskPrefix?: boolean;
 };
 
+/** Shallow-clone default status taxonomy rows for local edit state. */
 function cloneStatusRows(): StatusTaxonomyRow[] {
   return statusTaxonomyRows.map((row) => ({ ...row }));
 }
 
+/** Shallow-clone default priority taxonomy rows for local edit state. */
 function clonePriorityRows(): PriorityTableRow[] {
   return priorityTaxonomyRows.map((row) => ({ ...row }));
 }
 
+/** Stable client id for a newly added priority row. */
 function createPriorityRowId(): string {
   return `priority-${crypto.randomUUID()}`;
 }
 
+/** Map persisted categories into taxonomy table row shape. */
 function toCategoryRows(categories: PersistedCategory[]) {
   return categories.map((category) => ({
     id: category.id,
@@ -71,6 +76,7 @@ function toCategoryRows(categories: PersistedCategory[]) {
   }));
 }
 
+/** One taxonomy block (heading + optional add + table). */
 function TaxonomySection({
   headingId,
   titleRest,
@@ -121,9 +127,11 @@ function TaxonomySection({
   );
 }
 
+/** Task Categories page: category CRUD plus local status/priority taxonomy UI. */
 export function TaskCategoriesView({
   initialCategories,
 }: TaskCategoriesViewProps) {
+  const { getToken } = useAuth();
   const [categories, setCategories] = useState(initialCategories);
   const [statusRows, setStatusRows] = useState(cloneStatusRows);
   const [priorityRows, setPriorityRows] = useState(clonePriorityRows);
@@ -147,12 +155,14 @@ export function TaskCategoriesView({
       ? statusRows.map((row) => row.label)
       : priorityRows.map((row) => row.label);
 
+  /** Close the taxonomy edit/create dialog when `open` becomes false. */
   function handleTaxonomyOpenChange(open: boolean) {
     if (!open) {
       setTaxonomyDialog(null);
     }
   }
 
+  /** Apply a taxonomy label create/rename to local status or priority rows. */
   function handleTaxonomySubmitLabel(name: string) {
     if (!taxonomyDialog) {
       return;
@@ -182,12 +192,13 @@ export function TaskCategoriesView({
     );
   }
 
+  /** DELETE a category via API and remove it from local list on success. */
   async function handleDeleteCategory(categoryId: string) {
     setDeletingCategoryId(categoryId);
     setDeleteError(null);
 
     try {
-      const result = await deleteCategoryViaApi(categoryId);
+      const result = await deleteCategoryViaApi(categoryId, { getToken });
 
       if (!result.ok) {
         setDeleteError(result.error);

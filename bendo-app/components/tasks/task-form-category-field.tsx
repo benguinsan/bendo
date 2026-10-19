@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { listCategoriesViaApi } from "@/lib/task-categories/category-api-client";
@@ -13,26 +14,59 @@ type TaskFormCategoryFieldProps = {
   onChange: (value: string) => void;
 };
 
+/** Category `<select>` for task forms; loads options via Clerk-authenticated API. */
 export function TaskFormCategoryField({
   value,
   error,
   onChange,
 }: TaskFormCategoryFieldProps) {
   const fieldId = useId();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const getTokenRef = useRef(getToken);
   const [categories, setCategories] = useState<PersistedCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const loadIdRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    loadIdRef.current += 1;
+    const loadId = loadIdRef.current;
+
+    /** Fetch categories for the current auth state; ignore superseded load ids. */
     async function loadCategories() {
       setLoading(true);
       setLoadError(null);
 
+      if (!isSignedIn) {
+        if (loadId === loadIdRef.current) {
+          setCategories([]);
+          setLoadError("Sign in to load categories.");
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
-        const result = await listCategoriesViaApi();
-        if (cancelled) {
+        // Packaged desktop proxies /api/categories → Vercel; Bearer from Clerk
+        // client is more reliable than relying on __session alone.
+        // Read getToken from a ref so Clerk's unstable function identity does
+        // not re-trigger this effect and abort in-flight loads.
+        const result = await listCategoriesViaApi({
+          getToken: getTokenRef.current,
+        });
+
+        // Ignore superseded loads (Strict Mode remount / isSignedIn flicker).
+        // A cancelled boolean used to discard a finished 200 while a later
+        // attempt could fail — server log showed upstream=200, UI still errored.
+        if (loadId !== loadIdRef.current) {
           return;
         }
 
@@ -44,24 +78,21 @@ export function TaskFormCategoryField({
         }
 
         setCategories(result.categories);
+        setLoadError(null);
       } catch {
-        if (!cancelled) {
+        if (loadId === loadIdRef.current) {
           setCategories([]);
           setLoadError("Could not load categories.");
         }
       }
 
-      if (!cancelled) {
+      if (loadId === loadIdRef.current) {
         setLoading(false);
       }
     }
 
     void loadCategories();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   const fieldError = error ?? loadError ?? undefined;
 

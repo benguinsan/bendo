@@ -24,6 +24,11 @@ const DSH_PNPM_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as cons
 /** Packaged slim tree: built CLI (no system pnpm / tsx). */
 const DSH_BIN_REL = path.join("apps", "cli", "lib", "bin.js");
 const DSH_WEB_ARGS = ["web", "--patch", DORO_PATCH, "--no-open"] as const;
+/**
+ * dsh web boots cordis HMR, which needs Node's internal module loader
+ * (`vendor/hmr` → `--expose-internals` / loader.internal).
+ */
+const ELECTRON_AS_NODE_EXEC_ARGV = ["--expose-internals"] as const;
 /** Harness settings/credentials home under Electron userData (not ~/.dsh). */
 const ELECTRON_DSH_HOME_DIRNAME = "dsh";
 
@@ -35,6 +40,7 @@ export type EnsureHarnessResult =
   | { ok: true; spawned: boolean }
   | { ok: false; reason: string };
 
+/** Health-wait timeout for harness spawn (env override or default). */
 function spawnTimeoutMs(): number {
   const raw = process.env.BENDO_HARNESS_SPAWN_TIMEOUT_MS?.trim();
   if (!raw) {
@@ -119,8 +125,9 @@ export function resolveHarnessDir():
   return { ok: true, dir: candidate };
 }
 
-// Log the output of the harness child process to the console.
+/** Pipe harness child stdout/stderr lines into Electron console. */
 function pipeChildOutput(child: ChildProcess): void {
+  /** Forward one decoded chunk as `[harness]` log/error lines. */
   const forward = (text: string, stream: "stdout" | "stderr") => {
     for (const line of text.split(/\r?\n/)) {
       if (!line) {
@@ -144,7 +151,7 @@ function pipeChildOutput(child: ChildProcess): void {
   }
 }
 
-// Spawn error reason message.
+/** Human-readable reason when spawning the harness child fails. */
 function spawnErrorReason(
   error: NodeJS.ErrnoException,
   pnpmCommand: string
@@ -156,6 +163,7 @@ function spawnErrorReason(
   return `Failed to spawn harness: ${message}`;
 }
 
+/** Clear `ownedChild` when it matches the exited/errored process. */
 function clearOwnedChild(child: ChildProcess): void {
   if (ownedChild === child) {
     ownedChild = null;
@@ -212,7 +220,7 @@ export function ensureElectronDshHome():
   return { ok: true, dir };
 }
 
-// Set the environment variables for the harness child process.
+/** Env for the harness child: Bendo URL, DSH_HOME, bridge secret, optional Electron-as-Node. */
 function harnessChildEnv(
   bendoAppUrl: string,
   dshHome: string,
@@ -233,6 +241,7 @@ function harnessChildEnv(
   return env;
 }
 
+/** Own a spawned harness child: pipe logs, clear on exit/error, log spawn. */
 function trackHarnessChild(
   child: ChildProcess,
   commandLabel: string,
@@ -272,13 +281,17 @@ function startHarnessPackaged(
 
   let child: ChildProcess;
   try {
-    child = spawnExecutable(electronBin, [dshBin, ...DSH_WEB_ARGS], {
-      cwd: harnessDir,
-      env: harnessChildEnv(bendoAppUrl, dshHomeDir, { electronAsNode: true }),
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: shouldDetachChild(),
-      windowsHide: true,
-    });
+    child = spawnExecutable(
+      electronBin,
+      [...ELECTRON_AS_NODE_EXEC_ARGV, dshBin, ...DSH_WEB_ARGS],
+      {
+        cwd: harnessDir,
+        env: harnessChildEnv(bendoAppUrl, dshHomeDir, { electronAsNode: true }),
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: shouldDetachChild(),
+        windowsHide: true,
+      }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: `Failed to spawn harness: ${message}` };
@@ -286,7 +299,7 @@ function startHarnessPackaged(
 
   trackHarnessChild(
     child,
-    `\`electron-as-node ${DSH_BIN_REL} ${DSH_WEB_ARGS.join(" ")}\` in ${harnessDir}`,
+    `\`electron-as-node ${ELECTRON_AS_NODE_EXEC_ARGV.join(" ")} ${DSH_BIN_REL} ${DSH_WEB_ARGS.join(" ")}\` in ${harnessDir}`,
     "electron",
     dshHomeDir
   );
@@ -326,6 +339,7 @@ function startHarnessDev(
   return { ok: true, child };
 }
 
+/** Spawn packaged or dev harness unless already owned or shutting down. */
 function startHarness(
   harnessDir: string,
   bendoAppUrl: string
@@ -354,7 +368,7 @@ function startHarness(
     : startHarnessDev(harnessDir, bendoAppUrl, dshHome.dir);
 }
 
-// Flag to prevent new spawns (startup, reload, active) after shutdown.
+/** Mark harness subsystem shutting down so new spawns are refused. */
 export function beginHarnessShutdown(): void {
   shuttingDown = true;
 }
@@ -415,6 +429,7 @@ export async function ensureHarnessServer(
   );
 
   const exitedEarly = new Promise<EnsureHarnessResult>((resolve) => {
+    /** Resolve ensureHarness as failed if the child exits before health is ready. */
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
       const detail =
         signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;

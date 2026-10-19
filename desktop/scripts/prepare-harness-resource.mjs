@@ -6,7 +6,9 @@
  * v1: denylist rsync (docs/tests/python/…).
  * Phase 2: hoist @deepseek-ai + prune bulk/tooling .pnpm; keep MCP on disk.
  * Phase 3: stub dsh web UI dist (keep package + index.html), drop client src,
- * prune more UI/build .pnpm. Smoke-boot the result.
+ * prune more UI/build .pnpm. Rebuild ABI-sensitive natives (fs-ext) for the
+ * desktop Electron version (packaged spawn = Electron-as-Node). Smoke-boot
+ * with Electron-as-Node (same as release).
  *
  * Usage (from desktop/):
  *   npm run build:harness
@@ -23,6 +25,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -251,10 +254,9 @@ const PNPM_PRUNE_PREFIXES_PHASE3 = [
   "lightningcss-win32-",
   "esbuild@",
   "@esbuild+",
-  "sharp@",
-  "@img+sharp",
-  "node-pty@",
-  "@vscode+ripgrep",
+  // Keep native/runtime deps that default `dsh web` plugins still import at boot:
+  // node-pty (subprocess-local), sharp (attachment-local), @vscode/ripgrep (tool-fs-search).
+  // Pruning them leaves dangling package symlinks → ERR_MODULE_NOT_FOUND and harness exit 1.
   "react-dom@",
   "react@",
   "react-refresh@",
@@ -278,11 +280,51 @@ const MCP_KEEP_GLOBS = [
   "node_modules/.pnpm/@modelcontextprotocol+sdk@",
 ];
 
+/**
+ * Default `dsh web` still loads these packages; their native deps must resolve
+ * after Phase 2/3 .pnpm prune (dangling symlinks → boot exit 1).
+ * @type {ReadonlyArray<{ fromRel: string, id: string }>}
+ */
+const CRITICAL_RUNTIME_RESOLVES = [
+  {
+    fromRel: path.join(
+      "packages",
+      "subprocess",
+      "subprocess-local",
+      "lib",
+      "index.js"
+    ),
+    id: "node-pty",
+  },
+  {
+    fromRel: path.join(
+      "packages",
+      "attachment",
+      "attachment-local",
+      "lib",
+      "index.js"
+    ),
+    id: "sharp",
+  },
+  {
+    fromRel: path.join(
+      "packages",
+      "fs",
+      "tool-fs-search",
+      "lib",
+      "index.js"
+    ),
+    id: "@vscode/ripgrep",
+  },
+];
+
+/** Log an error and exit prepare with status 1. */
 function fail(message) {
   console.error(`[build:harness] ${message}`);
   process.exit(1);
 }
 
+/** Harness checkout path: `BENDO_HARNESS_DIR` or the monorepo default. */
 function resolveHarnessSource() {
   const raw = process.env.BENDO_HARNESS_DIR?.trim();
   if (!raw) {
@@ -291,6 +333,7 @@ function resolveHarnessSource() {
   return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
 }
 
+/** Human-readable byte size (B/KB/MB/…). */
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) {
     return "unknown";
@@ -305,6 +348,7 @@ function formatBytes(bytes) {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** Directory size in bytes via `du -sk`, or null if unavailable. */
 function dirSizeBytes(dir) {
   const du = spawnSync("du", ["-sk", dir], { encoding: "utf8" });
   if (du.status !== 0) {
@@ -317,6 +361,7 @@ function dirSizeBytes(dir) {
   return kb * 1024;
 }
 
+/** Short git HEAD of `repoDir`, or null when not a git checkout. */
 function gitShortRev(repoDir) {
   const result = spawnSync("git", ["-C", repoDir, "rev-parse", "--short", "HEAD"], {
     encoding: "utf8",
@@ -328,9 +373,11 @@ function gitShortRev(repoDir) {
   return rev || null;
 }
 
+/** Remove `.env*` files under `root` (never ship secrets in resources). */
 function stripEnvFiles(root) {
   /** @type {string[]} */
   const removed = [];
+  /** Recursively walk directories, skipping node_modules and .git. */
   const walk = (dir) => {
     let entries;
     try {
@@ -358,6 +405,33 @@ function stripEnvFiles(root) {
 }
 
 /**
+ * Fail prepare if prune left dangling runtime deps that crash packaged boot.
+ * @param {string} root
+ */
+function assertCriticalRuntimeResolves(root) {
+  for (const { fromRel, id } of CRITICAL_RUNTIME_RESOLVES) {
+    const fromFile = path.join(root, fromRel);
+    if (!fs.existsSync(fromFile)) {
+      console.warn(
+        `[build:harness] Skip resolve check for ${id} (missing ${fromRel})`
+      );
+      continue;
+    }
+    try {
+      createRequire(fromFile).resolve(id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      fail(
+        `Critical runtime package "${id}" does not resolve from ${fromRel} after prune (${message}). ` +
+          `Do not prune its .pnpm prefix.`
+      );
+    }
+    console.log(`[build:harness] Runtime resolve ok: ${id} ← ${fromRel}`);
+  }
+}
+
+/**
+ * Remove matching `.pnpm` virtual-store prefixes under `root`.
  * @param {string} root
  * @param {readonly string[]} prefixes
  * @returns {string[]}
@@ -439,6 +513,7 @@ function phase3StripWebUi(root) {
   return removed;
 }
 
+/** Return paths proving required MCP packages survived prune. */
 function assertMcpKept(root) {
   const findings = [];
   for (const glob of MCP_KEEP_GLOBS) {
@@ -463,10 +538,12 @@ function assertMcpKept(root) {
   return findings;
 }
 
+/** Promise that resolves after `ms` milliseconds. */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** True when `GET url` returns HTTP 2xx within a short timeout. */
 function httpGetOk(url) {
   return new Promise((resolve) => {
     const req = http.get(url, (res) => {
@@ -481,6 +558,7 @@ function httpGetOk(url) {
   });
 }
 
+/** Best-effort terminate of a spawned child and its process group/tree. */
 function killChildTree(child) {
   const pid = child.pid;
   if (pid == null) {
@@ -505,10 +583,174 @@ function killChildTree(child) {
 }
 
 /**
- * Boot slim harness briefly; require bridge health 2xx.
- * @param {string} harnessDir
+ * Packaged spawn uses Electron-as-Node (ABI ≠ system Node). Packages that
+ * compile against NODE_MODULE_VERSION (not N-API prebuilds) must be rebuilt
+ * for the desktop Electron version or boot fails with ERR_DLOPEN_FAILED.
+ * @type {readonly string[]}
  */
-async function smokeBoot(harnessDir) {
+const ELECTRON_GYP_REBUILD_PACKAGES = ["fs-ext"];
+
+/**
+ * Resolve desktop Electron binary path + version for gyp rebuild / smoke.
+ * @returns {{ electronBin: string, version: string }}
+ */
+function resolveDesktopElectron() {
+  let electronPkgJson;
+  try {
+    electronPkgJson = createRequire(import.meta.url).resolve(
+      "electron/package.json",
+      { paths: [desktopRoot] }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`Cannot resolve desktop electron package: ${message}`);
+  }
+  const version = JSON.parse(fs.readFileSync(electronPkgJson, "utf8")).version;
+  /** @type {string} */
+  let electronBin;
+  try {
+    electronBin = createRequire(electronPkgJson)("electron");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(
+      `Cannot resolve Electron binary (run npm install in desktop/): ${message}`
+    );
+  }
+  if (typeof electronBin !== "string" || !fs.existsSync(electronBin)) {
+    fail(`Electron binary missing at ${String(electronBin)}`);
+  }
+  return { version, electronBin };
+}
+
+/**
+ * Locate pnpm virtual-store package roots for a dependency name
+ * (…/node_modules/.pnpm/{name}@{ver}/node_modules/{name}).
+ * @param {string} harnessDir
+ * @param {string} packageName
+ * @returns {string[]}
+ */
+function findPnpmPackageRoots(harnessDir, packageName) {
+  const pnpmDir = path.join(harnessDir, "node_modules", ".pnpm");
+  if (!fs.existsSync(pnpmDir)) {
+    return [];
+  }
+  const folderPrefix = packageName.startsWith("@")
+    ? `${packageName.replace("/", "+")}@`
+    : `${packageName}@`;
+  /** @type {string[]} */
+  const roots = [];
+  for (const entry of fs.readdirSync(pnpmDir)) {
+    if (!entry.startsWith(folderPrefix)) {
+      continue;
+    }
+    const candidate = path.join(pnpmDir, entry, "node_modules", packageName);
+    if (fs.existsSync(path.join(candidate, "package.json"))) {
+      roots.push(candidate);
+    }
+  }
+  return roots;
+}
+
+/**
+ * node-gyp rebuild native addons for Electron ABI (packaged Electron-as-Node).
+ * @param {string} harnessDir
+ * @param {string} electronVersion
+ */
+function rebuildGypNativesForElectron(harnessDir, electronVersion) {
+  const arch = process.arch;
+  for (const packageName of ELECTRON_GYP_REBUILD_PACKAGES) {
+    const roots = findPnpmPackageRoots(harnessDir, packageName);
+    if (roots.length === 0) {
+      console.warn(
+        `[build:harness] No .pnpm package root for ${packageName}; skip Electron rebuild`
+      );
+      continue;
+    }
+    for (const pkgRoot of roots) {
+      if (!fs.existsSync(path.join(pkgRoot, "binding.gyp"))) {
+        console.warn(
+          `[build:harness] ${packageName} at ${pkgRoot} has no binding.gyp; skip`
+        );
+        continue;
+      }
+      console.log(
+        `[build:harness] node-gyp rebuild ${packageName} for Electron ${electronVersion} (${arch})…`
+      );
+      let nodeGypBin;
+      try {
+        nodeGypBin = createRequire(import.meta.url).resolve(
+          "node-gyp/bin/node-gyp.js",
+          { paths: [desktopRoot] }
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        fail(
+          `Cannot resolve node-gyp from desktop/ (direct devDependency required; run npm install in desktop/): ${message}`
+        );
+      }
+      const result = spawnSync(
+        process.execPath,
+        [
+          nodeGypBin,
+          "rebuild",
+          `--target=${electronVersion}`,
+          `--arch=${arch}`,
+          "--dist-url=https://electronjs.org/headers",
+        ],
+        {
+          cwd: pkgRoot,
+          encoding: "utf8",
+          env: { ...process.env },
+        }
+      );
+      if (result.status !== 0) {
+        fail(
+          `Failed to rebuild ${packageName} for Electron ${electronVersion}:\n` +
+            `${result.stdout ?? ""}\n${result.stderr ?? ""}`
+        );
+      }
+      console.log(`[build:harness] Rebuilt ${packageName} → Electron ABI`);
+    }
+  }
+}
+
+/**
+ * Fail prepare if ABI-sensitive natives still cannot load under Electron-as-Node.
+ * @param {string} harnessDir
+ * @param {string} electronBin
+ */
+function assertNativesLoadUnderElectron(harnessDir, electronBin) {
+  for (const packageName of ELECTRON_GYP_REBUILD_PACKAGES) {
+    const roots = findPnpmPackageRoots(harnessDir, packageName);
+    for (const pkgRoot of roots) {
+      const probe = spawnSync(
+        electronBin,
+        ["-e", `require(${JSON.stringify(pkgRoot)}); console.log("ok")`],
+        {
+          encoding: "utf8",
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+        }
+      );
+      if (probe.status !== 0) {
+        fail(
+          `${packageName} still fails under Electron-as-Node after rebuild:\n` +
+            `${probe.stdout ?? ""}\n${probe.stderr ?? ""}`
+        );
+      }
+      console.log(
+        `[build:harness] Electron-as-Node load ok: ${packageName}`
+      );
+    }
+  }
+}
+
+/**
+ * Boot slim harness briefly with Electron-as-Node (same as packaged spawn);
+ * require bridge health 2xx.
+ * @param {string} harnessDir
+ * @param {string} electronBin
+ */
+async function smokeBoot(harnessDir, electronBin) {
   if (process.env.BENDO_HARNESS_SKIP_SMOKE?.trim() === "1") {
     console.log("[build:harness] Smoke skipped (BENDO_HARNESS_SKIP_SMOKE=1)");
     return { ok: true, skipped: true };
@@ -524,7 +766,9 @@ async function smokeBoot(harnessDir) {
   const dshHome = fs.mkdtempSync(path.join(os.tmpdir(), "bendo-harness-smoke-"));
   const secret = `bendo-smoke-${Date.now()}`;
   const dshBin = path.join(harnessDir, DSH_BIN_REL);
+  // Match packaged spawn: HMR requires --expose-internals (see vendor/hmr).
   const args = [
+    "--expose-internals",
     dshBin,
     "web",
     "--patch",
@@ -534,11 +778,14 @@ async function smokeBoot(harnessDir) {
     String(SMOKE_PORT),
   ];
 
-  console.log(`[build:harness] Smoke: spawning node ${args.join(" ")}`);
-  const child = spawn(process.execPath, args, {
+  console.log(
+    `[build:harness] Smoke: Electron-as-Node ${path.basename(electronBin)} ${args.join(" ")}`
+  );
+  const child = spawn(electronBin, args, {
     cwd: harnessDir,
     env: {
       ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
       DSH_HOME: dshHome,
       DSH_CHAT_BRIDGE_SECRET: secret,
     },
@@ -710,6 +957,12 @@ for (const rel of strippedWeb) {
 const hoistedAgain = hoistDeepseekAiPackages(outDir);
 console.log(`[build:harness] Re-hoisted ${hoistedAgain} @deepseek-ai packages after Phase 3`);
 
+assertCriticalRuntimeResolves(outDir);
+
+const { version: electronVersion, electronBin } = resolveDesktopElectron();
+rebuildGypNativesForElectron(outDir, electronVersion);
+assertNativesLoadUnderElectron(outDir, electronBin);
+
 const mcpKept = assertMcpKept(outDir);
 if (mcpKept.length === 0) {
   console.warn(
@@ -764,6 +1017,8 @@ const manifest = {
   mcpKept,
   mcpCordisEnabled: false,
   webUiShipped: "stub-index-only",
+  electronVersionForNatives: electronVersion,
+  electronGypRebuildPackages: [...ELECTRON_GYP_REBUILD_PACKAGES],
 };
 
 fs.writeFileSync(
@@ -778,7 +1033,7 @@ console.log(
       : "")
 );
 
-const smoke = await smokeBoot(outDir);
+const smoke = await smokeBoot(outDir, electronBin);
 if (!smoke.ok) {
   fail(`Smoke boot failed: ${smoke.reason}`);
 }
