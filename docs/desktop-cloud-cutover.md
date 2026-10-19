@@ -3,7 +3,7 @@
 Tóm tắt phần vừa triển khai: packaged / Electron-spawned Next **không** giữ `CLERK_SECRET_KEY` hay `SUPABASE_SERVICE_ROLE_KEY`; công việc cần secret chạy trên **Vercel**, desktop forward **session JWT** và nhận **kết quả domain**.
 
 **Liên quan:** packaging / strip `.env` / DSH inject → [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md).  
-**Rule:** root `AGENTS.md` Product credentials; `bendo-app/AGENTS.md` §16.
+**Rule:** root `AGENTS.md` Product credentials; `bendo-app/AGENTS.md` §6.
 
 **Không trong phạm vi doc này:** Agent chat / DSH / bundle harness (vẫn local).
 

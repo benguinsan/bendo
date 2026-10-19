@@ -1,6 +1,6 @@
 # Agent model connection — bổ sung bảo mật & sửa đúng chức năng
 
-Tài liệu ghi các điều chỉnh **sau** khi ship modal model config + Test connection (`POST /api/agent/model-connection`). Không thay thế `bendo-app/AGENTS.md` §10 — rule ngắn vẫn nằm ở đó.
+Tài liệu ghi các điều chỉnh **sau** khi ship modal model config + Test connection (`POST /api/agent/model-connection`). Product rules: [`bendo-app-agent-chat.md`](./bendo-app-agent-chat.md); always-on pointer in `bendo-app/AGENTS.md` §6.
 
 **Phạm vi:** UI Agent chat model configuration, probe Next → provider. Apply / dynamic `llm-pi-ai` route (bước A–B): [`agent-model-dynamic-route-ab.md`](./agent-model-dynamic-route-ab.md). Persist durable Electron (bước C) đã ship — xem §8 trong doc A–B.
 
@@ -119,13 +119,13 @@ API provider thường không cần redirect cho ping; chặn follow là đúng 
 | `bendo-app/lib/agent/model-connection-api-client.ts` | Client `fetch` tới route |
 | `bendo-app/app/api/agent/model-connection/route.ts` | Clerk + Zod + allowlist |
 | `bendo-app/components/agent/model-api-key-dialog.tsx` | UI modal, reset key khi đổi provider |
-| `bendo-app/AGENTS.md` §10 | Rule ngắn (fields, probe, SSRF guards) |
+| `docs/bendo-app-agent-chat.md` | Rule (fields, probe, SSRF guards) |
 
 ---
 
 ## 9. Out of scope / kế hoạch tiếp (đã chốt hướng)
 
-Quy định product trong `bendo-app/AGENTS.md` §10 (**Plan — save model config before use**):
+Quy định product trong [`bendo-app-agent-chat.md`](./bendo-app-agent-chat.md) (**Plan — save model config before use**):
 
 - Lưu config local trên máy user (JSON / tương đương), Save/apply **trước** khi chat
 - Harness dùng config đã apply — **không** đính kèm full model config / API key theo mỗi chat turn

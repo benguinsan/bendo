@@ -88,4 +88,4 @@ flowchart TD
 - `desktop/src/main/model-config-store.ts`
 - `desktop/src/main/apply-persisted-model-config.ts`
 - `desktop/README.md`
-- Plan user model config (persist local, không đính kèm chat): `bendo-app/AGENTS.md` §10
+- Plan user model config (persist local, không đính kèm chat): `docs/bendo-app-agent-chat.md`
