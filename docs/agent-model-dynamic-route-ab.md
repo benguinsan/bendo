@@ -1,6 +1,6 @@
 # Agent model — dynamic llm-pi-ai route (bước A–B)
 
-Tài liệu giải thích **vì sao** cần đăng ký route động, **workflow** Save → apply → chat, và **chức năng** đã thêm/sửa trong bước **A** (harness) + **B** (Electron `DSH_HOME`). Không thay thế `bendo-app/AGENTS.md` §10.
+Tài liệu giải thích **vì sao** cần đăng ký route động, **workflow** Save → apply → chat, và **chức năng** đã thêm/sửa trong bước **A** (harness) + **B** (Electron `DSH_HOME`). Không thay thế [`bendo-app-agent-chat.md`](./bendo-app-agent-chat.md).
 
 **Bước C (đã ship):** persist durable Electron `userData` + `safeStorage`, Save = apply ∧ persist, startup re-apply khi harness ready. Non-Electron vẫn dùng `sessionStorage` sau apply.
 
@@ -8,7 +8,7 @@ Tài liệu giải thích **vì sao** cần đăng ký route động, **workflow
 
 | Doc | Vai trò |
 | --- | --- |
-| [`bendo-app/AGENTS.md`](../bendo-app/AGENTS.md) §10 | Rule product: Save/apply trước chat, không đính kèm key mỗi turn |
+| [`bendo-app-agent-chat.md`](./bendo-app-agent-chat.md) | Rule product: Save/apply trước chat, không đính kèm key mỗi turn |
 | [`agent-model-connection-hardening.md`](./agent-model-connection-hardening.md) | Probe / SSRF / Test connection |
 | [`desktop-electron-startup-flow.md`](./desktop-electron-startup-flow.md) | Spawn Next + harness |
 | [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md) | Bridge secret inject |
@@ -103,7 +103,7 @@ Không sửa `cordis.yml` composition để nhét key user. Placeholder `agent-d
 | `bendo-app/lib/agent/model-config-api-client.ts` | Client Save |
 | `bendo-app/lib/agent/dsh-chat-adapter.ts` | `applyModelConfig` trên bridge |
 | `bendo-app/components/agent/model-api-key-dialog.tsx` | Save: apply OK rồi mới `writeStored` |
-| `bendo-app/AGENTS.md` §10 | Rule Save/apply + ghi `llm-pi-ai` |
+| `docs/bendo-app-agent-chat.md` | Rule Save/apply + ghi `llm-pi-ai` |
 
 ### 4.3 Bảng map Bendo → dsh (`BENDO_PROVIDER_ROUTE`)
 

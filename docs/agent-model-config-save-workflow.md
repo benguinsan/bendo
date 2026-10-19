@@ -1,6 +1,6 @@
 # Agent model config — Save / persist / re-apply workflow
 
-Sơ đồ pattern **Save = apply ∧ persist** (bước C) và chuỗi function gọi tuần tự. Không thay `bendo-app/AGENTS.md` §10.
+Sơ đồ pattern **Save = apply ∧ persist** (bước C) và chuỗi function gọi tuần tự. Product rules: [`bendo-app-agent-chat.md`](./bendo-app-agent-chat.md); always-on pointer in `bendo-app/AGENTS.md` §6.
 
 **Liên quan:** [`agent-model-dynamic-route-ab.md`](./agent-model-dynamic-route-ab.md) (apply A–B), [`desktop-electron-startup-flow.md`](./desktop-electron-startup-flow.md) (startup).
 
