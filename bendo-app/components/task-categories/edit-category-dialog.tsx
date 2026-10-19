@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useId, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ function EditCategoryForm({
   onOpenChange,
   onUpdate,
 }: EditCategoryFormProps) {
+  const { getToken } = useAuth();
   const nameId = useId();
   const [name, setName] = useState(category.name);
   const [error, setError] = useState<string | undefined>();
@@ -61,10 +63,13 @@ function EditCategoryForm({
     }
 
     setIsSubmitting(true);
-    const updated = await updateCategoryViaApi({
-      categoryId: category.id,
-      name: result.data.name,
-    });
+    const updated = await updateCategoryViaApi(
+      {
+        categoryId: category.id,
+        name: result.data.name,
+      },
+      { getToken }
+    );
     setIsSubmitting(false);
 
     if (!updated.ok) {

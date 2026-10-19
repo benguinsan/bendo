@@ -24,6 +24,11 @@ const DSH_PNPM_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as cons
 /** Packaged slim tree: built CLI (no system pnpm / tsx). */
 const DSH_BIN_REL = path.join("apps", "cli", "lib", "bin.js");
 const DSH_WEB_ARGS = ["web", "--patch", DORO_PATCH, "--no-open"] as const;
+/**
+ * dsh web boots cordis HMR, which needs Node's internal module loader
+ * (`vendor/hmr` → `--expose-internals` / loader.internal).
+ */
+const ELECTRON_AS_NODE_EXEC_ARGV = ["--expose-internals"] as const;
 /** Harness settings/credentials home under Electron userData (not ~/.dsh). */
 const ELECTRON_DSH_HOME_DIRNAME = "dsh";
 
@@ -272,13 +277,17 @@ function startHarnessPackaged(
 
   let child: ChildProcess;
   try {
-    child = spawnExecutable(electronBin, [dshBin, ...DSH_WEB_ARGS], {
-      cwd: harnessDir,
-      env: harnessChildEnv(bendoAppUrl, dshHomeDir, { electronAsNode: true }),
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: shouldDetachChild(),
-      windowsHide: true,
-    });
+    child = spawnExecutable(
+      electronBin,
+      [...ELECTRON_AS_NODE_EXEC_ARGV, dshBin, ...DSH_WEB_ARGS],
+      {
+        cwd: harnessDir,
+        env: harnessChildEnv(bendoAppUrl, dshHomeDir, { electronAsNode: true }),
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: shouldDetachChild(),
+        windowsHide: true,
+      }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: `Failed to spawn harness: ${message}` };
@@ -286,7 +295,7 @@ function startHarnessPackaged(
 
   trackHarnessChild(
     child,
-    `\`electron-as-node ${DSH_BIN_REL} ${DSH_WEB_ARGS.join(" ")}\` in ${harnessDir}`,
+    `\`electron-as-node ${ELECTRON_AS_NODE_EXEC_ARGV.join(" ")} ${DSH_BIN_REL} ${DSH_WEB_ARGS.join(" ")}\` in ${harnessDir}`,
     "electron",
     dshHomeDir
   );

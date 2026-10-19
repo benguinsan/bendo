@@ -101,7 +101,7 @@ Không chỉ overlay: cần binary/`pnpm` entry **`dsh`** và profile **`web`** 
 
 Thực tế hôm nay (dev): cả monorepo `deepseek-harness` + `pnpm install` + `apps/cli` (`bin: dsh`).
 
-**Hướng slim:** chỉ giữ runtime đủ cho `dsh web` + Doro patch — không giữ docs/tests/snapshots/website/python gates. **v1:** denylist. **Phase 2:** hoist + prune SDK/tooling. **Phase 3:** stub dsh web UI (`apps/web/dist` chỉ `index.html`), bỏ `packages/client/**/src`, prune UI/build `.pnpm` (vite/shiki/react/esbuild/…); **giữ MCP trên đĩa** (cordis off). Perfect `pnpm deploy` = bước sau nếu còn cần.
+**Hướng slim:** chỉ giữ runtime đủ cho `dsh web` + Doro patch — không giữ docs/tests/snapshots/website/python gates. **v1:** denylist. **Phase 2:** hoist + prune SDK/tooling. **Phase 3:** stub dsh web UI (`apps/web/dist` chỉ `index.html`), bỏ `packages/client/**/src`, prune UI/build `.pnpm` (vite/shiki/react/esbuild/…); **giữ** native boot deps `node-pty` / `sharp` / `@vscode/ripgrep`; **rebuild `fs-ext` (node-gyp) cho Electron ABI** vì packaged spawn = Electron-as-Node (ABI ≠ system Node — smoke cũng dùng Electron); **giữ MCP trên đĩa** (cordis off). Perfect `pnpm deploy` = bước sau nếu còn cần.
 
 Checklist nhóm package (tên theo monorepo; prune cụ thể = bước sau):
 

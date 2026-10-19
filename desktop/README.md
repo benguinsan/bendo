@@ -30,7 +30,7 @@ npm start
   - Harness failure is **soft** — Bendo still loads; Agent chat stays offline until the bridge is up
 - Quit Electron: stops **only** Next / harness processes this session spawned
 - If Next spawn fails / path missing: offline page with **Retry**
-- Runtime note log (dev): `release/bendo-runtime.log` — main + `[next]` / `[harness]` console lines for the current session (recreated on each launch). Packaged apps write to `userData/logs/bendo-runtime.log` instead.
+- Runtime note log: `release/bendo-runtime.log` — main + `[next]` / `[harness]` for the current session (recreated each launch). Used by `npm start` and by the packaged app when launched from `release/mac-arm64/Bendo.app`. An installed app (`/Applications/Bendo.app`) writes to `~/Library/Application Support/bendo-desktop/logs/bendo-runtime.log` instead. Override with `BENDO_RUNTIME_LOG`.
 
 Optional: still run web / harness yourself in other terminals:
 

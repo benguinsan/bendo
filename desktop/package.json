@@ -23,6 +23,7 @@
     "dist": "npm run build:bendo && npm run build:harness && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.1",
     "@types/node": "^22.19.0",
     "electron": "^39.2.7",
     "electron-builder": "^26.15.3",

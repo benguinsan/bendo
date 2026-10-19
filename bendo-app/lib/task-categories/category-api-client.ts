@@ -1,4 +1,12 @@
+import {
+  browserApiFetch,
+  type BrowserApiGetToken,
+} from "@/lib/api/browser-api-fetch";
 import type { PersistedCategory } from "@/lib/task-categories/persisted-category";
+
+export type CategoryApiAuth = {
+  getToken?: BrowserApiGetToken;
+};
 
 type CategoryApiErrorCode =
   | "VALIDATION"
@@ -16,15 +24,17 @@ type ApiSuccessBody = {
 };
 
 export async function createCategoryViaApi(
-  name: string
+  name: string,
+  auth?: CategoryApiAuth
 ): Promise<
   { ok: true; category: PersistedCategory } | { ok: false; error: string }
 > {
   try {
-    const response = await fetch("/api/categories", {
+    const response = await browserApiFetch("/api/categories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
+      getToken: auth?.getToken,
     });
 
     let payload: unknown;
@@ -46,18 +56,25 @@ export async function createCategoryViaApi(
   }
 }
 
-export async function updateCategoryViaApi(input: {
-  categoryId: string;
-  name: string;
-}): Promise<
+export async function updateCategoryViaApi(
+  input: {
+    categoryId: string;
+    name: string;
+  },
+  auth?: CategoryApiAuth
+): Promise<
   { ok: true; category: PersistedCategory } | { ok: false; error: string }
 > {
   try {
-    const response = await fetch(`/api/categories/${input.categoryId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: input.name }),
-    });
+    const response = await browserApiFetch(
+      `/api/categories/${input.categoryId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: input.name }),
+        getToken: auth?.getToken,
+      }
+    );
 
     let payload: unknown;
     try {
@@ -79,11 +96,13 @@ export async function updateCategoryViaApi(input: {
 }
 
 export async function deleteCategoryViaApi(
-  categoryId: string
+  categoryId: string,
+  auth?: CategoryApiAuth
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const response = await fetch(`/api/categories/${categoryId}`, {
+    const response = await browserApiFetch(`/api/categories/${categoryId}`, {
       method: "DELETE",
+      getToken: auth?.getToken,
     });
 
     if (response.ok) {
@@ -104,11 +123,15 @@ export async function deleteCategoryViaApi(
   }
 }
 
-export async function listCategoriesViaApi(): Promise<
+export async function listCategoriesViaApi(
+  auth?: CategoryApiAuth
+): Promise<
   { ok: true; categories: PersistedCategory[] } | { ok: false; error: string }
 > {
   try {
-    const response = await fetch("/api/categories");
+    const response = await browserApiFetch("/api/categories", {
+      getToken: auth?.getToken,
+    });
 
     if (!response.ok) {
       let payload: unknown;

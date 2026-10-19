@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
@@ -17,6 +18,7 @@ import { validateNewCategory } from "@/lib/task-categories/category-input";
 
 export function CreateCategoryForm() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const nameId = useId();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -32,7 +34,7 @@ export function CreateCategoryForm() {
     }
 
     setIsSubmitting(true);
-    const created = await createCategoryViaApi(result.data.name);
+    const created = await createCategoryViaApi(result.data.name, { getToken });
     setIsSubmitting(false);
 
     if (!created.ok) {

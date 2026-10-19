@@ -24,11 +24,15 @@ const HOP_BY_HOP_REQUEST_HEADERS = new Set([
   "content-length",
 ]);
 
+// Drop encoding/length: undici `fetch` decompresses the body, but Vercel may
+// still send Content-Encoding. Forwarding that → browser ERR_CONTENT_DECODING_FAILED.
 const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "connection",
   "keep-alive",
   "transfer-encoding",
   "upgrade",
+  "content-encoding",
+  "content-length",
 ]);
 
 function isAllowlistedPrivilegedPath(pathname: string): boolean {
@@ -115,6 +119,7 @@ export async function maybeProxyPrivilegedRequest(
     return null;
   }
 
+  const method = request.method.toUpperCase();
   const token = await resolveSessionTokenForCloud(request);
   if (!token) {
     return unauthorized();
@@ -124,7 +129,6 @@ export async function maybeProxyPrivilegedRequest(
   const headers = forwardRequestHeaders(request);
   headers.set("Authorization", `Bearer ${token}`);
 
-  const method = request.method.toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD";
   const upstream = await fetch(target, {
     method,

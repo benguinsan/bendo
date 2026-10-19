@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -124,6 +125,7 @@ function TaxonomySection({
 export function TaskCategoriesView({
   initialCategories,
 }: TaskCategoriesViewProps) {
+  const { getToken } = useAuth();
   const [categories, setCategories] = useState(initialCategories);
   const [statusRows, setStatusRows] = useState(cloneStatusRows);
   const [priorityRows, setPriorityRows] = useState(clonePriorityRows);
@@ -187,7 +189,7 @@ export function TaskCategoriesView({
     setDeleteError(null);
 
     try {
-      const result = await deleteCategoryViaApi(categoryId);
+      const result = await deleteCategoryViaApi(categoryId, { getToken });
 
       if (!result.ok) {
         setDeleteError(result.error);
