@@ -16,6 +16,7 @@ export type BrowserApiFetchInit = RequestInit & {
   getToken?: BrowserApiGetToken;
 };
 
+/** Ask Clerk for a fresh session JWT (`skipCache`), or null on failure. */
 async function resolveBearerToken(
   getToken: BrowserApiGetToken
 ): Promise<string | null> {
@@ -26,6 +27,10 @@ async function resolveBearerToken(
   }
 }
 
+/**
+ * Same-origin fetch to local Next APIs with optional Clerk Bearer.
+ * On 401 after Bearer was sent, refresh once via `getToken` and retry.
+ */
 export async function browserApiFetch(
   input: RequestInfo | URL,
   init: BrowserApiFetchInit = {}

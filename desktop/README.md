@@ -105,6 +105,7 @@ npm run pack
 - Dev `npm start`: sibling `bendo-app` + `npm run dev`; sibling `deepseek-harness` + `pnpm dsh web …`
 - Packaged credentials: public via Next build inline; bridge secret via Electron inject / `userData` (không bake `.env` vào `resources/` / `.dmg`)
 - Harness snapshot: `resources/harness/MANIFEST.json` sau `build:harness` (size, rev, MCP kept). Phase 2–3: hoist + cắt SDK/UI `.pnpm` + stub dsh web UI → ~**377 MB**; **giữ MCP** (cordis off). Skip smoke: `BENDO_HARNESS_SKIP_SMOKE=1`.
+- `build:harness` rebuilds ABI natives (`fs-ext`) with **`node-gyp`** (declared direct `devDependency` — not only transitive via `@electron/rebuild`) against desktop Electron.
 - Signing / auto-update: bước sau
 
 ## Kiểm tra nhanh (tự tắt sau khi OK)

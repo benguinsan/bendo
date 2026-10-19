@@ -23,6 +23,7 @@ type ApiSuccessBody = {
   data: PersistedCategory;
 };
 
+/** POST /api/categories with optional Clerk Bearer via `browserApiFetch`. */
 export async function createCategoryViaApi(
   name: string,
   auth?: CategoryApiAuth
@@ -56,6 +57,7 @@ export async function createCategoryViaApi(
   }
 }
 
+/** PATCH /api/categories/:id with optional Clerk Bearer via `browserApiFetch`. */
 export async function updateCategoryViaApi(
   input: {
     categoryId: string;
@@ -95,6 +97,7 @@ export async function updateCategoryViaApi(
   }
 }
 
+/** DELETE /api/categories/:id with optional Clerk Bearer via `browserApiFetch`. */
 export async function deleteCategoryViaApi(
   categoryId: string,
   auth?: CategoryApiAuth
@@ -123,6 +126,7 @@ export async function deleteCategoryViaApi(
   }
 }
 
+/** GET /api/categories with optional Clerk Bearer via `browserApiFetch`. */
 export async function listCategoriesViaApi(
   auth?: CategoryApiAuth
 ): Promise<

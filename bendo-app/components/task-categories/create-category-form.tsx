@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { createCategoryViaApi } from "@/lib/task-categories/category-api-client";
 import { validateNewCategory } from "@/lib/task-categories/category-input";
 
+/** Form to create a task category and navigate back to the list. */
 export function CreateCategoryForm() {
   const router = useRouter();
   const { getToken } = useAuth();
@@ -24,6 +25,7 @@ export function CreateCategoryForm() {
   const [error, setError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /** Validate and POST a new category with Clerk Bearer. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = validateNewCategory(name);

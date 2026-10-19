@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 
 const SESSION_COOKIE = "__session";
 
+/** Extract the JWT from an `Authorization: Bearer …` header, if present. */
 function bearerFromAuthorization(header: string | null): string | null {
   if (!header) {
     return null;
@@ -47,6 +48,10 @@ function sessionFromCookieHeader(cookieHeader: string | null): string | null {
   return null;
 }
 
+/**
+ * Session JWT to forward to Vercel: Authorization Bearer, else `__session`
+ * from the request Cookie header, else Next `cookies()` jar.
+ */
 export async function getForwardableSessionToken(
   request?: Request
 ): Promise<string | null> {

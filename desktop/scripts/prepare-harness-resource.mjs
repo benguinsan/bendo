@@ -318,11 +318,13 @@ const CRITICAL_RUNTIME_RESOLVES = [
   },
 ];
 
+/** Log an error and exit prepare with status 1. */
 function fail(message) {
   console.error(`[build:harness] ${message}`);
   process.exit(1);
 }
 
+/** Harness checkout path: `BENDO_HARNESS_DIR` or the monorepo default. */
 function resolveHarnessSource() {
   const raw = process.env.BENDO_HARNESS_DIR?.trim();
   if (!raw) {
@@ -331,6 +333,7 @@ function resolveHarnessSource() {
   return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
 }
 
+/** Human-readable byte size (B/KB/MB/…). */
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) {
     return "unknown";
@@ -345,6 +348,7 @@ function formatBytes(bytes) {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** Directory size in bytes via `du -sk`, or null if unavailable. */
 function dirSizeBytes(dir) {
   const du = spawnSync("du", ["-sk", dir], { encoding: "utf8" });
   if (du.status !== 0) {
@@ -357,6 +361,7 @@ function dirSizeBytes(dir) {
   return kb * 1024;
 }
 
+/** Short git HEAD of `repoDir`, or null when not a git checkout. */
 function gitShortRev(repoDir) {
   const result = spawnSync("git", ["-C", repoDir, "rev-parse", "--short", "HEAD"], {
     encoding: "utf8",
@@ -368,9 +373,11 @@ function gitShortRev(repoDir) {
   return rev || null;
 }
 
+/** Remove `.env*` files under `root` (never ship secrets in resources). */
 function stripEnvFiles(root) {
   /** @type {string[]} */
   const removed = [];
+  /** Recursively walk directories, skipping node_modules and .git. */
   const walk = (dir) => {
     let entries;
     try {
@@ -398,11 +405,6 @@ function stripEnvFiles(root) {
 }
 
 /**
- * @param {string} root
- * @param {readonly string[]} prefixes
- * @returns {string[]}
- */
-/**
  * Fail prepare if prune left dangling runtime deps that crash packaged boot.
  * @param {string} root
  */
@@ -428,6 +430,12 @@ function assertCriticalRuntimeResolves(root) {
   }
 }
 
+/**
+ * Remove matching `.pnpm` virtual-store prefixes under `root`.
+ * @param {string} root
+ * @param {readonly string[]} prefixes
+ * @returns {string[]}
+ */
 function prunePnpmByPrefixes(root, prefixes) {
   const pnpmDir = path.join(root, "node_modules", ".pnpm");
   /** @type {string[]} */
@@ -505,6 +513,7 @@ function phase3StripWebUi(root) {
   return removed;
 }
 
+/** Return paths proving required MCP packages survived prune. */
 function assertMcpKept(root) {
   const findings = [];
   for (const glob of MCP_KEEP_GLOBS) {
@@ -529,10 +538,12 @@ function assertMcpKept(root) {
   return findings;
 }
 
+/** Promise that resolves after `ms` milliseconds. */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** True when `GET url` returns HTTP 2xx within a short timeout. */
 function httpGetOk(url) {
   return new Promise((resolve) => {
     const req = http.get(url, (res) => {
@@ -547,6 +558,7 @@ function httpGetOk(url) {
   });
 }
 
+/** Best-effort terminate of a spawned child and its process group/tree. */
 function killChildTree(child) {
   const pid = child.pid;
   if (pid == null) {
@@ -578,6 +590,10 @@ function killChildTree(child) {
  */
 const ELECTRON_GYP_REBUILD_PACKAGES = ["fs-ext"];
 
+/**
+ * Resolve desktop Electron binary path + version for gyp rebuild / smoke.
+ * @returns {{ electronBin: string, version: string }}
+ */
 function resolveDesktopElectron() {
   let electronPkgJson;
   try {
@@ -668,7 +684,9 @@ function rebuildGypNativesForElectron(harnessDir, electronVersion) {
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        fail(`Cannot resolve node-gyp (install desktop deps): ${message}`);
+        fail(
+          `Cannot resolve node-gyp from desktop/ (direct devDependency required; run npm install in desktop/): ${message}`
+        );
       }
       const result = spawnSync(
         process.execPath,

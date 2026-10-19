@@ -14,6 +14,7 @@ type TaskFormCategoryFieldProps = {
   onChange: (value: string) => void;
 };
 
+/** Category `<select>` for task forms; loads options via Clerk-authenticated API. */
 export function TaskFormCategoryField({
   value,
   error,
@@ -39,6 +40,7 @@ export function TaskFormCategoryField({
     loadIdRef.current += 1;
     const loadId = loadIdRef.current;
 
+    /** Fetch categories for the current auth state; ignore superseded load ids. */
     async function loadCategories() {
       setLoading(true);
       setLoadError(null);

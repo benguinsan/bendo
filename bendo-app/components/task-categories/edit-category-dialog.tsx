@@ -37,6 +37,7 @@ type EditCategoryFormProps = {
   onUpdate: (category: PersistedCategory) => void;
 };
 
+/** Inner form that PATCHes an existing category name. */
 function EditCategoryForm({
   category,
   existingNames,
@@ -49,6 +50,7 @@ function EditCategoryForm({
   const [error, setError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /** Validate and PATCH the category with Clerk Bearer. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = validateUpdatedCategory({
@@ -147,6 +149,7 @@ function EditCategoryForm({
   );
 }
 
+/** Dialog wrapper that mounts `EditCategoryForm` when a category is selected. */
 export function EditCategoryDialog({
   category,
   existingNames,

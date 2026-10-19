@@ -7,6 +7,7 @@ import { app } from "electron";
 let logFilePath: string | null = null;
 let consolePatched = false;
 
+/** Stringify a console argument for the runtime log file. */
 function formatArg(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -17,6 +18,7 @@ function formatArg(value: unknown): string {
   return inspect(value, { depth: 4, breakLength: 120 });
 }
 
+/** Append one line to the active runtime log file, ignoring write errors. */
 function appendLine(line: string): void {
   if (!logFilePath) {
     return;
@@ -51,10 +53,23 @@ function releaseDirBesidePackagedApp(): string | null {
   return null;
 }
 
+/** Packaged / last-resort log path under Electron userData. */
+function userDataLogPath(): string {
+  return path.join(app.getPath("userData"), "logs", RUNTIME_LOG_NAME);
+}
+
+/**
+ * True when we can create/overwrite `filePath`: parent dir writable, and if the
+ * file already exists it must be writable too (dir-only checks miss read-only files).
+ */
 function canWriteFile(filePath: string): boolean {
   try {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.accessSync(path.dirname(filePath), fs.constants.W_OK);
+    const dir = path.dirname(filePath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+    if (fs.existsSync(filePath)) {
+      fs.accessSync(filePath, fs.constants.W_OK);
+    }
     return true;
   } catch {
     return false;
@@ -87,41 +102,78 @@ export function resolveRuntimeLogPath(): string {
     }
   }
 
-  return path.join(app.getPath("userData"), "logs", RUNTIME_LOG_NAME);
+  return userDataLogPath();
 }
 
+/** Absolute path of the current session log, or null before `initRuntimeLog`. */
 export function getRuntimeLogPath(): string | null {
   return logFilePath;
 }
 
 /**
+ * Write the session header to `filePath`. Returns false if create/overwrite fails.
+ */
+function tryWriteSessionHeader(filePath: string): boolean {
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const header = [
+      "--- Bendo desktop runtime log ---",
+      `started: ${new Date().toISOString()}`,
+      `packaged: ${String(app.isPackaged)}`,
+      `file: ${filePath}`,
+      "",
+    ].join("\n");
+    fs.writeFileSync(filePath, `${header}\n`, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Truncate (or create) one session note file and mirror console.* into it.
  * Call once early in app startup (after `app` is usable).
+ * If the preferred path cannot be written (e.g. existing read-only log), fall
+ * back to userData; if that also fails, continue without a file log.
  */
 export function initRuntimeLog(): string {
-  const filePath = resolveRuntimeLogPath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const preferred = resolveRuntimeLogPath();
+  const fallback = userDataLogPath();
+  const candidates =
+    preferred === fallback ? [preferred] : [preferred, fallback];
 
-  const header = [
-    "--- Bendo desktop runtime log ---",
-    `started: ${new Date().toISOString()}`,
-    `packaged: ${String(app.isPackaged)}`,
-    `file: ${filePath}`,
-    "",
-  ].join("\n");
-  fs.writeFileSync(filePath, `${header}\n`, "utf8");
-  logFilePath = filePath;
+  let chosen: string | null = null;
+  for (const candidate of candidates) {
+    if (tryWriteSessionHeader(candidate)) {
+      chosen = candidate;
+      break;
+    }
+  }
 
   if (!consolePatched) {
     patchConsoleToFile();
     consolePatched = true;
   }
 
-  // Goes to terminal + file (patch already active).
-  console.log(`[log] Runtime log → ${filePath}`);
-  return filePath;
+  if (!chosen) {
+    logFilePath = null;
+    console.warn(
+      "[log] Runtime log file unavailable; continuing without a file log"
+    );
+    return "";
+  }
+
+  logFilePath = chosen;
+  if (chosen !== preferred) {
+    console.warn(
+      `[log] Preferred runtime log not writable (${preferred}); using ${chosen}`
+    );
+  }
+  console.log(`[log] Runtime log → ${chosen}`);
+  return chosen;
 }
 
+/** Mirror `console.log|info|warn|error|debug` into the runtime log file. */
 function patchConsoleToFile(): void {
   const levels = ["log", "info", "warn", "error", "debug"] as const;
 
