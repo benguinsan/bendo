@@ -50,7 +50,7 @@ export async function applyModelConfigViaApi(input: {
         error:
           typeof errorBody?.error === "string" && errorBody.error.trim()
             ? errorBody.error
-            : "Không áp dụng được model config.",
+            : "Couldn’t apply model config.",
         code: typeof errorBody?.code === "string" ? errorBody.code : undefined,
       };
     }
@@ -62,20 +62,20 @@ export async function applyModelConfigViaApi(input: {
 
     return {
       ok: false,
-      error: "Không áp dụng được model config.",
+      error: "Couldn’t apply model config.",
       code: "AGENT_UNAVAILABLE",
     };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return {
         ok: false,
-        error: "Không áp dụng được model config.",
+        error: "Couldn’t apply model config.",
         code: "ABORTED",
       };
     }
     return {
       ok: false,
-      error: "Không áp dụng được model config.",
+      error: "Couldn’t apply model config.",
       code: "AGENT_UNAVAILABLE",
     };
   }

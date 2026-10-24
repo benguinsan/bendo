@@ -241,6 +241,11 @@ export function readStoredModelApiKey(): StoredModelApiKey | null {
   }
 }
 
+/** True when this tab has a saved model config (sessionStorage). */
+export function hasStoredModelApiKey(): boolean {
+  return readStoredModelApiKey() !== null;
+}
+
 /** Persist full model config for this browser tab session only. */
 export function writeStoredModelApiKey(value: StoredModelApiKey): void {
   if (typeof window === "undefined") {

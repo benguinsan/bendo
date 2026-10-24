@@ -1,9 +1,7 @@
 "use client";
 
-import { KeyRoundIcon } from "lucide-react";
-import { useState } from "react";
+import { KeyRoundIcon, RefreshCwIcon } from "lucide-react";
 
-import { ModelApiKeyDialog } from "@/components/agent/model-api-key-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,9 +9,58 @@ import {
   DORO_DISPLAY_NAME,
   DORO_SUBTITLE,
 } from "@/lib/agent/chat";
+import { readinessBlockReason } from "@/lib/agent/chat-user-errors";
+import { cn } from "@/lib/utils";
 
-export function ChatHeader() {
-  const [apiKeyOpen, setApiKeyOpen] = useState(false);
+type ChatHeaderProps = {
+  bridgeConfigured: boolean;
+  bridgeReachable: boolean | null;
+  modelConfigured: boolean;
+  statusCheckError?: string | null;
+  checking?: boolean;
+  onOpenModelConfig: () => void;
+  onCheckAgain: () => void;
+};
+
+function readinessLabel(input: {
+  checking: boolean;
+  bridgeConfigured: boolean;
+  bridgeReachable: boolean | null;
+  modelConfigured: boolean;
+  statusCheckError?: string | null;
+}): { text: string; tone: "ready" | "warn" | "muted" } {
+  if (input.checking) {
+    return { text: "Checking…", tone: "muted" };
+  }
+  if (input.statusCheckError) {
+    return { text: "Status check failed", tone: "warn" };
+  }
+  const block = readinessBlockReason(input);
+  if (!block) {
+    return { text: "Ready to chat", tone: "ready" };
+  }
+  if (!input.modelConfigured) {
+    return { text: "Needs model config", tone: "warn" };
+  }
+  return { text: "Agent offline", tone: "warn" };
+}
+
+export function ChatHeader({
+  bridgeConfigured,
+  bridgeReachable,
+  modelConfigured,
+  statusCheckError = null,
+  checking = false,
+  onOpenModelConfig,
+  onCheckAgain,
+}: ChatHeaderProps) {
+  const label = readinessLabel({
+    checking,
+    bridgeConfigured,
+    bridgeReachable,
+    modelConfigured,
+    statusCheckError,
+  });
 
   return (
     <header className="border-border/60 flex shrink-0 items-center justify-between gap-3 border-b px-1 pb-4">
@@ -28,6 +75,16 @@ export function ChatHeader() {
           </p>
           <p className="text-muted-foreground truncate text-xs">
             {DORO_SUBTITLE}
+            <span
+              className={cn(
+                "ml-2 inline-block",
+                label.tone === "ready" && "text-priority-moderate",
+                label.tone === "warn" && "text-destructive",
+                label.tone === "muted" && "text-muted-foreground"
+              )}
+            >
+              · {label.text}
+            </span>
           </p>
         </div>
       </div>
@@ -37,13 +94,23 @@ export function ChatHeader() {
           variant="ghost"
           size="icon"
           className="text-muted-foreground size-10"
+          aria-label="Check again"
+          disabled={checking}
+          onClick={onCheckAgain}
+        >
+          <RefreshCwIcon className={cn(checking && "animate-spin")} />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground size-10"
           aria-label="Model configuration"
-          onClick={() => setApiKeyOpen(true)}
+          onClick={onOpenModelConfig}
         >
           <KeyRoundIcon />
         </Button>
       </div>
-      <ModelApiKeyDialog open={apiKeyOpen} onOpenChange={setApiKeyOpen} />
     </header>
   );
 }
