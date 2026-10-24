@@ -6,8 +6,11 @@ export const DORO_SUBTITLE = "Task assistant";
 
 const DORO_WELCOME_BODY =
   "Hé lô! Mình là Doro, trợ lý nhỏ xíu đồng hành cùng bạn trong Bendo ✨\n\n" +
-  "Để mình bắt đầu hoạt động, bạn chỉ cần cung cấp API key " +
-  "và endpoint của model mà bạn muốn sử dụng nhé! 🚀";
+  "Lần đầu dùng Agent, làm lần lượt:\n" +
+  "1. Bấm biểu tượng chìa khóa phía trên.\n" +
+  "2. Điền endpoint, model và API key của bạn (có thể Test trước).\n" +
+  "3. Bấm Save — đợi báo thành công.\n" +
+  "4. Khi trạng thái “Ready to chat”, gửi tin nhắn bình thường.";
 
 /** Local welcome bubble until chat history is persisted. */
 export function createDoroWelcomeMessage(now = new Date()): ChatMessage {

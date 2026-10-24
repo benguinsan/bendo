@@ -43,6 +43,8 @@ import { cn } from "@/lib/utils";
 type ModelApiKeyDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after Save succeeds (apply ∧ persist / session write). */
+  onSaved?: () => void;
 };
 
 const selectClassName = cn(
@@ -84,8 +86,10 @@ function readInitialFormState(): {
 
 function ModelApiKeyForm({
   onOpenChange,
+  onSaved,
 }: {
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }) {
   const providerId = useId();
   const endpointId = useId();
@@ -254,6 +258,7 @@ function ModelApiKeyForm({
     setSavedMask(maskModelApiKey(keyToSave));
     setSavedApiKey(keyToSave);
     setApiKey("");
+    onSaved?.();
     onOpenChange(false);
   }
 
@@ -500,10 +505,13 @@ function ModelApiKeyForm({
 export function ModelApiKeyDialog({
   open,
   onOpenChange,
+  onSaved,
 }: ModelApiKeyDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open ? <ModelApiKeyForm onOpenChange={onOpenChange} /> : null}
+      {open ? (
+        <ModelApiKeyForm onOpenChange={onOpenChange} onSaved={onSaved} />
+      ) : null}
     </Dialog>
   );
 }

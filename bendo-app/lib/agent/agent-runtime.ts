@@ -28,7 +28,7 @@ type IdempotencyEntry = {
 const idempotencyCache = new Map<string, IdempotencyEntry>();
 
 const offlineMessage =
-  "Agent is offline. Set DSH_CHAT_BRIDGE_URL and DSH_CHAT_BRIDGE_SECRET.";
+  "Agent is offline. Reopen Bendo Desktop or ask whoever installed it for help.";
 
 function pruneIdempotencyCache(now: number) {
   for (const [key, entry] of idempotencyCache) {
