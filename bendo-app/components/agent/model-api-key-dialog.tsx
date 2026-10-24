@@ -164,7 +164,7 @@ function ModelApiKeyForm({
     if (!trimmedEndpoint) {
       next.endpoint = "API endpoint is required.";
     } else if (!isAllowedModelEndpoint(provider, trimmedEndpoint)) {
-      next.endpoint = "Endpoint không được phép.";
+      next.endpoint = "Endpoint is not allowed.";
     }
 
     if (!trimmedModel) {
@@ -459,7 +459,7 @@ function ModelApiKeyForm({
 
           {testStatus?.kind === "success" ? (
             <output className="block text-sm text-emerald-700">
-              Kết nối thành công
+              Connection successful
             </output>
           ) : null}
           {testStatus?.kind === "error" ? (

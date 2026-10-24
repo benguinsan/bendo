@@ -27,7 +27,7 @@ const bodySchema = z
       ctx.addIssue({
         code: "custom",
         path: ["endpoint"],
-        message: "Endpoint không được phép.",
+        message: "Endpoint is not allowed.",
       });
     }
   });

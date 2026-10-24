@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRoundIcon } from "lucide-react";
+import { KeyRoundIcon, RefreshCwIcon } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,10 @@ type ChatHeaderProps = {
   bridgeConfigured: boolean;
   bridgeReachable: boolean | null;
   modelConfigured: boolean;
+  statusCheckError?: string | null;
   checking?: boolean;
   onOpenModelConfig: () => void;
+  onCheckAgain: () => void;
 };
 
 function readinessLabel(input: {
@@ -25,9 +27,13 @@ function readinessLabel(input: {
   bridgeConfigured: boolean;
   bridgeReachable: boolean | null;
   modelConfigured: boolean;
+  statusCheckError?: string | null;
 }): { text: string; tone: "ready" | "warn" | "muted" } {
   if (input.checking) {
     return { text: "Checking…", tone: "muted" };
+  }
+  if (input.statusCheckError) {
+    return { text: "Status check failed", tone: "warn" };
   }
   const block = readinessBlockReason(input);
   if (!block) {
@@ -43,14 +49,17 @@ export function ChatHeader({
   bridgeConfigured,
   bridgeReachable,
   modelConfigured,
+  statusCheckError = null,
   checking = false,
   onOpenModelConfig,
+  onCheckAgain,
 }: ChatHeaderProps) {
   const label = readinessLabel({
     checking,
     bridgeConfigured,
     bridgeReachable,
     modelConfigured,
+    statusCheckError,
   });
 
   return (
@@ -80,6 +89,17 @@ export function ChatHeader({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground size-10"
+          aria-label="Check again"
+          disabled={checking}
+          onClick={onCheckAgain}
+        >
+          <RefreshCwIcon className={cn(checking && "animate-spin")} />
+        </Button>
         <Button
           type="button"
           variant="ghost"

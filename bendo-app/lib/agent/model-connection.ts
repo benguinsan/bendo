@@ -19,14 +19,14 @@ export type ModelConnectionResult =
   | { ok: true }
   | { ok: false; error: string; code?: string };
 
-const ERROR_INVALID_KEY = "API key không hợp lệ";
-const ERROR_NO_CREDIT = "Tài khoản hết credit";
-const ERROR_MODEL_MISSING = "Model không tồn tại";
-const ERROR_RATE_LIMIT = "Đang bị giới hạn tốc độ, thử lại sau";
-const ERROR_PROVIDER = "Provider đang lỗi, thử lại sau";
-const ERROR_UNREACHABLE = "Không kết nối được tới endpoint";
-const ERROR_REJECTED = "Yêu cầu bị từ chối bởi provider";
-const ERROR_ENDPOINT_NOT_ALLOWED = "Endpoint không được phép";
+const ERROR_INVALID_KEY = "Invalid API key";
+const ERROR_NO_CREDIT = "Account is out of credit";
+const ERROR_MODEL_MISSING = "Model not found";
+const ERROR_RATE_LIMIT = "Rate limited — try again later";
+const ERROR_PROVIDER = "Provider error — try again later";
+const ERROR_UNREACHABLE = "Couldn’t reach the endpoint";
+const ERROR_REJECTED = "Request rejected by the provider";
+const ERROR_ENDPOINT_NOT_ALLOWED = "Endpoint is not allowed";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";

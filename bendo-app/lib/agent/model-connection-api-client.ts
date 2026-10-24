@@ -58,7 +58,7 @@ export async function testModelConnectionViaApi(input: {
         error:
           typeof errorBody?.error === "string" && errorBody.error.trim()
             ? errorBody.error
-            : "Không kết nối được tới endpoint",
+            : "Couldn’t reach the endpoint",
         code: typeof errorBody?.code === "string" ? errorBody.code : undefined,
       };
     }
@@ -79,20 +79,20 @@ export async function testModelConnectionViaApi(input: {
 
     return {
       ok: false,
-      error: "Không kết nối được tới endpoint",
+      error: "Couldn’t reach the endpoint",
       code: "UNREACHABLE",
     };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return {
         ok: false,
-        error: "Không kết nối được tới endpoint",
+        error: "Couldn’t reach the endpoint",
         code: "UNREACHABLE",
       };
     }
     return {
       ok: false,
-      error: "Không kết nối được tới endpoint",
+      error: "Couldn’t reach the endpoint",
       code: "UNREACHABLE",
     };
   }

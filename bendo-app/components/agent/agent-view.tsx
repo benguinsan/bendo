@@ -6,7 +6,10 @@ import { ChatComposer } from "@/components/agent/chat-composer";
 import { ChatHeader } from "@/components/agent/chat-header";
 import { ChatMessageList } from "@/components/agent/chat-message-list";
 import { ModelApiKeyDialog } from "@/components/agent/model-api-key-dialog";
-import { fetchAgentBridgeStatus } from "@/lib/agent/agent-status-client";
+import {
+  fetchAgentBridgeStatus,
+  type AgentBridgeStatusClientResult,
+} from "@/lib/agent/agent-status-client";
 import {
   createDoroWelcomeMessage,
   createUserTextMessage,
@@ -21,6 +24,7 @@ import {
   writeStoredModelApiKey,
 } from "@/lib/agent/model-api-key";
 import { loadDesktopModelConfig } from "@/lib/agent/model-config-desktop";
+import { isMissingModelConfigSoftReply } from "@/lib/agent/soft-model-reply";
 import type { ChatMessage } from "@/lib/agent/types";
 import type { DashboardProfile } from "@/lib/dashboard/task-types";
 
@@ -54,16 +58,40 @@ export function AgentView({ profile }: AgentViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [apiKeyOpen, setApiKeyOpen] = useState(false);
   const [modelConfigured, setModelConfigured] = useState(false);
+  /** Soft 200 reply: harness has no applied model — treat as needs config. */
+  const [softNeedsModel, setSoftNeedsModel] = useState(false);
   const [bridge, setBridge] = useState<BridgeState>({
     bridgeConfigured: false,
     bridgeReachable: null,
   });
+  /** Status HTTP/client failure — distinct from confirmed bridgeReachable: false. */
+  const [statusCheckError, setStatusCheckError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const turnAbortRef = useRef<AbortController | null>(null);
   const statusAbortRef = useRef<AbortController | null>(null);
   const readinessGenRef = useRef(0);
 
-  async function runReadinessCheck() {
+  function applyStatusResult(
+    configured: boolean,
+    bridgeResult: AgentBridgeStatusClientResult
+  ) {
+    setModelConfigured(configured);
+    if (!bridgeResult.ok) {
+      // Request/auth/parse failure — do not pretend the bridge was probed offline.
+      setStatusCheckError(bridgeResult.error);
+      setChecking(false);
+      return;
+    }
+    setStatusCheckError(null);
+    setBridge(bridgeResult.status);
+    setChecking(false);
+  }
+
+  async function runReadinessCheck(options?: { markChecking?: boolean }) {
+    if (options?.markChecking) {
+      setChecking(true);
+      setStatusCheckError(null);
+    }
     readinessGenRef.current += 1;
     const gen = readinessGenRef.current;
     statusAbortRef.current?.abort();
@@ -79,16 +107,16 @@ export function AgentView({ profile }: AgentViewProps) {
       return;
     }
 
-    setModelConfigured(configured);
-    if (!bridgeResult.ok) {
-      setBridge({ bridgeConfigured: true, bridgeReachable: false });
-      setChecking(false);
-      return;
-    }
-    setBridge(bridgeResult.status);
-    setChecking(false);
+    applyStatusResult(configured, bridgeResult);
   }
 
+  const runReadinessCheckRef = useRef(runReadinessCheck);
+
+  useEffect(() => {
+    runReadinessCheckRef.current = runReadinessCheck;
+  });
+
+  // Pattern A: initial check + refresh when the tab becomes visible again.
   useEffect(() => {
     void (async () => {
       readinessGenRef.current += 1;
@@ -107,25 +135,39 @@ export function AgentView({ profile }: AgentViewProps) {
 
       setModelConfigured(configured);
       if (!bridgeResult.ok) {
-        setBridge({ bridgeConfigured: true, bridgeReachable: false });
+        setStatusCheckError(bridgeResult.error);
         setChecking(false);
         return;
       }
+      setStatusCheckError(null);
       setBridge(bridgeResult.status);
       setChecking(false);
     })();
+
+    function onVisibilityChange() {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void runReadinessCheckRef.current({ markChecking: true });
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       readinessGenRef.current += 1;
       turnAbortRef.current?.abort();
       statusAbortRef.current?.abort();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
+
+  const effectiveModelConfigured = modelConfigured && !softNeedsModel;
 
   const errorContext = {
     bridgeConfigured: bridge.bridgeConfigured,
     bridgeReachable: bridge.bridgeReachable,
-    modelConfigured,
+    modelConfigured: effectiveModelConfigured,
+    statusCheckError,
   };
 
   const blockReason = checking
@@ -167,8 +209,14 @@ export function AgentView({ profile }: AgentViewProps) {
         )
       );
       setPending(false);
-      void runReadinessCheck();
+      void runReadinessCheck({ markChecking: true });
       return;
+    }
+
+    if (isMissingModelConfigSoftReply(result.reply.body)) {
+      setSoftNeedsModel(true);
+    } else {
+      setSoftNeedsModel(false);
     }
 
     setSessionId(result.sessionId);
@@ -182,9 +230,13 @@ export function AgentView({ profile }: AgentViewProps) {
         <ChatHeader
           bridgeConfigured={bridge.bridgeConfigured}
           bridgeReachable={bridge.bridgeReachable}
-          modelConfigured={modelConfigured}
+          modelConfigured={effectiveModelConfigured}
+          statusCheckError={statusCheckError}
           checking={checking}
           onOpenModelConfig={() => setApiKeyOpen(true)}
+          onCheckAgain={() => {
+            void runReadinessCheck({ markChecking: true });
+          }}
         />
         <ChatMessageList messages={messages} profile={profile} />
         {pending ? (
@@ -207,8 +259,9 @@ export function AgentView({ profile }: AgentViewProps) {
         open={apiKeyOpen}
         onOpenChange={setApiKeyOpen}
         onSaved={() => {
+          setSoftNeedsModel(false);
           setModelConfigured(true);
-          void runReadinessCheck();
+          void runReadinessCheck({ markChecking: true });
         }}
       />
     </div>

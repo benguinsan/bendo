@@ -6,6 +6,8 @@ export type ChatUserErrorContext = {
   bridgeConfigured: boolean;
   bridgeReachable: boolean | null;
   modelConfigured: boolean;
+  /** Status API/request failed — not a confirmed offline bridge. */
+  statusCheckError?: string | null;
 };
 
 const FALLBACK =
@@ -31,6 +33,10 @@ export function mapChatErrorForUser(
 
   if (code === "VALIDATION") {
     return "That message isn’t valid. Check the text and send again.";
+  }
+
+  if (context.statusCheckError) {
+    return "Couldn’t check Agent status. Tap Check again, or restart Bendo.";
   }
 
   if (!context.modelConfigured) {
@@ -84,6 +90,9 @@ export function mapChatErrorForUser(
 export function readinessBlockReason(
   context: ChatUserErrorContext
 ): string | null {
+  if (context.statusCheckError) {
+    return "Couldn’t check Agent status. Tap Check again.";
+  }
   if (!context.modelConfigured) {
     return "Save model configuration before chatting.";
   }

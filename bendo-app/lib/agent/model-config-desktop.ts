@@ -95,14 +95,14 @@ async function persistOnce(
     }
     return {
       ok: false,
-      error: result.error || "Không lưu được cấu hình trên máy.",
+      error: result.error || "Couldn’t save configuration on this machine.",
       retryable: result.retryable,
     };
   } catch {
     // IPC throw — may be transient; allow another attempt.
     return {
       ok: false,
-      error: "Không lưu được cấu hình trên máy.",
+      error: "Couldn’t save configuration on this machine.",
       retryable: true,
     };
   }
