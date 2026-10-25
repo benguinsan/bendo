@@ -13,6 +13,22 @@ export type ChatUserErrorContext = {
 const FALLBACK =
   "Couldn’t send the message. Check the Agent connection and try again.";
 
+const SIGN_IN_AGAIN =
+  "You’re signed out or your session expired. Sign in again, then retry.";
+
+function mapAgentUnavailable(raw: string): string {
+  if (/offline|DSH_CHAT_BRIDGE/iu.test(raw)) {
+    return "Agent is offline. Wait until it’s ready or restart Bendo.";
+  }
+  if (/unreachable|timed out|timeout/iu.test(raw)) {
+    return "Couldn’t reach the Agent. Tap “Check again” or restart the app.";
+  }
+  if (/cancelled/iu.test(raw)) {
+    return "Message send cancelled.";
+  }
+  return "Agent isn’t responding right now. Try again later or check model config (key icon).";
+}
+
 export function mapChatErrorForUser(
   input: {
     error: string;
@@ -25,6 +41,15 @@ export function mapChatErrorForUser(
 
   if (code === "ABORTED") {
     return "Message send cancelled.";
+  }
+
+  if (
+    code === "UNAUTHORIZED" ||
+    code === "FORBIDDEN" ||
+    /^unauthorized\.?$/iu.test(raw) ||
+    /^forbidden\.?$/iu.test(raw)
+  ) {
+    return SIGN_IN_AGAIN;
   }
 
   if (code === "AGENT_TIMEOUT") {
@@ -52,16 +77,7 @@ export function mapChatErrorForUser(
   }
 
   if (code === "AGENT_UNAVAILABLE") {
-    if (/offline|DSH_CHAT_BRIDGE/iu.test(raw)) {
-      return "Agent is offline. Wait until it’s ready or restart Bendo.";
-    }
-    if (/unreachable|timed out|timeout/iu.test(raw)) {
-      return "Couldn’t reach the Agent. Tap “Check again” or restart the app.";
-    }
-    if (/cancelled/iu.test(raw)) {
-      return "Message send cancelled.";
-    }
-    return "Agent isn’t responding right now. Try again later or check model config (key icon).";
+    return mapAgentUnavailable(raw);
   }
 
   if (/timed out|timeout/iu.test(raw)) {
