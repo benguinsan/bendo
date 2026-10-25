@@ -19,12 +19,12 @@ import {
   mapChatErrorForUser,
   readinessBlockReason,
 } from "@/lib/agent/chat-user-errors";
+import { doroSoftReplyForChatFailure } from "@/lib/agent/doro-model-soft-replies";
 import {
   hasStoredModelApiKey,
   writeStoredModelApiKey,
 } from "@/lib/agent/model-api-key";
 import { loadDesktopModelConfig } from "@/lib/agent/model-config-desktop";
-import { isMissingModelConfigSoftReply } from "@/lib/agent/soft-model-reply";
 import type { ChatMessage } from "@/lib/agent/types";
 import type { DashboardProfile } from "@/lib/dashboard/task-types";
 
@@ -58,8 +58,6 @@ export function AgentView({ profile }: AgentViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [apiKeyOpen, setApiKeyOpen] = useState(false);
   const [modelConfigured, setModelConfigured] = useState(false);
-  /** Soft 200 reply: harness has no applied model — treat as needs config. */
-  const [softNeedsModel, setSoftNeedsModel] = useState(false);
   const [bridge, setBridge] = useState<BridgeState>({
     bridgeConfigured: false,
     bridgeReachable: null,
@@ -161,12 +159,10 @@ export function AgentView({ profile }: AgentViewProps) {
     };
   }, []);
 
-  const effectiveModelConfigured = modelConfigured && !softNeedsModel;
-
   const errorContext = {
     bridgeConfigured: bridge.bridgeConfigured,
     bridgeReachable: bridge.bridgeReachable,
-    modelConfigured: effectiveModelConfigured,
+    modelConfigured,
     statusCheckError,
   };
 
@@ -202,6 +198,25 @@ export function AgentView({ profile }: AgentViewProps) {
     }
 
     if (!result.ok) {
+      const softBody = doroSoftReplyForChatFailure({
+        error: result.error,
+        code: result.code,
+      });
+      if (softBody) {
+        // Provider/model issues → Doro bubble (same idea as harness soft replies).
+        const softReply: ChatMessage = {
+          id: `msg-doro-soft-${crypto.randomUUID()}`,
+          role: "agent",
+          kind: "text",
+          createdAt: new Date().toISOString(),
+          body: softBody,
+        };
+        setMessages((current) => [...current, softReply]);
+        setError(null);
+        setPending(false);
+        return;
+      }
+
       setError(
         mapChatErrorForUser(
           { error: result.error, code: result.code },
@@ -213,12 +228,7 @@ export function AgentView({ profile }: AgentViewProps) {
       return;
     }
 
-    if (isMissingModelConfigSoftReply(result.reply.body)) {
-      setSoftNeedsModel(true);
-    } else {
-      setSoftNeedsModel(false);
-    }
-
+    // Soft missing-model (and other harness soft) replies stay as Doro bubbles.
     setSessionId(result.sessionId);
     setMessages((current) => [...current, result.reply]);
     setPending(false);
@@ -230,7 +240,7 @@ export function AgentView({ profile }: AgentViewProps) {
         <ChatHeader
           bridgeConfigured={bridge.bridgeConfigured}
           bridgeReachable={bridge.bridgeReachable}
-          modelConfigured={effectiveModelConfigured}
+          modelConfigured={modelConfigured}
           statusCheckError={statusCheckError}
           checking={checking}
           onOpenModelConfig={() => setApiKeyOpen(true)}
@@ -259,7 +269,6 @@ export function AgentView({ profile }: AgentViewProps) {
         open={apiKeyOpen}
         onOpenChange={setApiKeyOpen}
         onSaved={() => {
-          setSoftNeedsModel(false);
           setModelConfigured(true);
           void runReadinessCheck({ markChecking: true });
         }}
