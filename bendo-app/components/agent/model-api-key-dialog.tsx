@@ -1,6 +1,6 @@
 "use client";
 
-import { ZapIcon } from "lucide-react";
+import { ChevronDownIcon, ZapIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,17 @@ type FormErrors = {
   model?: string;
 };
 
+function usesCustomAdvanced(
+  provider: ModelApiProvider,
+  endpoint: string,
+  model: string
+): boolean {
+  const defaults = MODEL_API_PROVIDER_DEFAULTS[provider];
+  return (
+    endpoint.trim() !== defaults.endpoint || model.trim() !== defaults.model
+  );
+}
+
 function readInitialFormState(): {
   provider: ModelApiProvider;
   endpoint: string;
@@ -95,20 +106,21 @@ function ModelApiKeyForm({
   const endpointId = useId();
   const keyId = useId();
   const modelId = useId();
+  const advancedId = useId();
+
+  const initial = readInitialFormState();
 
   const [provider, setProvider] = useState<ModelApiProvider>(
-    () => readInitialFormState().provider
+    () => initial.provider
   );
-  const [endpoint, setEndpoint] = useState(
-    () => readInitialFormState().endpoint
-  );
-  const [model, setModel] = useState(() => readInitialFormState().model);
+  const [endpoint, setEndpoint] = useState(() => initial.endpoint);
+  const [model, setModel] = useState(() => initial.model);
   const [apiKey, setApiKey] = useState("");
   const [savedMask, setSavedMask] = useState<string | null>(
-    () => readInitialFormState().savedMask
+    () => initial.savedMask
   );
   const [savedApiKey, setSavedApiKey] = useState<string | null>(
-    () => readInitialFormState().savedApiKey
+    () => initial.savedApiKey
   );
   const [errors, setErrors] = useState<FormErrors>({});
   const [testing, setTesting] = useState(false);
@@ -117,6 +129,9 @@ function ModelApiKeyForm({
     { kind: "success" } | { kind: "error"; message: string } | null
   >(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(() =>
+    usesCustomAdvanced(initial.provider, initial.endpoint, initial.model)
+  );
   const isDesktop = hasDesktopModelConfigPersist();
   /** Skip late desktop hydrate if the user already edited the form. */
   const dirtyRef = useRef(false);
@@ -140,6 +155,9 @@ function ModelApiKeyForm({
       setSavedMask(maskModelApiKey(desktop.apiKey));
       setSavedApiKey(desktop.apiKey);
       setApiKey("");
+      setAdvancedOpen(
+        usesCustomAdvanced(desktop.provider, desktop.endpoint, desktop.model)
+      );
       writeStoredModelApiKey(desktop);
     })();
     return () => {
@@ -200,6 +218,7 @@ function ModelApiKeyForm({
       setModel(stored.model);
       setSavedMask(maskModelApiKey(stored.apiKey));
       setSavedApiKey(stored.apiKey);
+      setAdvancedOpen(usesCustomAdvanced(next, stored.endpoint, stored.model));
       return;
     }
 
@@ -207,6 +226,7 @@ function ModelApiKeyForm({
     setModel(defaults.model);
     setSavedMask(null);
     setSavedApiKey(null);
+    setAdvancedOpen(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -215,6 +235,9 @@ function ModelApiKeyForm({
     if (nextErrors.endpoint || nextErrors.model || nextErrors.apiKey) {
       setErrors(nextErrors);
       setSaveError(null);
+      if (nextErrors.endpoint || nextErrors.model) {
+        setAdvancedOpen(true);
+      }
       return;
     }
 
@@ -267,6 +290,9 @@ function ModelApiKeyForm({
     if (nextErrors.endpoint || nextErrors.model || nextErrors.apiKey) {
       setErrors(nextErrors);
       setTestStatus(null);
+      if (nextErrors.endpoint || nextErrors.model) {
+        setAdvancedOpen(true);
+      }
       return;
     }
 
@@ -309,8 +335,8 @@ function ModelApiKeyForm({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm">
             {isDesktop
-              ? "Add your own provider endpoint, model, and API key for Agent chat. Save applies the config to the local Agent and stores it on this machine across restarts (not synced to the cloud)."
-              : "Add your own provider endpoint, model, and API key for Agent chat. Save applies the config to the local Agent; values also stay in this browser session."}
+              ? "Choose a provider, paste your API key, then Save. Config applies to the local Agent and stays on this machine."
+              : "Choose a provider, paste your API key, then Save. Config applies to the local Agent for this browser session."}
           </DialogDescription>
         </div>
         <DialogClose
@@ -345,20 +371,12 @@ function ModelApiKeyForm({
               </select>
             </Field>
 
-            <div className="bg-muted/40 flex flex-col gap-3 rounded-lg p-3">
+            <div className="bg-muted/40 flex flex-col gap-2 rounded-lg p-3">
               <p className="text-foreground text-sm font-medium">
-                How to get a {MODEL_API_PROVIDER_LABELS[provider]} key
+                Get a {MODEL_API_PROVIDER_LABELS[provider]} API key
               </p>
               <p className="text-muted-foreground text-sm">
                 {instructions.summary}
-              </p>
-              <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 text-sm">
-                {instructions.steps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-              <p className="text-muted-foreground text-sm">
-                {instructions.billingNote}
               </p>
               <a
                 href={instructions.docsUrl}
@@ -368,58 +386,10 @@ function ModelApiKeyForm({
               >
                 Open {MODEL_API_PROVIDER_LABELS[provider]} key page
               </a>
+              <p className="text-muted-foreground text-xs">
+                {instructions.billingNote}
+              </p>
             </div>
-
-            <Field data-invalid={errors.endpoint ? true : undefined}>
-              <FieldLabel htmlFor={endpointId}>API endpoint</FieldLabel>
-              <Input
-                id={endpointId}
-                name="endpoint"
-                type="url"
-                autoComplete="off"
-                spellCheck={false}
-                value={endpoint}
-                placeholder="https://..."
-                aria-invalid={Boolean(errors.endpoint)}
-                className="h-10"
-                onChange={(event) => {
-                  markDirty();
-                  setEndpoint(event.target.value);
-                  setTestStatus(null);
-                  if (errors.endpoint) {
-                    setErrors((current) => ({
-                      ...current,
-                      endpoint: undefined,
-                    }));
-                  }
-                }}
-              />
-              <FieldError>{errors.endpoint}</FieldError>
-            </Field>
-
-            <Field data-invalid={errors.model ? true : undefined}>
-              <FieldLabel htmlFor={modelId}>Model name</FieldLabel>
-              <Input
-                id={modelId}
-                name="model"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                value={model}
-                placeholder="Model id"
-                aria-invalid={Boolean(errors.model)}
-                className="h-10"
-                onChange={(event) => {
-                  markDirty();
-                  setModel(event.target.value);
-                  setTestStatus(null);
-                  if (errors.model) {
-                    setErrors((current) => ({ ...current, model: undefined }));
-                  }
-                }}
-              />
-              <FieldError>{errors.model}</FieldError>
-            </Field>
 
             <Field data-invalid={errors.apiKey ? true : undefined}>
               <FieldLabel htmlFor={keyId}>API key</FieldLabel>
@@ -455,6 +425,89 @@ function ModelApiKeyForm({
               ) : null}
               <FieldError>{errors.apiKey}</FieldError>
             </Field>
+
+            <details
+              className="border-border rounded-lg border"
+              open={advancedOpen}
+              onToggle={(event) => {
+                setAdvancedOpen(event.currentTarget.open);
+              }}
+            >
+              <summary
+                id={advancedId}
+                className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm select-none [&::-webkit-details-marker]:hidden"
+              >
+                <ChevronDownIcon
+                  className={cn(
+                    "size-4 shrink-0 transition-transform",
+                    advancedOpen && "rotate-180"
+                  )}
+                />
+                Advanced
+                <span className="text-muted-foreground/80 font-normal">
+                  (endpoint & model)
+                </span>
+              </summary>
+              <div className="border-border flex flex-col gap-4 border-t px-3 py-3">
+                <p className="text-muted-foreground text-xs">
+                  Defaults are filled for you. Change these only if you need a
+                  custom API base URL or model id.
+                </p>
+                <Field data-invalid={errors.endpoint ? true : undefined}>
+                  <FieldLabel htmlFor={endpointId}>API endpoint</FieldLabel>
+                  <Input
+                    id={endpointId}
+                    name="endpoint"
+                    type="url"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={endpoint}
+                    placeholder="https://..."
+                    aria-invalid={Boolean(errors.endpoint)}
+                    className="h-10"
+                    onChange={(event) => {
+                      markDirty();
+                      setEndpoint(event.target.value);
+                      setTestStatus(null);
+                      if (errors.endpoint) {
+                        setErrors((current) => ({
+                          ...current,
+                          endpoint: undefined,
+                        }));
+                      }
+                    }}
+                  />
+                  <FieldError>{errors.endpoint}</FieldError>
+                </Field>
+
+                <Field data-invalid={errors.model ? true : undefined}>
+                  <FieldLabel htmlFor={modelId}>Model name</FieldLabel>
+                  <Input
+                    id={modelId}
+                    name="model"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={model}
+                    placeholder="Model id"
+                    aria-invalid={Boolean(errors.model)}
+                    className="h-10"
+                    onChange={(event) => {
+                      markDirty();
+                      setModel(event.target.value);
+                      setTestStatus(null);
+                      if (errors.model) {
+                        setErrors((current) => ({
+                          ...current,
+                          model: undefined,
+                        }));
+                      }
+                    }}
+                  />
+                  <FieldError>{errors.model}</FieldError>
+                </Field>
+              </div>
+            </details>
           </FieldGroup>
 
           {testStatus?.kind === "success" ? (

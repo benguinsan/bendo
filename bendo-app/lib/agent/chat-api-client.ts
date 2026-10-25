@@ -44,6 +44,23 @@ function isAbortError(error: unknown): boolean {
     : error instanceof Error && error.name === "AbortError";
 }
 
+/** Prefer body.code; map bare 401/403 from requireApiUser to auth codes. */
+function resolveChatApiFailureCode(
+  body: ApiErrorBody,
+  status: number
+): string | undefined {
+  if (typeof body.code === "string" && body.code.trim()) {
+    return body.code.trim();
+  }
+  if (status === 401) {
+    return "UNAUTHORIZED";
+  }
+  if (status === 403) {
+    return "FORBIDDEN";
+  }
+  return undefined;
+}
+
 /**
  * Browser helper: POST /api/agent/chat (never calls dsh directly).
  * Uses a bounded timeout and optional caller AbortSignal; both the fetch and
@@ -107,7 +124,7 @@ export async function sendChatTurnViaApi(input: {
       return {
         ok: false,
         error: body.error || `Agent request failed (${response.status}).`,
-        code: body.code,
+        code: resolveChatApiFailureCode(body, response.status),
         clientRequestId,
       };
     }
