@@ -62,13 +62,23 @@ mac:
 dmg:
   artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
-# Windows / Linux installer targets deferred. Slim harness prepare (rsync +
-# symlink hoist) is macOS-first; re-enable when Win/Linux-safe prepare exists.
-# win:
-#   target:
-#     - target: nsis
-#       arch:
-#         - x64
+# Windows — unsigned beta OK (SmartScreen warning). Prepare is Node copy (win-safe).
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: dir
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  shortcutName: Bendo
+
 # linux:
 #   target:
 #     - AppImage

@@ -1,6 +1,6 @@
 {
   "name": "bendo-desktop",
-  "version": "0.0.1",
+  "version": "0.1.0-beta.1",
   "private": true,
   "description": "Bendo Electron shell — loads local Bendo (Docker/Next); does not embed the web UI",
   "author": "Bendo",
@@ -19,8 +19,11 @@
     "typecheck": "tsc --noEmit",
     "test:smoke": "npm run build && node scripts/smoke.mjs",
     "smoke": "npm run test:smoke",
+    "ops:pack-ready": "node scripts/check-pack-ops.mjs",
     "pack": "npm run build:bendo && npm run build:harness && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
-    "dist": "npm run build:bendo && npm run build:harness && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg"
+    "dist": "npm run build:bendo && npm run build:harness && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
+    "pack:win": "npm run build:bendo && npm run build:harness && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --dir",
+    "dist:win": "npm run build:bendo && npm run build:harness && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
