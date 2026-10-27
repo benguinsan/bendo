@@ -19,8 +19,8 @@
  * Skip smoke (faster iterate):
  *   BENDO_HARNESS_SKIP_SMOKE=1 npm run build:harness
  *
- * Platform: macOS first (rsync + symlink hoist). Windows packaging is out of
- * scope until a Win-safe copy/hoist path exists — fail early on win32.
+ * Copy: Node fs denylist (rsync-compatible exclude list) — works on
+ * darwin / linux / win32. Hoist @deepseek-ai via symlink (posix) or copy (win32).
  */
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -43,13 +43,6 @@ const SMOKE_HEALTH_URL = `http://127.0.0.1:${SMOKE_PORT}/bendo-chat`;
 const SMOKE_TIMEOUT_MS = 90_000;
 const SMOKE_POLL_MS = 500;
 
-if (process.platform === "win32") {
-  console.error(
-    "[build:harness] Windows packaging is not supported yet (prepare uses rsync + symlinks). Pack on macOS for now; a Win-safe copy/hoist path comes later."
-  );
-  process.exit(1);
-}
-
 const ENV_NAMES = [
   ".env",
   ".env.local",
@@ -61,7 +54,7 @@ const ENV_NAMES = [
   ".env.test.local",
 ];
 
-/** Top-level / path prefixes to drop (rsync --exclude). */
+/** Top-level / path prefixes to drop (same patterns as former rsync --exclude). */
 const RSYNC_EXCLUDES = [
   ".git/",
   ".github/",
@@ -148,12 +141,106 @@ if (process.platform === "darwin") {
 }
 
 /**
+ * @param {string} pattern rsync-style exclude
+ * @returns {RegExp | null} for simple star globs (e.g. "*.map")
+ */
+function starGlobToRegExp(pattern) {
+  if (!pattern.includes("*")) {
+    return null;
+  }
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/gu, "\\$&")
+    .replace(/\*\*/gu, "{{GLOBSTAR}}")
+    .replace(/\*/gu, "[^/]*")
+    .replace(/\{\{GLOBSTAR\}\}/gu, ".*");
+  return new RegExp(`^${escaped}$`, "u");
+}
+
+/**
+ * Approximate rsync --exclude matching for a path relative to the tree root
+ * (posix separators).
+ * @param {string} relPosix
+ * @param {string} pattern
+ */
+function matchesExclude(relPosix, pattern) {
+  const trimmed = pattern.replace(/\/$/u, "");
+  if (trimmed.startsWith("**/")) {
+    const rest = trimmed.slice(3);
+    const re = starGlobToRegExp(rest);
+    if (re) {
+      return (
+        re.test(relPosix) ||
+        relPosix.split("/").some((seg) => re.test(seg)) ||
+        re.test(relPosix.split("/").at(-1) ?? "")
+      );
+    }
+    return (
+      relPosix === rest ||
+      relPosix.endsWith(`/${rest}`) ||
+      relPosix.includes(`/${rest}/`)
+    );
+  }
+  if (trimmed.includes("**/")) {
+    const [pre, post] = trimmed.split("/**/");
+    if (!(relPosix === pre || relPosix.startsWith(`${pre}/`))) {
+      return false;
+    }
+    if (!post) {
+      return true;
+    }
+    return (
+      relPosix.includes(`/${post}/`) ||
+      relPosix.endsWith(`/${post}`) ||
+      relPosix.includes(`/${post}`)
+    );
+  }
+  if (pattern.endsWith("/")) {
+    return relPosix === trimmed || relPosix.startsWith(`${trimmed}/`);
+  }
+  const re = starGlobToRegExp(trimmed);
+  if (re) {
+    return re.test(relPosix) || re.test(relPosix.split("/").at(-1) ?? "");
+  }
+  return relPosix === trimmed || relPosix.endsWith(`/${trimmed}`);
+}
+
+/**
+ * @param {string} relPosix
+ */
+function shouldExcludeRel(relPosix) {
+  return RSYNC_EXCLUDES.some((pattern) => matchesExclude(relPosix, pattern));
+}
+
+/**
+ * Recursive copy with denylist (Win-safe; no rsync).
+ * Preserves symlinks/junctions (like rsync -a) so pnpm layout stays compact.
+ * @param {string} srcRoot
+ * @param {string} destRoot
+ */
+function copyTreeWithExcludes(srcRoot, destRoot) {
+  fs.mkdirSync(path.dirname(destRoot), { recursive: true });
+  fs.cpSync(srcRoot, destRoot, {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: (src) => {
+      const rel = path.relative(srcRoot, src);
+      if (!rel || rel === ".") {
+        return true;
+      }
+      const relPosix = rel.split(path.sep).join("/");
+      return !shouldExcludeRel(relPosix);
+    },
+  });
+}
+
+/**
  * Hoist `@deepseek-ai/*` into root `node_modules/@deepseek-ai/` so Doro overlay
  * ESM imports resolve under plain Node / Electron-as-Node (pnpm+tsx differs).
  * Prefer `.pnpm/node_modules/@deepseek-ai` (full transitive set), then fill gaps
  * from `apps/cli/node_modules/@deepseek-ai`.
+ * posix: relative symlinks; win32: directory copy (NSIS-safe).
  * @param {string} root
- * @returns {number} links created/updated
+ * @returns {number} links/copies created/updated
  */
 function hoistDeepseekAiPackages(root) {
   const toDir = path.join(root, "node_modules", "@deepseek-ai");
@@ -172,6 +259,7 @@ function hoistDeepseekAiPackages(root) {
   let created = 0;
   /** @type {Set<string>} */
   const seen = new Set();
+  const useCopy = process.platform === "win32";
 
   for (const fromDir of sources) {
     for (const name of fs.readdirSync(fromDir)) {
@@ -190,7 +278,11 @@ function hoistDeepseekAiPackages(root) {
       } catch {
         // ignore
       }
-      fs.symlinkSync(path.relative(toDir, src), dest);
+      if (useCopy) {
+        fs.cpSync(src, dest, { recursive: true });
+      } else {
+        fs.symlinkSync(path.relative(toDir, src), dest);
+      }
       seen.add(name);
       created += 1;
     }
@@ -873,22 +965,10 @@ console.log(`[build:harness] Output: ${outDir}`);
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(path.dirname(outDir), { recursive: true });
 
-const rsyncArgs = [
-  "-a",
-  "--delete",
-  ...RSYNC_EXCLUDES.flatMap((pattern) => ["--exclude", pattern]),
-  `${harnessRoot}${path.sep}`,
-  `${outDir}${path.sep}`,
-];
-
-console.log(`[build:harness] rsync (${RSYNC_EXCLUDES.length} excludes)…`);
-const rsync = spawnSync("rsync", rsyncArgs, { stdio: "inherit" });
-if (rsync.error?.code === "ENOENT") {
-  fail("rsync not found on PATH (required for build:harness on macOS/Linux)");
-}
-if (rsync.status !== 0) {
-  fail(`rsync failed (exit ${rsync.status ?? "unknown"})`);
-}
+console.log(
+  `[build:harness] copy tree (${RSYNC_EXCLUDES.length} excludes, platform=${process.platform})…`
+);
+copyTreeWithExcludes(harnessRoot, outDir);
 
 const stripped = stripEnvFiles(outDir);
 for (const rel of stripped) {
@@ -911,7 +991,7 @@ if (!fs.existsSync(path.join(outDir, "package.json"))) {
 
 const sizeBeforePhase2 = dirSizeBytes(outDir);
 console.log(
-  `[build:harness] Size after rsync: ${sizeBeforePhase2 == null ? "unknown" : formatBytes(sizeBeforePhase2)}`
+  `[build:harness] Size after copy: ${sizeBeforePhase2 == null ? "unknown" : formatBytes(sizeBeforePhase2)}`
 );
 
 const hoisted = hoistDeepseekAiPackages(outDir);
@@ -1029,7 +1109,7 @@ fs.writeFileSync(
 console.log(
   `[build:harness] Size after Phase 3: ${manifest.sizeHuman ?? "size unknown"}` +
     (sizeBeforePhase2 != null && sizeAfterPhase3 != null
-      ? ` (saved ${formatBytes(sizeBeforePhase2 - sizeAfterPhase3)} vs post-rsync)`
+      ? ` (saved ${formatBytes(sizeBeforePhase2 - sizeAfterPhase3)} vs post-copy)`
       : "")
 );
 

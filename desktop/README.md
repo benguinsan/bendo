@@ -84,21 +84,31 @@ Electron injects `DSH_CHAT_BRIDGE_URL` / `DSH_CHAT_BRIDGE_SECRET` into **spawned
 
 If the Next.js **dev** server logs blocked HMR from `127.0.0.1`, ensure `bendo-app/next.config.ts` includes `allowedDevOrigins: ["127.0.0.1"]` and restart the web server (or rebuild Docker).
 
-## Đóng gói (macOS) — shell + Bendo + slim harness
+## Đóng gói — shell + Bendo + slim harness
 
-Tạo `.dmg` gồm Electron shell, Next standalone (`Resources/bendo-app`), **và** slim harness (`Resources/harness` — Doro overlay + pruned `dsh web` runtime). Không ship nguyên checkout ~1.8 GB (docs/tests/python/website/` .git` bị prune).
+Tạo installer gồm Electron shell, Next standalone (`Resources/bendo-app`), **và** slim harness (`Resources/harness` — Doro overlay + pruned `dsh web` runtime). Không ship nguyên checkout ~1.8 GB (docs/tests/python/website/` .git` bị prune).
 
-**macOS only for now:** `build:harness` cần `rsync` + symlink hoist; Windows installer target đã tắt. Pack trên Mac; Win-safe prepare = việc sau.
+`build:harness` dùng **Node copy** (denylist) — chạy được trên macOS và Windows. Hoist `@deepseek-ai`: symlink trên posix, **copy** trên win32 (an toàn cho NSIS).
 
 ```bash
 # from desktop/
 npm install
+npm run ops:pack-ready  # bước 1: version + BENDO_CLOUD_API_URL + cloud /api/health (Clerk = Dashboard tay)
 npm run build:bendo    # next build (standalone) + sync → resources/bendo-app
 npm run build:harness   # prune-copy sibling deepseek-harness → resources/harness
-npm run dist            # build:bendo + build:harness + tsc + .dmg → release/
-# thử nhanh không tạo dmg:
-npm run pack
+
+# macOS .dmg
+npm run dist
+npm run pack            # dir only (nhanh hơn)
+
+# Windows (chạy trên máy Windows; hoặc electron-builder --win từ CI/Mac có wine — khuyến nghị build trên Win)
+npm run dist:win        # NSIS .exe + win-unpacked
+npm run pack:win        # win-unpacked only
 ```
+
+Pack ops / release note: `npm run ops:pack-ready`; stub `release-notes/0.1.0-beta.1.md`. Ship checklist: [`docs/desktop-ship-mvp-checklist.md`](../docs/desktop-ship-mvp-checklist.md) §A.4–A.5.
+
+**Windows beta:** unsigned → SmartScreen “Windows protected your PC” → More info → Run anyway. Ship checklist: [`docs/desktop-ship-mvp-checklist.md`](../docs/desktop-ship-mvp-checklist.md) (Windows-first).
 
 - Packaged Next: `server.js` qua Electron-as-Node (`ELECTRON_RUN_AS_NODE=1`)
 - Packaged harness: `apps/cli/lib/bin.js web --patch ./bendo-agent(doro)/cordis.yml --no-open` qua Electron-as-Node (không cần system `pnpm`)
