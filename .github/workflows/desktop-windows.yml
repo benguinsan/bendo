@@ -1,0 +1,191 @@
+# Build Windows NSIS installer: npm run dist:win on windows-latest.
+# Does not replace clean-machine E2E — download the .exe and test on a Win PC.
+#
+# Required repository Variables / Secrets (Settings → Secrets and variables):
+#   vars.BENDO_CLOUD_API_URL                          e.g. https://bendo-psi.vercel.app
+#   secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+#   secrets.NEXT_PUBLIC_SUPABASE_URL
+#   secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY
+#
+# Optional:
+#   vars.HARNESS_REPOSITORY   default deepseek-ai/deepseek-harness
+#   secrets.HARNESS_TOKEN     only if HARNESS_REPOSITORY is private
+name: Desktop Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      harness_ref:
+        description: Git ref for the DeepSeek Harness checkout
+        required: true
+        default: master
+      publish_release:
+        description: Attach .exe to a GitHub Release (creates tag if missing)
+        type: boolean
+        default: false
+      release_tag:
+        description: Release tag (e.g. v0.1.0-beta.1). Required when publish_release is true
+        required: false
+        default: ""
+
+concurrency:
+  group: desktop-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  dist-win:
+    name: dist:win → NSIS .exe
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    env:
+      BENDO_CLOUD_API_URL: ${{ vars.BENDO_CLOUD_API_URL }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+      NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: /
+      NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: /
+      # Packaged desktop uses cloud cutover — no Clerk/Supabase server secrets in the .exe
+      BENDO_HARNESS_SKIP_SMOKE: "0"
+
+    steps:
+      - name: Check bake / public env
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in BENDO_CLOUD_API_URL NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing $key — set repository Variable/Secret before running this workflow."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          if [ "${{ inputs.publish_release }}" = "true" ] && [ -z "${{ inputs.release_tag }}" ]; then
+            echo "::error::publish_release requires release_tag (e.g. v0.1.0-beta.1)."
+            exit 1
+          fi
+          echo "BENDO_CLOUD_API_URL=$BENDO_CLOUD_API_URL"
+
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+
+      - name: Checkout DeepSeek Harness
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.HARNESS_REPOSITORY != '' && vars.HARNESS_REPOSITORY || 'deepseek-ai/deepseek-harness' }}
+          ref: ${{ inputs.harness_ref }}
+          path: deepseek-harness
+          token: ${{ secrets.HARNESS_TOKEN != '' && secrets.HARNESS_TOKEN || github.token }}
+
+      - name: Inject Doro packaging overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="desktop/packaging/bendo-agent(doro)"
+          dst="deepseek-harness/bendo-agent(doro)"
+          if [ ! -f "$src/cordis.yml" ]; then
+            echo "::error::Missing $src/cordis.yml — vendor Doro under desktop/packaging/."
+            exit 1
+          fi
+          rm -rf "$dst"
+          mkdir -p "$dst"
+          cp -R "$src"/. "$dst"/
+          test -f "$dst/cordis.yml"
+          echo "Injected Doro overlay → $dst"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            desktop/package-lock.json
+            bendo-app/package-lock.json
+
+      - name: Setup pnpm (harness)
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Install harness dependencies
+        working-directory: deepseek-harness
+        run: pnpm install --frozen-lockfile
+
+      - name: Build harness (apps/cli bin)
+        working-directory: deepseek-harness
+        run: pnpm run build
+
+      - name: Install bendo-app dependencies
+        working-directory: bendo-app
+        run: npm ci
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Ops pack-ready
+        working-directory: desktop
+        run: npm run ops:pack-ready
+
+      - name: Dist Windows (NSIS .exe)
+        working-directory: desktop
+        run: npm run dist:win
+
+      - name: List release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la desktop/release || true
+          exe="$(ls desktop/release/Bendo-*-win-x64.exe 2>/dev/null | head -n 1 || true)"
+          if [ -z "$exe" ]; then
+            echo "::error::No Bendo-*-win-x64.exe under desktop/release/"
+            exit 1
+          fi
+          echo "EXE=$exe" >> "$GITHUB_ENV"
+          echo "Built: $exe"
+          (
+            cd desktop/release
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "$(basename "$exe")"
+            else
+              powershell.exe -NoProfile -Command "Get-FileHash -Algorithm SHA256 '$(basename "$exe")' | Format-List"
+            fi
+          )
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bendo-desktop-win-x64
+          path: |
+            desktop/release/Bendo-*-win-x64.exe
+            desktop/release/*.blockmap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.publish_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: Bendo Desktop ${{ inputs.release_tag }} (Windows)
+          body: |
+            Windows NSIS installer from `npm run dist:win` (unsigned).
+
+            - Artifact: `Bendo-*-win-x64.exe`
+            - Cloud API: `${{ vars.BENDO_CLOUD_API_URL }}`
+            - SmartScreen: More info → Run anyway
+
+            Clean-machine E2E still required after download (login → CRUD → Agent chat).
+          files: |
+            desktop/release/Bendo-*-win-x64.exe
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

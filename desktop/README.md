@@ -94,21 +94,36 @@ Tạo installer gồm Electron shell, Next standalone (`Resources/bendo-app`), *
 # from desktop/
 npm install
 npm run ops:pack-ready  # bước 1: version + BENDO_CLOUD_API_URL + cloud /api/health (Clerk = Dashboard tay)
-npm run build:bendo    # next build (standalone) + sync → resources/bendo-app
-npm run build:harness   # prune-copy sibling deepseek-harness → resources/harness
+# .env optional nếu đã export BENDO_CLOUD_API_URL (CI)
 
-# macOS .dmg
+# macOS .dmg (máy mac)
 npm run dist
 npm run pack            # dir only (nhanh hơn)
 
-# Windows (chạy trên máy Windows; hoặc electron-builder --win từ CI/Mac có wine — khuyến nghị build trên Win)
-npm run dist:win        # NSIS .exe + win-unpacked
+# Windows — NSIS .exe + win-unpacked (script: dist:win, không phải dist:window)
+npm run dist:win
 npm run pack:win        # win-unpacked only
 ```
 
-Pack ops / release note: `npm run ops:pack-ready`; stub `release-notes/0.1.0-beta.1.md`. Ship checklist: [`docs/desktop-ship-mvp-checklist.md`](../docs/desktop-ship-mvp-checklist.md) §A.4–A.5.
+`dist` / `pack` / `dist:win` / `pack:win` gọi `scripts/run-electron-builder.mjs` (set `CSC_IDENTITY_AUTO_DISCOVERY=false` trong Node — chạy được dưới **cmd.exe** trên Windows).
 
-**Windows beta:** unsigned → SmartScreen “Windows protected your PC” → More info → Run anyway. Ship checklist: [`docs/desktop-ship-mvp-checklist.md`](../docs/desktop-ship-mvp-checklist.md) (Windows-first).
+Artifact Win kỳ vọng: `desktop/release/Bendo-<version>-win-x64.exe` (NSIS). Unsigned beta → SmartScreen: More info → Run anyway.
+
+### Windows `.exe` qua GitHub Actions (khuyến nghị khi không có máy Win)
+
+Workflow đã wire: [`../.github/workflows/desktop-windows.yml`](../.github/workflows/desktop-windows.yml) — runner **`windows-latest`** → `npm run dist:win` → artifact / optional GitHub Release.
+
+Tóm tắt (chi tiết + secrets: [root README](../README.md) § Desktop Windows):
+
+1. Checkout monorepo + public/private harness → inject [`packaging/bendo-agent(doro)/`](packaging/bendo-agent(doro)/)
+2. `pnpm` build harness · `npm ci` bendo-app + desktop
+3. Bake **public** only (`BENDO_CLOUD_API_URL`, `NEXT_PUBLIC_*`) — không nhét cloud/bridge secrets vào installer
+4. `ops:pack-ready` → `dist:win` → `Bendo-*-win-x64.exe`
+
+Actions **không** thay E2E: tải `.exe` về máy Win sạch rồi test. Local Win vẫn OK (cùng lệnh). Cross-pack từ Mac không khuyến nghị (`fs-ext` ABI win32).
+
+Pack ops / release note: `npm run ops:pack-ready`; stub `release-notes/0.1.0-beta.1.md` (điền `bendoCloudApiUrl` từ `resources/bendo-app/bendo-public-config.json` lúc pack). Ship checklist: [`docs/desktop-ship-mvp-checklist.md`](../docs/desktop-ship-mvp-checklist.md) (Windows-first, §A.4–A.5 / §E).
+
 
 - Packaged Next: `server.js` qua Electron-as-Node (`ELECTRON_RUN_AS_NODE=1`)
 - Packaged harness: `apps/cli/lib/bin.js web --patch ./bendo-agent(doro)/cordis.yml --no-open` qua Electron-as-Node (không cần system `pnpm`)
@@ -144,9 +159,12 @@ desktop/
 ├── resources/harness/     # Slim dsh + Doro staging (gitignored; from build:harness)
 ├── electron-builder.yml   # Packaging (shell + extraResources bendo-app + harness)
 ├── release/               # electron-builder output (gitignored)
+├── packaging/bendo-agent(doro)/  # Doro overlay snapshot for CI pack
 ├── scripts/run-app.mjs    # npm start — real app
+├── scripts/run-electron-builder.mjs  # pack/dist (cmd-safe CSC env)
 ├── scripts/prepare-bendo-resource.mjs
 ├── scripts/prepare-harness-resource.mjs
+├── scripts/check-pack-ops.mjs        # npm run ops:pack-ready
 ├── scripts/smoke.mjs      # npm run test:smoke — auto quit (no spawn)
 ├── prompts/               # Implementation prompts (gitignored)
 ├── skills-lock.json       # Locked skill install sources

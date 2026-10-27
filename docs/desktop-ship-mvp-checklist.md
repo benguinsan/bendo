@@ -136,11 +136,13 @@ Thứ tự: **E.0 → E.1 → E.2 → E.3 → E.4**. C (E2E máy 2) nên pass tr
 - [ ] `npm run dist:win`
 - [ ] Lấy file trong `desktop/release/` — tên kiểu `Bendo-<version>-win-x64.exe` (NSIS).
 
-**Cách B — GitHub Actions (sau, khi muốn lặp lại không cần máy Win)**
+**Cách B — GitHub Actions (khi muốn lặp lại không cần máy Win)**
 
-- [ ] Workflow `windows-latest`: checkout app + harness → `npm run dist:win`.
-- [ ] Upload asset lên **GitHub Release** (không chỉ Actions artifact — artifact thường cần login GH).
-- [ ] Secrets/env: public bake only; không nhét cloud secrets vào installer.
+- [x] Workflow `windows-latest`: [`.github/workflows/desktop-windows.yml`](../.github/workflows/desktop-windows.yml) — checkout app + harness + Doro packaging overlay → `npm run dist:win`.
+- [x] Upload Actions artifact; optional GitHub Release khi `publish_release` + `release_tag`.
+- [ ] Secrets/vars trên GitHub (xem root `README.md` § Desktop Windows): `BENDO_CLOUD_API_URL`, `NEXT_PUBLIC_*` — public bake only; không nhét cloud secrets vào installer.
+- [ ] Chạy workflow một lần → tải `.exe` → E2E máy 2 (§C / §E.4).
+
 
 ### E.2 Host + tạo link tải
 
@@ -193,7 +195,7 @@ Trên máy **không** có monorepo (máy 2 hoặc máy khác):
 2. Quay lại mac clean E2E + (sau) signing.
 3. Gmail reminders.
 4. Discord bot.
-5. CI Windows → GitHub Release (E.1 cách B) nếu chưa làm.
+5. CI Windows → GitHub Release (E.1 cách B) — workflow đã có; còn set secrets + chạy + E2E máy 2.
 
 ---
 

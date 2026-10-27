@@ -1,0 +1,25 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": ".types",
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "incremental": false,
+    "baseUrl": "..",
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["*.ts"],
+  "references": [
+    { "path": "../vendor/cordis" },
+    { "path": "../packages/core/tools" },
+    { "path": "../packages/core/system-prompt" },
+    { "path": "../packages/core/agent" },
+    { "path": "../packages/core/agent-default-model" },
+    { "path": "../packages/core/session" },
+    { "path": "../packages/host/webserver" },
+    { "path": "../packages/llm/llm" },
+    { "path": "../packages/util/brand" }
+  ]
+}
