@@ -1,0 +1,103 @@
+# Doro overlay — persona + tools live in this folder.
+# From the harness root:
+#   pnpm dsh web --patch './bendo-agent(doro)/cordis.yml'
+#
+# Bendo API (tools.ts → bendo-app/app/api):
+#   export BENDO_API_BASE_URL=http://localhost:3000   # optional
+#   export BENDO_API_TOKEN=<Clerk session JWT>        # optional fallback; chat bridge prefers per-request clerkToken
+#
+# Chat bridge (Phase 1):
+#   POST http://127.0.0.1:3080/bendo-chat
+#   Header: x-bendo-chat-secret: <secret>
+#   Chat body: { "message": "...", "sessionId?: "...", "clerkToken?: "..." }
+#   Apply model config (before chat): {
+#     "action": "applyModelConfig",
+#     "provider": "openrouter|vilao|gpt|gemini",
+#     "endpoint": "https://...",
+#     "apiKey": "...",
+#     "model": "..."
+#   }
+#   Apply does more than agent-default-model selection. chat-bridge writes:
+#     1) credentials for the mapped apiKeyEnv (OPENROUTER_API_KEY, …)
+#     2) $DSH_HOME/settings.yaml → llm-pi-ai.providers.<dshRoute>
+#        (apiKeyEnv, baseURL, models[{id}]; openai-completions for OpenAI-compat
+#         / vilao hand-declare; gemini→google omits api to keep catalog protocol)
+#        Electron-spawned harness: DSH_HOME={userData}/dsh (not ~/.dsh).
+#        CLI `pnpm dsh web` alone still defaults to ~/.dsh unless you export DSH_HOME.
+#     3) agent-default-model selection (provider + model) via saveSelection
+#   Bendo → dsh route map (see BENDO_PROVIDER_ROUTE in chat-bridge.ts):
+#     openrouter→openrouter | gpt→openai | gemini→google | vilao→vilao (hand-declare)
+#   Bendo Agent chat requires applyModelConfig first. Without apply, chat still
+#   returns 200 with a Doro soft reply (configure model) — no agent turn and no
+#   agent-default-model fallback (no shipped provider key).
+#   Do not rely on editing only the agent-default-model row below for Bendo chat —
+#   without the llm-pi-ai provider route, a real turn fails with UNKNOWN_MODEL.
+#   Secret (cordis `secret` below stays empty — no weak repo default):
+#     • Desktop Electron: injects DSH_CHAT_BRIDGE_SECRET into Next + harness.
+#     • Local without Electron: put the SAME value in
+#         bendo-app/.env  AND  deepseek-harness/.env  (dsh loads cwd .env),
+#       or export DSH_CHAT_BRIDGE_SECRET before `pnpm dsh web`.
+#   Env wins over cordis when set. Without env/file secret, POST returns 503.
+#
+# Research uses the same Saved applyModelConfig chat model (no second search model).
+# `web_fetch` loads concrete URLs. Optional dedicated search backends (DeepSeek /
+# Exa / Perplexity) can be added later without changing chat apply/Save.
+# Optional MCP (default off). Uncomment and point at a real server:
+# - insert another row with name: '@deepseek-ai/dsh-mcp-client'
+
+# Composition placeholder for dsh (plugin still required). Bendo chat ignores this
+# until applyModelConfig has run; apply also writes llm-pi-ai.providers (see above).
+# Do not put a real user API key here — keys arrive via credentials on apply.
+- id: agent-default-model
+  config:
+    provider: vilao
+    model: 7n/openrouter/free
+
+# URL fetch only — research Q&A runs on the Saved chat model + time-context clock.
+- id: web
+  config:
+    fetchProvider: http
+
+# Optional dedicated web_search (not required for Bendo research):
+# - id: web
+#   config:
+#     searchProvider: deepseek-official   # or exa | perplexity
+#     fetchProvider: http
+# - id: web-search-deepseek
+#   config:
+#     apiKeyEnv: DEEPSEEK_API_KEY
+#     model: deepseek-v4-flash
+
+- id: system-prompt
+  config:
+    persona: >-
+      You are Doro, the Bendo personal task assistant.
+      Follow doro:personality, doro:operations, and doro:safety.
+      Prefer clear Vietnamese. Banter is fine; task replies stay short.
+      Use Doro tools for task work. Research uses the same Saved chat model
+      ({{model}}); use web_fetch for concrete URLs. Treat time-context as the
+      authoritative "now" (OS/host zone) — never invent today's date. Never invent
+      task IDs or sources. Working directory is {{cwd}}.
+
+- insert:
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+      config:
+        # Omit timeZone → process/OS zone (Electron spawn sets TZ from the host).
+        # 0 = inject on every eligible step so research always sees latest clock.
+        refreshIntervalMs: 0
+    - id: doro-persona
+      name: ./persona.ts
+    - id: doro-tools
+      name: ./tools.ts
+      config:
+        baseUrl: http://localhost:3000
+    - id: bendo-chat-bridge
+      name: ./chat-bridge.ts
+      config:
+        path: /bendo-chat
+        # Empty on purpose — use DSH_CHAT_BRIDGE_SECRET in process env (Electron inject
+        # or export when running `pnpm dsh web` manually). Do not commit a real secret here.
+        secret: ""
+        timeoutMs: 120000
+        maxBodyBytes: 1000000
