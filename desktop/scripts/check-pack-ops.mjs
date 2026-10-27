@@ -27,7 +27,8 @@ function loadDesktopDotEnv() {
   try {
     text = fs.readFileSync(filePath, "utf8");
   } catch {
-    failures.push(`Missing ${filePath} — copy from .env.example and set BENDO_CLOUD_API_URL.`);
+    // Optional: CI may export BENDO_CLOUD_API_URL with no desktop/.env.
+    // Unset URL is reported by the check below.
     return;
   }
   for (const rawLine of text.split(/\r?\n/u)) {

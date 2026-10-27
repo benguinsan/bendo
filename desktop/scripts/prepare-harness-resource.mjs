@@ -164,8 +164,8 @@ function starGlobToRegExp(pattern) {
  */
 function matchesExclude(relPosix, pattern) {
   const trimmed = pattern.replace(/\/$/u, "");
-  if (pattern.startsWith("**/")) {
-    const rest = pattern.slice(3);
+  if (trimmed.startsWith("**/")) {
+    const rest = trimmed.slice(3);
     const re = starGlobToRegExp(rest);
     if (re) {
       return (
@@ -180,7 +180,7 @@ function matchesExclude(relPosix, pattern) {
       relPosix.includes(`/${rest}/`)
     );
   }
-  if (pattern.includes("**/")) {
+  if (trimmed.includes("**/")) {
     const [pre, post] = trimmed.split("/**/");
     if (!(relPosix === pre || relPosix.startsWith(`${pre}/`))) {
       return false;
@@ -197,11 +197,11 @@ function matchesExclude(relPosix, pattern) {
   if (pattern.endsWith("/")) {
     return relPosix === trimmed || relPosix.startsWith(`${trimmed}/`);
   }
-  const re = starGlobToRegExp(pattern);
+  const re = starGlobToRegExp(trimmed);
   if (re) {
     return re.test(relPosix) || re.test(relPosix.split("/").at(-1) ?? "");
   }
-  return relPosix === pattern || relPosix.endsWith(`/${pattern}`);
+  return relPosix === trimmed || relPosix.endsWith(`/${trimmed}`);
 }
 
 /**
