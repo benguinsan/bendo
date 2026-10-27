@@ -37,6 +37,11 @@ export const Config: z<Config> = z.object({
 const priorityEnum = ['low', 'moderate', 'extreme'] as const
 const statusEnum = ['pending', 'completed'] as const
 
+/** Encode model-supplied ids for URL path segments (not JSON body fields). */
+function pathId(id: string): string {
+  return encodeURIComponent(id)
+}
+
 const jsonOutput = {
   schema: { type: 'json' as const },
   render: renderJson,
@@ -157,7 +162,7 @@ export function apply(ctx: Context, config: Config) {
     },
     output: jsonOutput,
     async execute(args, exec) {
-      return bendoFetch(api, `/api/tasks/${args.taskId}`, { signal: exec.signal })
+      return bendoFetch(api, `/api/tasks/${pathId(args.taskId)}`, { signal: exec.signal })
     },
   }))
 
@@ -245,7 +250,7 @@ export function apply(ctx: Context, config: Config) {
       if (Object.keys(body).length === 0) {
         throw new Error('update_task requires at least one field to change besides taskId.')
       }
-      return bendoFetch(api, `/api/tasks/${args.taskId}`, {
+      return bendoFetch(api, `/api/tasks/${pathId(args.taskId)}`, {
         method: 'PATCH',
         signal: exec.signal,
         body,
@@ -261,7 +266,7 @@ export function apply(ctx: Context, config: Config) {
     },
     output: jsonOutput,
     async execute(args, exec) {
-      return bendoFetch(api, `/api/tasks/${args.taskId}`, {
+      return bendoFetch(api, `/api/tasks/${pathId(args.taskId)}`, {
         method: 'DELETE',
         signal: exec.signal,
       })
@@ -303,7 +308,7 @@ export function apply(ctx: Context, config: Config) {
     },
     output: jsonOutput,
     async execute(args, exec) {
-      return bendoFetch(api, `/api/categories/${args.categoryId}`, {
+      return bendoFetch(api, `/api/categories/${pathId(args.categoryId)}`, {
         method: 'PATCH',
         signal: exec.signal,
         body: { name: args.name },
@@ -319,7 +324,7 @@ export function apply(ctx: Context, config: Config) {
     },
     output: jsonOutput,
     async execute(args, exec) {
-      return bendoFetch(api, `/api/categories/${args.categoryId}`, {
+      return bendoFetch(api, `/api/categories/${pathId(args.categoryId)}`, {
         method: 'DELETE',
         signal: exec.signal,
       })
@@ -370,7 +375,7 @@ export function apply(ctx: Context, config: Config) {
     },
     output: jsonOutput,
     async execute(args, exec) {
-      return bendoFetch(api, `/api/notifications/${args.notificationId}`, {
+      return bendoFetch(api, `/api/notifications/${pathId(args.notificationId)}`, {
         method: 'PATCH',
         signal: exec.signal,
       })

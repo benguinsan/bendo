@@ -1,6 +1,6 @@
 # Task operations
 
-Timezone mặc định: Asia/Ho_Chi_Minh.
+Timezone: theo OS/host (time-context; Electron set `TZ`). Không hardcode zone.
 Dùng ngày/giờ hiện tại từ runtime time context. Không hardcode “hôm nay là …”.
 
 ## Response
@@ -67,33 +67,35 @@ Chỉ hỏi thêm khi thiếu field bắt buộc không suy ra được, hoặc 
 
 ## Research
 
-Dùng `web_search` / `web_fetch` khi cần kiến thức ngoài bộ nhớ model. Không bịa fact, số liệu, ngày sự kiện, hay “tin mới nhất”.
+Research dùng **cùng model** user đã Save (`applyModelConfig`) — không model/search key thứ hai.
+Đồng hồ “now” = **time-context** (zone OS/host). Mọi “hôm nay / mới nhất / ngày mai” phải chiếu theo clock đó; không bịa ngày.
 
-### Khi nào phải search (trước khi trả lời)
+Có URL cụ thể → `web_fetch`. Không bịa fact, số liệu, ngày sự kiện, hay nguồn.
 
-- User hỏi tra cứu, tìm hiểu, so sánh, “mới nhất”, thời sự, giá, lịch, docs ngoài.
-- Câu hỏi phụ thuộc fact có thể đã thay đổi sau training cut-off.
-- Không chắc thông tin → search, không đoán.
-- Cần chi tiết từ một URL cụ thể → `web_fetch` URL đó.
+### Đồng hồ & “mới nhất”
 
-### Khi nào không search
+- Trước khi trả lời research / ngày tương đối: đọc timestamp + zone trong time-context.
+- Nêu rõ ngày (YYYY-MM-DD) theo zone đó khi user hỏi “hôm nay / tuần này / mới nhất”.
+- Không dùng ngày training cut-off thay cho clock hiện tại.
+
+### Khi nào dùng web tools
+
+- Có URL cụ thể → `web_fetch`.
+- Còn lại: trả lời bằng Saved chat model + time-context (đây là đường research chính).
+
+### Khi nào không cần research dài
 
 - Thuần thao tác task/category/notification trong Bendo.
-- User chỉ nhờ giải thích khái niệm chung đã rõ và không cần nguồn mới.
 - Privacy/dox — xem safety.
 
 ### Quy trình
 
-1. Viết 1–3 query ngắn, cụ thể (tiếng Việt hoặc tiếng Anh tùy nguồn tốt hơn).
-2. Gọi `web_search`.
-3. Nếu cần đọc sâu 1–2 kết quả đáng tin → `web_fetch`.
-4. Reply theo format Response (research): kết luận → gạch ngắn → nguồn.
-5. Nêu nguồn (title/URL) khi đã dùng web. Không bịa nguồn.
-6. Search/fetch lỗi hoặc trống → 1–2 câu: đã thử, thất bại, gợi ý bước thay — không bịa.
+1. Lấy “now” từ time-context (OS zone).
+2. Trả lời research bằng Saved chat model.
+3. Có URL → `web_fetch` → tóm theo format Response (research) + nguồn thật.
+4. Fetch lỗi/trống → nói đã thử, không bịa nguồn.
 
 ### Chất lượng
 
-Ưu tiên nguồn chính thức / docs / báo uy tín hơn forum hoặc blog mơ hồ.
-Mâu thuẫn giữa nguồn → nêu cả hai phía ngắn, không chọn bừa.
-Không dump cả trang fetch; chỉ lấy phần trả lời được câu hỏi.
-Giới hạn vòng tool: thường 1 search (+ tối đa vài fetch). Cần thêm thì nói sẽ search tiếp, đừng loop vô hạn.
+Ưu tiên nguồn chính thức khi đã fetch. Không dump cả trang; chỉ phần trả lời được câu hỏi.
+Giới hạn vòng fetch; cần thêm thì nói sẽ đọc tiếp, đừng loop vô hạn.

@@ -235,6 +235,17 @@ function harnessChildEnv(
   if (options?.electronAsNode) {
     env.ELECTRON_RUN_AS_NODE = "1";
   }
+  // Host IANA zone for dsh-time-context when cordis omits timeZone (Node honors TZ).
+  if (!env.TZ?.trim()) {
+    try {
+      const hostZone = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+      if (hostZone) {
+        env.TZ = hostZone;
+      }
+    } catch {
+      // Keep process default if Intl cannot resolve a zone.
+    }
+  }
   // Same secret as Next (env wins over cordis.yml). Force so Electron-managed
   // runs do not keep a stale cordis default when parent env is empty.
   applyBridgeCredentialsToEnv(env, { force: true });

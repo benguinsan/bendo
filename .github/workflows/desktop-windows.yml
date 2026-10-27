@@ -32,14 +32,17 @@ concurrency:
   group: desktop-windows-${{ github.ref }}
   cancel-in-progress: true
 
+# Build job is read-only. Write is only on publish-release (GitHub Release).
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   dist-win:
     name: dist:win → NSIS .exe
     runs-on: windows-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
 
     env:
       BENDO_CLOUD_API_URL: ${{ vars.BENDO_CLOUD_API_URL }}
@@ -56,6 +59,9 @@ jobs:
     steps:
       - name: Check bake / public env
         shell: bash
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           missing=0
@@ -68,7 +74,7 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
-          if [ "${{ inputs.publish_release }}" = "true" ] && [ -z "${{ inputs.release_tag }}" ]; then
+          if [ "$PUBLISH_RELEASE" = "true" ] && [ -z "$RELEASE_TAG" ]; then
             echo "::error::publish_release requires release_tag (e.g. v0.1.0-beta.1)."
             exit 1
           fi
@@ -76,6 +82,8 @@ jobs:
 
       - name: Checkout monorepo
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Checkout DeepSeek Harness
         uses: actions/checkout@v4
@@ -84,6 +92,7 @@ jobs:
           ref: ${{ inputs.harness_ref }}
           path: deepseek-harness
           token: ${{ secrets.HARNESS_TOKEN != '' && secrets.HARNESS_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Inject Doro packaging overlay
         shell: bash
@@ -170,8 +179,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  publish-release:
+    name: Publish GitHub Release
+    if: ${{ inputs.publish_release }}
+    needs: dist-win
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bendo-desktop-win-x64
+          path: release-assets
+
       - name: Publish GitHub Release
-        if: ${{ inputs.publish_release }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag }}
@@ -185,7 +207,7 @@ jobs:
 
             Clean-machine E2E still required after download (login → CRUD → Agent chat).
           files: |
-            desktop/release/Bendo-*-win-x64.exe
+            release-assets/Bendo-*-win-x64.exe
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
