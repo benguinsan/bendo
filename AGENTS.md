@@ -90,9 +90,11 @@ Env catalog: `bendo-app/.env.example`. Chat-bridge contract: [`bendo-app/AGENTS.
 ## Multi-agent (Orca: Claude plans/reviews, Cursor implements)
 
 - **Claude (coordinator/reviewer):** reads context, writes the prompt, gets it approved, dispatches, reviews the diff and re-runs checks. Does not implement tasks dispatched to Cursor.
-- **Cursor (implementer):** works only inside the approved prompt scope, in its own worktree. Ambiguity or needed deviation → ask, don't improvise.
+- **Cursor (implementer):** works only inside the approved prompt scope, one task at a time. Ambiguity or needed deviation → ask, don't improvise. Leaves changes uncommitted.
 - **Owner (human):** approves prompts and final results, and does all commit/push/merge. Agents never merge into `development` or `main`.
-- One agent = one worktree/branch. Never `reset`, `clean` or `checkout` over uncommitted changes you did not make.
+- Agents share the `development` worktree, so **one writer at a time**: Claude edits only before dispatch and after `worker_done`; while Cursor runs, Claude is read-only. Any other open session (idle Claude/Cursor) is read-only.
+- Dispatch only from a clean tree (`git status` empty, or baseline noted) so `git diff` = the implementer's work. Dispatch with `worker-start --worktree current --agent cursor`.
+- Never `reset`, `clean` or `checkout` over uncommitted changes you did not make.
 - Every prompt has a **Do not touch** section (approved files/behavior). Need to change it → ask, don't edit.
 - Report with evidence: exact commands run + real output, files changed, deviations from the prompt. No evidence = not PASS; unknown cause = write `unknown`, don't guess.
 - Regression → roll back the change; no workaround layers.

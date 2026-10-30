@@ -30,7 +30,7 @@ Clerk / Supabase / Next skills stay in `bendo-app/.agents/`.
 1. Read this file (+ root AGENTS / on-demand docs as needed).
 2. Inspect Electron code; read `electron` skill when relevant.
 3. Ask only if ambiguity blocks work.
-4. Write `prompts/<feature>.md`; ask approval before coding (unless user skips prompts).
+4. Write `prompts/<feature>.md` (goal, decisions, files, **do not touch**, requirements, security, acceptance, checks, manual tests); ask approval before coding (unless user skips prompts).
 5. Implement approved scope only; run checks; report exact test/run steps.
 6. On merge: put the prompt's goal, decisions and acceptance in the commit/PR body; update `docs/` only for non-obvious decisions. Move the finished prompt to `prompts/done/` (gitignored — never commit).
 
