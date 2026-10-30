@@ -136,6 +136,7 @@ From `bendo-app/`: Ultracite (oxlint + oxfmt) — **not** ESLint/Prettier.
 - Minimum after implement: `npm run typecheck`, `npm run lint`
 - `npm run format` when style fails (CI runs `format:check`); `npm run build` when routes/config/server modules change
 - Report real command output; do not claim pass without running
+- `typecheck` / `lint` / `test` must cover the files you changed — new files (incl. `*.test.ts`) must not be hidden by `tsconfig` `exclude`, lint ignores or test globs. If unsure, prove it (e.g. `npx tsc --noEmit --listFiles | grep <file>`).
 
 ---
 

@@ -89,6 +89,8 @@ Env catalog: `bendo-app/.env.example`. Chat-bridge contract: [`bendo-app/AGENTS.
 
 ## Multi-agent (Orca: Claude plans/reviews, Cursor implements)
 
+Detail, commands and rationale: [`docs/multi-agent-orca.md`](docs/multi-agent-orca.md).
+
 - **Claude (coordinator/reviewer):** reads context, writes the prompt, gets it approved, dispatches, reviews the diff and re-runs checks. Does not implement tasks dispatched to Cursor.
 - **Cursor (implementer):** works only inside the approved prompt scope, one task at a time. Ambiguity or needed deviation → ask, don't improvise. Leaves changes uncommitted.
 - **Owner (human):** approves prompts and final results, and does all commit/push/merge. Agents never merge into `development` or `main`.
@@ -97,6 +99,8 @@ Env catalog: `bendo-app/.env.example`. Chat-bridge contract: [`bendo-app/AGENTS.
 - Never `reset`, `clean` or `checkout` over uncommitted changes you did not make.
 - Every prompt has a **Do not touch** section (approved files/behavior). Need to change it → ask, don't edit.
 - Report with evidence: exact commands run + real output, files changed, deviations from the prompt. No evidence = not PASS; unknown cause = write `unknown`, don't guess.
+- Reviewer verifies a check's **scope**, not just its exit code: confirm every changed/new file is actually covered (e.g. `tsc --listFiles | grep <file>`, check `tsconfig` `include`/`exclude`, test globs). A green check that skips the changed files is not a pass.
+- Need a sub-agent (to protect context or parallelize reading)? **Tell the owner first and wait for approval.** Never spawn one silently.
 - Regression → roll back the change; no workaround layers.
 - Only one agent builds/packages/deploys at a time. Never hand implementers write-capable MCPs (Clerk, Vercel).
 

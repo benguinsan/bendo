@@ -20,6 +20,10 @@ import {
 import { initRuntimeLog } from "./runtime-log";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
+import {
+  isTrustedBendoSender,
+  isTrustedReloadSender,
+} from "./trusted-sender";
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;
@@ -122,6 +126,9 @@ function registerIpc(): void {
   ipcMain.handle("bendo:get-url", () => getBendoAppUrl());
 
   ipcMain.handle("bendo:reload", async (event) => {
+    if (!isTrustedReloadSender(event)) {
+      return { ok: false as const };
+    }
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) {
       return { ok: false as const };
@@ -130,15 +137,30 @@ function registerIpc(): void {
     return { ok };
   });
 
-  ipcMain.handle("bendo:model-config:save", async (_event, payload: unknown) =>
-    saveModelConfig(payload)
-  );
+  ipcMain.handle("bendo:model-config:save", async (event, payload: unknown) => {
+    if (!isTrustedBendoSender(event)) {
+      return {
+        ok: false as const,
+        error: "Untrusted sender.",
+        retryable: false,
+      };
+    }
+    return saveModelConfig(payload);
+  });
 
-  ipcMain.handle("bendo:model-config:load", () => loadModelConfig());
+  ipcMain.handle("bendo:model-config:load", (event) => {
+    if (!isTrustedBendoSender(event)) {
+      return { ok: false as const, error: "Untrusted sender." };
+    }
+    return loadModelConfig();
+  });
 
-  ipcMain.handle("bendo:open-external", async (_event, url: unknown) =>
-    openExternalUrl(url)
-  );
+  ipcMain.handle("bendo:open-external", async (event, url: unknown) => {
+    if (!isTrustedBendoSender(event)) {
+      return { ok: false as const, error: "Untrusted sender." };
+    }
+    return openExternalUrl(url);
+  });
 }
 
 async function runSmoke(win: BrowserWindow): Promise<void> {

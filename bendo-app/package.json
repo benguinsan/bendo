@@ -15,6 +15,7 @@
     "lint": "ultracite check",
     "format": "ultracite fix",
     "format:check": "oxfmt --check",
+    "test": "tsx --test \"lib/**/*.test.ts\"",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "docker:build": "docker build -t bendo .",
@@ -47,6 +48,7 @@
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "ultracite": "^7.10.6"
   },

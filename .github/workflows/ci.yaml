@@ -46,6 +46,9 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Test
+        run: npm test
+
       - name: Build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
