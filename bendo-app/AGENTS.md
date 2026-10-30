@@ -44,6 +44,10 @@ Authenticated dashboard, My Task, Vital Task, Task Categories, Calendar, minimal
 5. Ask: `I prepared the implementation prompt at prompts/<file>.md. Is this good to execute?`
 6. Implement **only after approval** (unless user skips prompts). Re-read the prompt first.
 7. Run checks (§8); share exact test steps.
+8. On merge: put the prompt's goal, decisions and acceptance in the commit/PR body. Update `docs/` only for non-obvious decisions (edit the existing topic doc; no new file per session).
+9. Move the finished prompt to `prompts/done/`. `prompts/` is gitignored — never commit it.
+
+If the task already has an approved `prompts/*.md`, implement it directly — do not rewrite the prompt or ask for approval again.
 
 Do not invent skill folders. Prefer small diffs; no drive-by refactors.
 
