@@ -9,8 +9,9 @@ You are a **principal-level full-stack engineer** on **bendo** — personal todo
 | Monorepo / desktop / Electron packaging | [`../AGENTS.md`](../AGENTS.md), [`../desktop/AGENTS.md`](../desktop/AGENTS.md) |
 | Task / category / status / calendar / activity detail | [`../docs/bendo-app-task-domain.md`](../docs/bendo-app-task-domain.md) |
 | Agent chat + model config (apply/persist/probe) | [`../docs/bendo-app-agent-chat.md`](../docs/bendo-app-agent-chat.md), [`../docs/agent-model-config-save-workflow.md`](../docs/agent-model-config-save-workflow.md) |
+| Model connection probe hardening / dynamic route | [`../docs/agent-model-connection-hardening.md`](../docs/agent-model-connection-hardening.md), [`../docs/agent-model-dynamic-route-ab.md`](../docs/agent-model-dynamic-route-ab.md) |
 | Discord identity mapping | [`../docs/bendo-app-discord-identity.md`](../docs/bendo-app-discord-identity.md) |
-| Desktop → Vercel cloud cutover | [`../docs/desktop-cloud-cutover.md`](../docs/desktop-cloud-cutover.md) |
+| Desktop → Vercel cloud cutover | [`../docs/desktop-cloud-cutover.md`](../docs/desktop-cloud-cutover.md), [`../docs/desktop-categories-cloud-proxy-session.md`](../docs/desktop-categories-cloud-proxy-session.md) (proxy/JWT debug lessons) |
 | Env var catalog | `.env.example` (keep in sync when vars change) |
 
 <!-- BEGIN:nextjs-agent-rules -->
@@ -119,7 +120,7 @@ Never expose to browser: service role, `CLERK_SECRET_KEY`, `DSH_CHAT_BRIDGE_SECR
 
 - POST create, GET read, PATCH partial, DELETE delete — `/api/tasks`, `/api/categories` (+ ids).
 - `GET /api/me`, `GET|POST|DELETE /api/discord-identity` — see Discord doc; envelopes `{ data: … }`.
-- Also: `/api/notifications` (schema; header not wired), `/api/agent/*`, `/api/health`.
+- Also: `/api/notifications` (schema; header not wired), `/api/agent/{chat,status,model-config,model-connection}`, `/api/health`.
 - Prefer thin routes; list is convention, not exhaustive.
 
 ---
@@ -129,7 +130,7 @@ Never expose to browser: service role, `CLERK_SECRET_KEY`, `DSH_CHAT_BRIDGE_SECR
 From `bendo-app/`: Ultracite (oxlint + oxfmt) — **not** ESLint/Prettier.
 
 - Minimum after implement: `npm run typecheck`, `npm run lint`
-- `npm run format` when style fails; `npm run build` when routes/config/server modules change
+- `npm run format` when style fails (CI runs `format:check`); `npm run build` when routes/config/server modules change
 - Report real command output; do not claim pass without running
 
 ---
