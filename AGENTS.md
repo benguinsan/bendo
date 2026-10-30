@@ -87,6 +87,19 @@ Env catalog: `bendo-app/.env.example`. Chat-bridge contract: [`bendo-app/AGENTS.
 
 ---
 
+## Multi-agent (Orca: Claude plans/reviews, Cursor implements)
+
+- **Claude (coordinator/reviewer):** reads context, writes the prompt, gets it approved, dispatches, reviews the diff and re-runs checks. Does not implement tasks dispatched to Cursor.
+- **Cursor (implementer):** works only inside the approved prompt scope, in its own worktree. Ambiguity or needed deviation → ask, don't improvise.
+- **Owner (human):** approves prompts and final results, and does all commit/push/merge. Agents never merge into `development` or `main`.
+- One agent = one worktree/branch. Never `reset`, `clean` or `checkout` over uncommitted changes you did not make.
+- Every prompt has a **Do not touch** section (approved files/behavior). Need to change it → ask, don't edit.
+- Report with evidence: exact commands run + real output, files changed, deviations from the prompt. No evidence = not PASS; unknown cause = write `unknown`, don't guess.
+- Regression → roll back the change; no workaround layers.
+- Only one agent builds/packages/deploys at a time. Never hand implementers write-capable MCPs (Clerk, Vercel).
+
+---
+
 ## Docs
 
 - Short README per package; root `README.md` is the human index.

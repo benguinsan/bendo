@@ -40,7 +40,7 @@ Authenticated dashboard, My Task, Vital Task, Task Categories, Calendar, minimal
 1. Read this file (+ on-demand docs for the feature).
 2. Read skills the user names; pull others from §3 only when needed.
 3. Inspect code; ask only if ambiguity blocks work.
-4. Write `prompts/<feature>.md` (goal, skills, decisions, files, requirements, security, acceptance, checks, manual tests). UI prompts include visual detail.
+4. Write `prompts/<feature>.md` (goal, skills, decisions, files, **do not touch**, requirements, security, acceptance, checks, manual tests). UI prompts include visual detail.
 5. Ask: `I prepared the implementation prompt at prompts/<file>.md. Is this good to execute?`
 6. Implement **only after approval** (unless user skips prompts). Re-read the prompt first.
 7. Run checks (§8); share exact test steps.
