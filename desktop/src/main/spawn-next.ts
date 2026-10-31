@@ -14,10 +14,21 @@ import {
 import { getBendoAppUrl, getBendoHealthUrl, isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
+import {
+  NEXT_PORT_CANDIDATES,
+  nextPortsBusyReason,
+  pickFreePort,
+} from "./pick-port";
 import { getSessionSecret } from "./session-secret";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
+
+/**
+ * Captured at module load (before packaged dynamic writes BENDO_APP_URL).
+ * User-set URL keeps fixed single-port behaviour.
+ */
+const userSetBendoAppUrlAtBoot = Boolean(process.env.BENDO_APP_URL?.trim());
 
 let ownedChild: ChildProcess | null = null;
 /** Once true, spawn helpers refuse new spawns (quit / stopRuntimes). */
@@ -332,27 +343,36 @@ export function stopSpawnedNext(): void {
   killProcessTree(child);
 }
 
+function usesPackagedDynamicPorts(): boolean {
+  return app.isPackaged && !userSetBendoAppUrlAtBoot;
+}
+
 /**
- * If Bendo is already up, attach. Otherwise spawn Next and wait for health.
- * Packaged → standalone server.js; dev → `npm run dev`.
- * Smoke mode never spawns.
+ * One spawn/attach attempt for the current `BENDO_APP_URL`.
+ * Packaged dynamic mode treats a foreign healthy listener as "busy → skip"
+ * (caller tries the next candidate). Fixed packaged URL still errors.
  */
-export async function ensureBendoServer(
+async function ensureBendoServerOnce(
   url: string
 ): Promise<EnsureBendoResult> {
   const healthUrl = getBendoHealthUrl();
 
-  if (isSmokeMode()) {
+  if (ownedChild) {
     const check = await isHealthy(healthUrl);
-    if (!check.ok) {
-      return { ok: false, reason: check.reason };
+    if (check.ok) {
+      return { ok: true, spawned: true };
     }
-    return { ok: true, spawned: false };
   }
 
   const existing = await isHealthy(healthUrl);
   if (existing.ok) {
     if (app.isPackaged) {
+      if (usesPackagedDynamicPorts()) {
+        return {
+          ok: false,
+          reason: `Port ${portFromAppUrl()} busy`,
+        };
+      }
       const port = portFromAppUrl();
       return {
         ok: false,
@@ -421,4 +441,62 @@ export async function ensureBendoServer(
 
   stopSpawnedNext();
   return result;
+}
+
+/**
+ * If Bendo is already up, attach. Otherwise spawn Next and wait for health.
+ * Packaged → standalone server.js; dev → `npm run dev`.
+ * Packaged without user `BENDO_APP_URL`: try 3000..3009 via bind probe;
+ * busy / early exit / health fail → next candidate (no "already in use").
+ * Smoke mode never spawns.
+ */
+export async function ensureBendoServer(
+  url: string
+): Promise<EnsureBendoResult> {
+  const healthUrl = getBendoHealthUrl();
+
+  if (isSmokeMode()) {
+    const check = await isHealthy(healthUrl);
+    if (!check.ok) {
+      return { ok: false, reason: check.reason };
+    }
+    return { ok: true, spawned: false };
+  }
+
+  // Already spawned this session (e.g. packaged boot before frame-trust) —
+  // do not re-enter the candidate loop (our listen would look "busy").
+  if (ownedChild) {
+    const check = await isHealthy(healthUrl);
+    if (check.ok) {
+      return { ok: true, spawned: true };
+    }
+  }
+
+  if (!usesPackagedDynamicPorts()) {
+    return ensureBendoServerOnce(url);
+  }
+
+  let remaining = [...NEXT_PORT_CANDIDATES];
+  while (remaining.length > 0) {
+    const port = await pickFreePort(remaining);
+    if (port == null) {
+      return { ok: false, reason: nextPortsBusyReason() };
+    }
+
+    process.env.BENDO_APP_URL = `http://127.0.0.1:${port}`;
+    const attemptUrl = getBendoAppUrl();
+    console.log(`[next] Packaged candidate port ${port}`);
+
+    const result = await ensureBendoServerOnce(attemptUrl);
+    if (result.ok) {
+      return result;
+    }
+
+    console.warn(
+      `[next] Candidate ${port} failed (${result.reason}); trying next`
+    );
+    remaining = remaining.filter((p) => p > port);
+  }
+
+  return { ok: false, reason: nextPortsBusyReason() };
 }

@@ -22,10 +22,16 @@ import {
 import { initRuntimeLog } from "./runtime-log";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
+import {
+  resolvePackagedHarnessPort,
+} from "./spawn-harness";
+import { ensureBendoServer } from "./spawn-next";
 import { isTrustedReloadSender } from "./trusted-sender";
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;
+/** User-set before we rewrite env for packaged dynamic ports. */
+const userSetBendoAppUrlAtBoot = Boolean(process.env.BENDO_APP_URL?.trim());
 
 // Single instance so bendo:// from the browser reaches this process (esp. Windows).
 const gotTheLock = app.requestSingleInstanceLock();
@@ -202,8 +208,22 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 }
 
 if (gotTheLock) {
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     initRuntimeLog();
+
+    // Packaged dynamic ports: pick harness + bring Next up *before* frame-trust
+    // freezes the canonical origin filter on BENDO_APP_URL.
+    let packagedBootFailure: string | undefined;
+    if (app.isPackaged && !isSmokeMode()) {
+      await resolvePackagedHarnessPort();
+      if (!userSetBendoAppUrlAtBoot) {
+        const bendo = await ensureBendoServer(getBendoAppUrl());
+        if (!bendo.ok) {
+          packagedBootFailure = bendo.reason;
+        }
+      }
+    }
+
     installFrameTrustHooks();
     registerBendoProtocolClient();
     registerIpc();
@@ -211,6 +231,13 @@ if (gotTheLock) {
 
     if (isSmokeMode()) {
       void runSmoke(win);
+      return;
+    }
+
+    if (packagedBootFailure) {
+      console.error(`[next] Packaged boot failed: ${packagedBootFailure}`);
+      await showOffline(win, packagedBootFailure);
+      markProtocolInitialLoadComplete();
       return;
     }
 
