@@ -80,7 +80,11 @@ function buildTaskUpdateFields(patch: UpdateTaskApiInput, now: Date) {
       ? {}
       : {
           scheduled_date: nextDate,
-          scheduled_at: scheduledAtFromDateInput(nextDate, now),
+          scheduled_at: scheduledAtFromDateInput(
+            nextDate,
+            now,
+            patch.tzOffsetMinutes ?? 0
+          ),
         }),
   };
 }
@@ -218,7 +222,11 @@ export async function createTask(
     }
   }
 
-  const scheduledAt = scheduledAtFromDateInput(body.date, now);
+  const scheduledAt = scheduledAtFromDateInput(
+    body.date,
+    now,
+    body.tzOffsetMinutes ?? 0
+  );
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.rpc("create_task_with_activity", {
     p_clerk_user_id: userId,
