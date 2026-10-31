@@ -25,7 +25,7 @@ import { stopRuntimes } from "./runtime-shutdown";
 import {
   resolvePackagedHarnessPort,
 } from "./spawn-harness";
-import { ensureBendoServer } from "./spawn-next";
+import { ensureBendoServer, lockBendoAppPort } from "./spawn-next";
 import { isTrustedReloadSender } from "./trusted-sender";
 
 const isMac = process.platform === "darwin";
@@ -224,6 +224,8 @@ if (gotTheLock) {
       }
     }
 
+    // frame-trust freezes the origin filter here; retries must reuse this port.
+    lockBendoAppPort();
     installFrameTrustHooks();
     registerBendoProtocolClient();
     registerIpc();
@@ -233,6 +235,18 @@ if (gotTheLock) {
       void runSmoke(win);
       return;
     }
+
+    // Registered before the boot-failure return so a Dock click after closing the
+    // offline window can open a new window and retry startup.
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        const next = createWindow();
+        void loadBendo(next).then(async () => {
+          // Gate already open after first boot; flush only if something was queued.
+          await flushPendingProtocolUrl();
+        });
+      }
+    });
 
     if (packagedBootFailure) {
       console.error(`[next] Packaged boot failed: ${packagedBootFailure}`);
@@ -252,16 +266,6 @@ if (gotTheLock) {
     if (launchProtocol) {
       void handleBendoProtocolUrl(launchProtocol);
     }
-
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        const next = createWindow();
-        void loadBendo(next).then(async () => {
-          // Gate already open after first boot; flush only if something was queued.
-          await flushPendingProtocolUrl();
-        });
-      }
-    });
   });
 
   app.on("before-quit", () => {

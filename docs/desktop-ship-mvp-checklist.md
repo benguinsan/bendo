@@ -51,7 +51,7 @@ cd desktop && npm run ops:pack-ready
 
 - [x] `desktop/.env`: `BENDO_CLOUD_API_URL=https://bendo-psi.vercel.app` (public; bake lúc `build:bendo`).
 - [x] Vercel deploy sống — `GET /api/health` → 200; `GET /api/me` reachable (401 khi chưa login = OK).
-- [ ] **Clerk Dashboard (owner):** allow `http://127.0.0.1:3000` + `http://127.0.0.1:3000/auth/desktop-handoff` (+ `localhost` variants nếu dùng). Không đăng ký `bendo://`. Chi tiết: [`desktop-oauth-bendo-protocol.md`](./desktop-oauth-bendo-protocol.md) §2.
+- [ ] **Clerk Dashboard (owner):** allow origin + `/auth/desktop-handoff` cho cả dải cổng Next **3000–3009** (bản đóng gói tự nhảy cổng khi 3000 bận; + `localhost` variants nếu dùng). Không đăng ký `bendo://`. Chi tiết: [`desktop-oauth-bendo-protocol.md`](./desktop-oauth-bendo-protocol.md) §2.
 - [ ] Smoke CRUD có session trên cloud (sign-in browser / packaged) — sau khi Clerk allowlist xong.
 
 ### A.5 Version
