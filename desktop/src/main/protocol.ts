@@ -3,6 +3,10 @@ import path from "node:path";
 import { app, BrowserWindow } from "electron";
 
 import { getBendoAppUrl } from "./bendo-url";
+import {
+  canonicalizeLoopbackUrl,
+  isLoopbackHostname,
+} from "./canonical-origin";
 
 /** Custom URL scheme — OS opens Electron instead of leaving the user on a browser tab. */
 export const BENDO_PROTOCOL = "bendo";
@@ -43,17 +47,14 @@ function isAllowedCallbackTarget(target: URL): boolean {
   }
 
   const appUrl = new URL(getBendoAppUrl());
-  const loopback = (host: string) =>
-    host === "127.0.0.1" || host === "localhost" || host === "::1";
-
   if (target.origin === appUrl.origin) {
     return true;
   }
 
-  // localhost ↔ 127.0.0.1 on the same port as the running Bendo URL.
+  // localhost ↔ 127.0.0.1 / [::1] on the same port (fixes bracketed IPv6 hostnames).
   return (
-    loopback(target.hostname) &&
-    loopback(appUrl.hostname) &&
+    isLoopbackHostname(target.hostname) &&
+    isLoopbackHostname(appUrl.hostname) &&
     target.port === appUrl.port
   );
 }
@@ -136,11 +137,13 @@ export async function handleBendoProtocolUrl(raw: string): Promise<void> {
     return;
   }
 
+  const canonical = canonicalizeLoopbackUrl(target) ?? target;
+
   try {
-    await win.loadURL(target);
+    await win.loadURL(canonical);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[protocol] Failed to load ${target}:`, message);
+    console.error(`[protocol] Failed to load ${canonical}:`, message);
   }
   focusWindow(win);
 }

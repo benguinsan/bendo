@@ -1,5 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
+import {
+  computeDesktopSessionProof,
+  isValidDesktopNonce,
+} from "./lib/desktop/session-proof";
 
 /**
  * Without CLERK_SECRET_KEY (packaged desktop → Vercel for auth), Clerk
@@ -28,11 +33,31 @@ const clerkProtected = clerkMiddleware(async (auth, req) => {
   await auth.protect();
 });
 
-export default hasClerkSecret
+const baseMiddleware = hasClerkSecret
   ? clerkProtected
   : function passthroughMiddleware() {
       return NextResponse.next();
     };
+
+export default async function middleware(request: NextRequest, event: unknown) {
+  const result = await (
+    baseMiddleware as (
+      req: NextRequest,
+      evt: unknown
+    ) => Response | undefined | Promise<Response | undefined>
+  )(request, event);
+
+  const secret = process.env.BENDO_DESKTOP_SESSION_SECRET?.trim();
+  const nonce = request.headers.get("x-bendo-desktop-nonce");
+  if (!secret || !isValidDesktopNonce(nonce)) {
+    return result;
+  }
+
+  const proof = await computeDesktopSessionProof(secret, nonce);
+  const response = result ?? NextResponse.next();
+  response.headers.set("x-bendo-desktop-proof", proof);
+  return response;
+}
 
 export const config = {
   matcher: [

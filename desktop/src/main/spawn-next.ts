@@ -14,6 +14,7 @@ import {
 import { getBendoAppUrl, getBendoHealthUrl, isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
+import { getSessionSecret } from "./session-secret";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
@@ -189,6 +190,8 @@ function packagedNextEnv(appDir: string): NodeJS.ProcessEnv {
 
   applyBridgeCredentialsToEnv(env, { force: true });
   applyCloudApiUrlToEnv(env, appDir);
+  // Always override — packaged child must not inherit a stale parent value.
+  env.BENDO_DESKTOP_SESSION_SECRET = getSessionSecret(true);
   return env;
 }
 
@@ -197,6 +200,7 @@ function nextDevEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   applyBridgeCredentialsToEnv(env);
   applyCloudApiUrlToEnv(env);
+  env.BENDO_DESKTOP_SESSION_SECRET = getSessionSecret(false);
   return env;
 }
 
@@ -348,9 +352,21 @@ export async function ensureBendoServer(
 
   const existing = await isHealthy(healthUrl);
   if (existing.ok) {
+    if (app.isPackaged) {
+      const port = portFromAppUrl();
+      return {
+        ok: false,
+        reason: `Port ${port} is already in use by another process`,
+      };
+    }
     console.log(
       `[next] Attaching to existing Bendo at ${url} (health ${healthUrl})`
     );
+    if (!process.env.BENDO_DESKTOP_SESSION_SECRET?.trim()) {
+      console.warn(
+        "[next] Attached without a shared BENDO_DESKTOP_SESSION_SECRET; privileged desktop IPC will stay denied until the page can prove the session"
+      );
+    }
     return { ok: true, spawned: false };
   }
 

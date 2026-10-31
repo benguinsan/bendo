@@ -40,14 +40,14 @@ Authenticated dashboard, My Task, Vital Task, Task Categories, Calendar, minimal
 1. Read this file (+ on-demand docs for the feature).
 2. Read skills the user names; pull others from §3 only when needed.
 3. Inspect code; ask only if ambiguity blocks work.
-4. Write `prompts/<feature>.md` (goal, skills, decisions, files, **do not touch**, requirements, security, acceptance, checks, manual tests). UI prompts include visual detail.
-5. Ask: `I prepared the implementation prompt at prompts/<file>.md. Is this good to execute?`
+4. Write `bendo-app/prompts/<feature>.md` (goal, skills, decisions, files, **do not touch**, requirements, security, acceptance, checks, manual tests). UI prompts include visual detail.
+5. Ask: `I prepared the implementation prompt at bendo-app/prompts/<file>.md. Is this good to execute?`
 6. Implement **only after approval** (unless user skips prompts). Re-read the prompt first.
 7. Run checks (§8); share exact test steps.
 8. On merge: put the prompt's goal, decisions and acceptance in the commit/PR body. Update `docs/` only for non-obvious decisions (edit the existing topic doc; no new file per session).
-9. Move the finished prompt to `prompts/done/`. `prompts/` is gitignored — never commit it.
+9. Move the finished prompt to `bendo-app/prompts/done/`. `bendo-app/prompts/` is gitignored — never commit it.
 
-If the task already has an approved `prompts/*.md`, implement it directly — do not rewrite the prompt or ask for approval again.
+If the task already has an approved `bendo-app/prompts/*.md`, implement it directly — do not rewrite the prompt or ask for approval again.
 
 Do not invent skill folders. Prefer small diffs; no drive-by refactors.
 
@@ -86,7 +86,7 @@ Do not invent skill folders. Prefer small diffs; no drive-by refactors.
 - Supabase = source of truth. Core tables: `tasks`, `categories`, `task_activities`, `discord_identities`. Schema: `supabase/schema.sql` (+ Dashboard SQL Editor). **No** `supabase db push` / `migrations/`. Keep `lib/supabase/database.types.ts` aligned.
 - Every user-owned row scoped to Clerk user id.
 - RLS on all public tables; revoke `anon`/`authenticated` table access; **service_role only**. No `auth.uid()` policies (Clerk is auth).
-- Mutations that need activity → `*_with_activity` RPC (one transaction). See `prompts/shared-transactions.md`.
+- Mutations that need activity → `*_with_activity` RPC (one transaction). See `bendo-app/prompts/done/shared-transactions.md`.
 - Stats = derive from `tasks`; no stats tables.
 - Do not filter joined tables with `.eq('foreignTable.column', …)` in supabase-js — filter in JS after fetch.
 
@@ -136,6 +136,7 @@ From `bendo-app/`: Ultracite (oxlint + oxfmt) — **not** ESLint/Prettier.
 - Minimum after implement: `npm run typecheck`, `npm run lint`
 - `npm run format` when style fails (CI runs `format:check`); `npm run build` when routes/config/server modules change
 - Report real command output; do not claim pass without running
+- `typecheck` / `lint` / `test` must cover the files you changed — new files (incl. `*.test.ts`) must not be hidden by `tsconfig` `exclude`, lint ignores or test globs. If unsure, prove it (e.g. `npx tsc --noEmit --listFiles | grep <file>`).
 
 ---
 

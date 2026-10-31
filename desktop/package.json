@@ -10,13 +10,15 @@
   },
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "build:bendo": "node scripts/prepare-bendo-resource.mjs",
     "build:harness": "node scripts/prepare-harness-resource.mjs",
     "app": "npm run build && node scripts/run-app.mjs",
     "dev": "npm run app",
     "start": "npm run app",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test:trust": "npm run build && electron scripts/frame-trust-e2e/main.js",
     "test:smoke": "npm run build && node scripts/smoke.mjs",
     "smoke": "npm run test:smoke",
     "ops:pack-ready": "node scripts/check-pack-ops.mjs",
@@ -31,6 +33,7 @@
     "electron": "^39.2.7",
     "electron-builder": "^26.15.3",
     "node-gyp": "^12.4.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
 }

@@ -1,6 +1,7 @@
 import type { BrowserWindow } from "electron";
 
 import { getBendoAppUrl } from "./bendo-url";
+import { canonicalizeLoopbackUrl } from "./canonical-origin";
 import { openExternalUrl } from "./open-external";
 
 /**
@@ -8,7 +9,7 @@ import { openExternalUrl } from "./open-external";
  * Discord Connect + Clerk Google/OAuth complete in the OS browser instead.
  * Local Bendo (127.0.0.1 / localhost) and the offline file page stay in-window.
  */
-function isIdentityOAuthHost(hostname: string): boolean {
+export function isIdentityOAuthHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
 
   if (
@@ -52,7 +53,7 @@ function isClerkOAuthPath(url: URL): boolean {
   );
 }
 
-function isBendoAppUrl(url: string): boolean {
+export function isBendoAppUrl(url: string): boolean {
   try {
     const target = new URL(url);
     const app = new URL(getBendoAppUrl());
@@ -131,20 +132,45 @@ export function attachOAuthExternalNavigation(win: BrowserWindow): void {
     return { action: "deny" };
   });
 
-  contents.on("will-navigate", (event, url) => {
-    if (!shouldOpenOAuthExternally(url)) {
+  const guardInWindowNavigation = (
+    event: { preventDefault: () => void },
+    url: string
+  ) => {
+    if (shouldOpenOAuthExternally(url)) {
+      event.preventDefault();
+      void openExternalUrl(url);
       return;
     }
-    event.preventDefault();
-    void openExternalUrl(url);
+    // Keep the shell on the canonical loopback origin (localhost/[::1] → 127.0.0.1).
+    const canonical = canonicalizeLoopbackUrl(url);
+    if (canonical && canonical !== url) {
+      event.preventDefault();
+      void contents.loadURL(canonical);
+      return;
+    }
+    // Block random https sites from taking over the shell; identity hosts stay
+    // in-window so non-OAuth Clerk/account pages can complete without bouncing out.
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return;
+      }
+      if (isBendoAppUrl(url) || isIdentityOAuthHost(parsed.hostname)) {
+        return;
+      }
+      event.preventDefault();
+      void openExternalUrl(url);
+    } catch {
+      // Invalid URL — leave Electron's default handling alone.
+    }
+  };
+
+  contents.on("will-navigate", (event, url) => {
+    guardInWindowNavigation(event, url);
   });
 
   // Some Clerk/Google hops use will-redirect instead of will-navigate.
   contents.on("will-redirect", (event, url) => {
-    if (!shouldOpenOAuthExternally(url)) {
-      return;
-    }
-    event.preventDefault();
-    void openExternalUrl(url);
+    guardInWindowNavigation(event, url);
   });
 }
