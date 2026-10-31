@@ -14,8 +14,10 @@ Tóm tắt phần vừa triển khai: packaged / Electron-spawned Next **không*
    `http://127.0.0.1:<port>/auth/desktop-handoff?next=…`  
    (không dùng path tương đối — tránh Clerk đưa về Vercel).
 3. Trang handoff ngay lập tức mở `bendo://auth/callback?target=<encoded local URL>` → OS focus Electron → `loadURL` target (kèm query/hash Clerk).
-4. **Clerk Dashboard:** allow `http://127.0.0.1:3000` và  
-   `http://127.0.0.1:3000/auth/desktop-handoff` (thêm `localhost` nếu dùng).  
+4. **Clerk Dashboard:** bản đóng gói chọn cổng Next đầu tiên còn trống trong **3000–3009**,
+   nên allow cả mười origin `http://127.0.0.1:<port>` và mười URL
+   `http://127.0.0.1:<port>/auth/desktop-handoff` (thêm `localhost` nếu dùng).
+   Danh sách đầy đủ: [`desktop-oauth-bendo-protocol.md`](./desktop-oauth-bendo-protocol.md) §2.  
    Custom scheme `bendo://` thường không cần (và thường không được) khai báo trong Clerk — chỉ http handoff.
 
 ---

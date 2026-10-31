@@ -44,11 +44,35 @@ Clerk thường **không** chấp nhận `bendo://` làm Allowed redirect URL. R
 
 ## 2. Clerk Dashboard (bắt buộc cấu hình tay)
 
-Allow origins / redirect URLs (đúng port Bendo local), ví dụ:
+Packaged desktop picks the first free Next port in **3000–3009** (and harness **3080–3089**). Allow every origin / handoff URL in that Next range so OAuth still works when 3000 is busy:
+
+**Origins (10):**
 
 - `http://127.0.0.1:3000`
+- `http://127.0.0.1:3001`
+- `http://127.0.0.1:3002`
+- `http://127.0.0.1:3003`
+- `http://127.0.0.1:3004`
+- `http://127.0.0.1:3005`
+- `http://127.0.0.1:3006`
+- `http://127.0.0.1:3007`
+- `http://127.0.0.1:3008`
+- `http://127.0.0.1:3009`
+
+**Desktop handoff redirect URLs (10):**
+
 - `http://127.0.0.1:3000/auth/desktop-handoff`
-- (nếu dùng) `http://localhost:3000` và `…/auth/desktop-handoff`
+- `http://127.0.0.1:3001/auth/desktop-handoff`
+- `http://127.0.0.1:3002/auth/desktop-handoff`
+- `http://127.0.0.1:3003/auth/desktop-handoff`
+- `http://127.0.0.1:3004/auth/desktop-handoff`
+- `http://127.0.0.1:3005/auth/desktop-handoff`
+- `http://127.0.0.1:3006/auth/desktop-handoff`
+- `http://127.0.0.1:3007/auth/desktop-handoff`
+- `http://127.0.0.1:3008/auth/desktop-handoff`
+- `http://127.0.0.1:3009/auth/desktop-handoff`
+
+Optional if you also use the hostname form: the same ten ports on `http://localhost:…` and `http://localhost:…/auth/desktop-handoff`.
 
 Không bắt buộc (và thường không được) đăng ký `bendo://` trong Clerk.
 

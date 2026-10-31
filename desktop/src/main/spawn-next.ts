@@ -14,10 +14,21 @@ import {
 import { getBendoAppUrl, getBendoHealthUrl, isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
+import {
+  NEXT_PORT_CANDIDATES,
+  nextPortsBusyReason,
+  pickFreePort,
+} from "./pick-port";
 import { getSessionSecret } from "./session-secret";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 60_000;
 const WAIT_INTERVAL_MS = 500;
+
+/**
+ * Captured at module load (before packaged dynamic writes BENDO_APP_URL).
+ * User-set URL keeps fixed single-port behaviour.
+ */
+const userSetBendoAppUrlAtBoot = Boolean(process.env.BENDO_APP_URL?.trim());
 
 let ownedChild: ChildProcess | null = null;
 /** Once true, spawn helpers refuse new spawns (quit / stopRuntimes). */
@@ -26,6 +37,11 @@ let shuttingDown = false;
 export type EnsureBendoResult =
   | { ok: true; spawned: boolean }
   | { ok: false; reason: string };
+
+/** Internal: `portFailure` = a different candidate port could still succeed. */
+type EnsureAttempt =
+  | EnsureBendoResult
+  | { ok: false; reason: string; portFailure: true };
 
 function spawnTimeoutMs(): number {
   const raw = process.env.BENDO_SPAWN_TIMEOUT_MS?.trim();
@@ -109,8 +125,14 @@ export function resolveBendoAppDir():
   return { ok: true, dir: candidate };
 }
 
+/** True once the current child printed EADDRINUSE (reset per spawn). */
+let childReportedAddrInUse = false;
+
 function pipeChildOutput(child: ChildProcess): void {
   const forward = (text: string, stream: "stdout" | "stderr") => {
+    if (text.includes("EADDRINUSE")) {
+      childReportedAddrInUse = true;
+    }
     for (const line of text.split(/\r?\n/)) {
       if (!line) {
         continue;
@@ -156,6 +178,7 @@ function trackChild(
   errorCommand: string
 ): void {
   ownedChild = child;
+  childReportedAddrInUse = false;
   pipeChildOutput(child);
 
   child.on("error", (error: NodeJS.ErrnoException) => {
@@ -332,27 +355,45 @@ export function stopSpawnedNext(): void {
   killProcessTree(child);
 }
 
+function usesPackagedDynamicPorts(): boolean {
+  return app.isPackaged && !userSetBendoAppUrlAtBoot;
+}
+
+/** Set once frame-trust has frozen the origin; later retries may not change port. */
+let lockedPort: number | null = null;
+
+/** Call right before `installFrameTrustHooks()`. */
+export function lockBendoAppPort(): void {
+  lockedPort = Number(portFromAppUrl());
+}
+
 /**
- * If Bendo is already up, attach. Otherwise spawn Next and wait for health.
- * Packaged → standalone server.js; dev → `npm run dev`.
- * Smoke mode never spawns.
+ * One spawn/attach attempt for the current `BENDO_APP_URL`.
+ * Packaged dynamic mode treats a foreign healthy listener as "busy → skip"
+ * (caller tries the next candidate). Fixed packaged URL still errors.
  */
-export async function ensureBendoServer(
+async function ensureBendoServerOnce(
   url: string
-): Promise<EnsureBendoResult> {
+): Promise<EnsureAttempt> {
   const healthUrl = getBendoHealthUrl();
 
-  if (isSmokeMode()) {
+  if (ownedChild) {
     const check = await isHealthy(healthUrl);
-    if (!check.ok) {
-      return { ok: false, reason: check.reason };
+    if (check.ok) {
+      return { ok: true, spawned: true };
     }
-    return { ok: true, spawned: false };
   }
 
   const existing = await isHealthy(healthUrl);
   if (existing.ok) {
     if (app.isPackaged) {
+      if (usesPackagedDynamicPorts()) {
+        return {
+          ok: false,
+          reason: `Port ${portFromAppUrl()} busy`,
+          portFailure: true,
+        };
+      }
       const port = portFromAppUrl();
       return {
         ok: false,
@@ -386,19 +427,22 @@ export async function ensureBendoServer(
     `[next] Waiting for health ${healthUrl} (timeout ${timeoutMs}ms)…`
   );
 
-  const exitedEarly = new Promise<EnsureBendoResult>((resolve) => {
+  const exitedEarly = new Promise<EnsureAttempt>((resolve) => {
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
       const detail =
         signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
       resolve({
         ok: false,
         reason: `Next process exited before ready (${detail})`,
+        // Only a port clash is fixed by another port; other exits are not.
+        ...(childReportedAddrInUse ? { portFailure: true as const } : {}),
       });
     };
-    child.once("exit", onExit);
+    // "close" fires after stdout/stderr end, so EADDRINUSE output is not missed.
+    child.once("close", onExit);
   });
 
-  const spawnFailed = new Promise<EnsureBendoResult>((resolve) => {
+  const spawnFailed = new Promise<EnsureAttempt>((resolve) => {
     child.once("error", (error: NodeJS.ErrnoException) => {
       resolve({
         ok: false,
@@ -421,4 +465,80 @@ export async function ensureBendoServer(
 
   stopSpawnedNext();
   return result;
+}
+
+/**
+ * If Bendo is already up, attach. Otherwise spawn Next and wait for health.
+ * Packaged → standalone server.js; dev → `npm run dev`.
+ * Packaged without user `BENDO_APP_URL`: try 3000..3009 via bind probe;
+ * busy / early exit / health fail → next candidate (no "already in use").
+ * Smoke mode never spawns.
+ */
+export async function ensureBendoServer(
+  url: string
+): Promise<EnsureBendoResult> {
+  const healthUrl = getBendoHealthUrl();
+
+  if (isSmokeMode()) {
+    const check = await isHealthy(healthUrl);
+    if (!check.ok) {
+      return { ok: false, reason: check.reason };
+    }
+    return { ok: true, spawned: false };
+  }
+
+  // Our own child already holds the port: never re-probe or respawn (the port
+  // would look "busy", or a second port would be chosen). Wait for it instead.
+  if (ownedChild) {
+    const waited = await waitForHealthy(healthUrl, {
+      timeoutMs: spawnTimeoutMs(),
+      intervalMs: WAIT_INTERVAL_MS,
+    });
+    return waited.ok
+      ? { ok: true, spawned: true }
+      : { ok: false, reason: waited.reason };
+  }
+
+  if (!usesPackagedDynamicPorts()) {
+    return ensureBendoServerOnce(url);
+  }
+
+  let remaining =
+    lockedPort == null ? [...NEXT_PORT_CANDIDATES] : [lockedPort];
+  let lastReason = "";
+  const busyReason = () =>
+    `${
+      lockedPort == null
+        ? nextPortsBusyReason()
+        : `Port ${lockedPort} is busy. Quit whatever is using it and relaunch Bendo.`
+    }${lastReason ? ` Last error: ${lastReason}` : ""}`;
+  while (remaining.length > 0) {
+    const port = await pickFreePort(remaining);
+    if (port == null) {
+      return { ok: false, reason: busyReason() };
+    }
+
+    process.env.BENDO_APP_URL = `http://127.0.0.1:${port}`;
+    const attemptUrl = getBendoAppUrl();
+    console.log(`[next] Packaged candidate port ${port}`);
+
+    const result = await ensureBendoServerOnce(attemptUrl);
+    if (result.ok) {
+      return result;
+    }
+
+    // Health timeout, missing server.js, spawn error...: another port will not
+    // help and each retry could burn a full spawn timeout. Report the real cause.
+    if (!("portFailure" in result)) {
+      return result;
+    }
+
+    lastReason = result.reason;
+    console.warn(
+      `[next] Candidate ${port} failed (${result.reason}); trying next`
+    );
+    remaining = remaining.filter((p) => p > port);
+  }
+
+  return { ok: false, reason: busyReason() };
 }
