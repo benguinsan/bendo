@@ -1,6 +1,7 @@
 import type { BrowserWindow } from "electron";
 
 import { getBendoAppUrl } from "./bendo-url";
+import { canonicalizeLoopbackUrl } from "./canonical-origin";
 import { openExternalUrl } from "./open-external";
 
 /**
@@ -131,10 +132,20 @@ export function attachOAuthExternalNavigation(win: BrowserWindow): void {
     return { action: "deny" };
   });
 
-  const guardInWindowNavigation = (event: { preventDefault: () => void }, url: string) => {
+  const guardInWindowNavigation = (
+    event: { preventDefault: () => void },
+    url: string
+  ) => {
     if (shouldOpenOAuthExternally(url)) {
       event.preventDefault();
       void openExternalUrl(url);
+      return;
+    }
+    // Keep the shell on the canonical loopback origin (localhost/[::1] → 127.0.0.1).
+    const canonical = canonicalizeLoopbackUrl(url);
+    if (canonical && canonical !== url) {
+      event.preventDefault();
+      void contents.loadURL(canonical);
       return;
     }
     // Block random https sites from taking over the shell; identity hosts stay

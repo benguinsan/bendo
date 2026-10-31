@@ -2,16 +2,12 @@ import { app, type IpcMainInvokeEvent } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isBendoAppUrl } from "./oauth-navigation";
+import { isFrameTrusted } from "./frame-trust";
+
+export { isFrameTrusted };
 
 function senderUrl(event: IpcMainInvokeEvent): string | undefined {
   return event.senderFrame?.url;
-}
-
-/** True when the invoke came from the local Bendo app origin. */
-export function isTrustedBendoSender(event: IpcMainInvokeEvent): boolean {
-  const url = senderUrl(event);
-  return Boolean(url && isBendoAppUrl(url));
 }
 
 /**
@@ -38,7 +34,7 @@ export function isOfflinePageSender(event: IpcMainInvokeEvent): boolean {
   }
 }
 
-/** reload: Bendo origin, or the packaged offline retry page only. */
+/** reload: proven Bendo frame, or the packaged offline retry page only. */
 export function isTrustedReloadSender(event: IpcMainInvokeEvent): boolean {
-  return isTrustedBendoSender(event) || isOfflinePageSender(event);
+  return isFrameTrusted(event) || isOfflinePageSender(event);
 }

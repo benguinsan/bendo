@@ -3,6 +3,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { getBendoAppUrl, isSmokeMode } from "./bendo-url";
+import { canonicalizeLoopbackUrl } from "./canonical-origin";
+import { installFrameTrustHooks, isFrameTrusted } from "./frame-trust";
 import {
   loadModelConfig,
   saveModelConfig,
@@ -20,10 +22,7 @@ import {
 import { initRuntimeLog } from "./runtime-log";
 import { ensureRuntimes } from "./runtime-manager";
 import { stopRuntimes } from "./runtime-shutdown";
-import {
-  isTrustedBendoSender,
-  isTrustedReloadSender,
-} from "./trusted-sender";
+import { isTrustedReloadSender } from "./trusted-sender";
 
 const isMac = process.platform === "darwin";
 const SMOKE_TIMEOUT_MS = 30_000;
@@ -102,6 +101,7 @@ async function showOffline(win: BrowserWindow, reason: string): Promise<void> {
 
 async function loadBendo(win: BrowserWindow): Promise<boolean> {
   const url = getBendoAppUrl();
+  const loadUrl = canonicalizeLoopbackUrl(url) ?? url;
   const { bendo } = await ensureRuntimes(url);
 
   if (!bendo.ok) {
@@ -111,11 +111,11 @@ async function loadBendo(win: BrowserWindow): Promise<boolean> {
   }
 
   try {
-    await win.loadURL(url);
+    await win.loadURL(loadUrl);
     return true;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Failed to load Bendo at ${url}:`, message);
+    console.error(`Failed to load Bendo at ${loadUrl}:`, message);
     await showOffline(win, message);
     return false;
   }
@@ -138,7 +138,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("bendo:model-config:save", async (event, payload: unknown) => {
-    if (!isTrustedBendoSender(event)) {
+    if (!isFrameTrusted(event)) {
       return {
         ok: false as const,
         error: "Untrusted sender.",
@@ -149,14 +149,14 @@ function registerIpc(): void {
   });
 
   ipcMain.handle("bendo:model-config:load", (event) => {
-    if (!isTrustedBendoSender(event)) {
+    if (!isFrameTrusted(event)) {
       return { ok: false as const, error: "Untrusted sender." };
     }
     return loadModelConfig();
   });
 
   ipcMain.handle("bendo:open-external", async (event, url: unknown) => {
-    if (!isTrustedBendoSender(event)) {
+    if (!isFrameTrusted(event)) {
       return { ok: false as const, error: "Untrusted sender." };
     }
     return openExternalUrl(url);
@@ -204,6 +204,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 if (gotTheLock) {
   app.whenReady().then(() => {
     initRuntimeLog();
+    installFrameTrustHooks();
     registerBendoProtocolClient();
     registerIpc();
     const win = createWindow();

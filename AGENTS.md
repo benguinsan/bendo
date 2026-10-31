@@ -97,6 +97,7 @@ Detail, commands and rationale: [`docs/multi-agent-orca.md`](docs/multi-agent-or
 - Agents share the `development` worktree, so **one writer at a time**: Claude edits only before dispatch and after `worker_done`; while Cursor runs, Claude is read-only. Any other open session (idle Claude/Cursor) is read-only.
 - Dispatch only from a clean tree (`git status` empty, or baseline noted) so `git diff` = the implementer's work. Dispatch with `worker-start --worktree current --agent cursor`.
 - Never `reset`, `clean` or `checkout` over uncommitted changes you did not make.
+- A task's prompt lives in its package's gitignored dir (`bendo-app/prompts/` or `desktop/prompts/`; none at repo root). Always cite it with the repo-root path, e.g. `desktop/prompts/foo.md`.
 - Every prompt has a **Do not touch** section (approved files/behavior). Need to change it → ask, don't edit.
 - Report with evidence: exact commands run + real output, files changed, deviations from the prompt. No evidence = not PASS; unknown cause = write `unknown`, don't guess.
 - Reviewer verifies a check's **scope**, not just its exit code: confirm every changed/new file is actually covered (e.g. `tsc --listFiles | grep <file>`, check `tsconfig` `include`/`exclude`, test globs). A green check that skips the changed files is not a pass.
