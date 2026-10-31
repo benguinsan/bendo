@@ -16,14 +16,24 @@ import { isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
 import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
+import {
+  HARNESS_PORT_CANDIDATES,
+  pickFreePort,
+} from "./pick-port";
 
 const DEFAULT_SPAWN_TIMEOUT_MS = 90_000;
 const WAIT_INTERVAL_MS = 500;
 const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
-const DSH_PNPM_ARGS = ["dsh", "web", "--patch", DORO_PATCH, "--no-open"] as const;
 /** Packaged slim tree: built CLI (no system pnpm / tsx). */
 const DSH_BIN_REL = path.join("apps", "cli", "lib", "bin.js");
-const DSH_WEB_ARGS = ["web", "--patch", DORO_PATCH, "--no-open"] as const;
+/**
+ * Captured at module load before packaged dynamic writes harness env.
+ * User-set URL keeps fixed single-port behaviour.
+ */
+const userSetHarnessUrlAtBoot = Boolean(
+  process.env.BENDO_HARNESS_URL?.trim() ||
+    process.env.DSH_CHAT_BRIDGE_URL?.trim()
+);
 /**
  * dsh web boots cordis HMR, which needs Node's internal module loader
  * (`vendor/hmr` → `--expose-internals` / loader.internal).
@@ -279,6 +289,41 @@ function trackHarnessChild(
   );
 }
 
+/** `--port` from BENDO_HARNESS_URL so dynamic packaged ports match the bridge. */
+function harnessWebArgs(): string[] {
+  const args = ["web", "--patch", DORO_PATCH, "--no-open"];
+  try {
+    const port = new URL(getHarnessUrl()).port;
+    if (port) {
+      args.push("--port", port);
+    }
+  } catch {
+    // keep default dsh port
+  }
+  return args;
+}
+
+/**
+ * Packaged builds without user harness URL: pick first free port in 3080..3089
+ * and write `BENDO_HARNESS_URL` + `DSH_CHAT_BRIDGE_URL` (bridge-credentials path).
+ * Must run before the first `getBridgeCredentials()` / Next spawn.
+ */
+export async function resolvePackagedHarnessPort(): Promise<void> {
+  if (!app.isPackaged || userSetHarnessUrlAtBoot) {
+    return;
+  }
+  const port = await pickFreePort(HARNESS_PORT_CANDIDATES);
+  if (port == null) {
+    console.warn(
+      `[harness] No free port in ${HARNESS_PORT_CANDIDATES[0]}–${HARNESS_PORT_CANDIDATES[HARNESS_PORT_CANDIDATES.length - 1]}; using default`
+    );
+    return;
+  }
+  process.env.BENDO_HARNESS_URL = `http://127.0.0.1:${port}`;
+  process.env.DSH_CHAT_BRIDGE_URL = `http://127.0.0.1:${port}/bendo-chat`;
+  console.log(`[harness] Packaged bridge port ${port}`);
+}
+
 /** Packaged slim harness: Electron-as-Node → apps/cli/lib/bin.js (no system pnpm). */
 function startHarnessPackaged(
   harnessDir: string,
@@ -289,12 +334,13 @@ function startHarnessPackaged(
   | { ok: false; reason: string } {
   const dshBin = path.join(harnessDir, DSH_BIN_REL);
   const electronBin = process.execPath;
+  const webArgs = harnessWebArgs();
 
   let child: ChildProcess;
   try {
     child = spawnExecutable(
       electronBin,
-      [...ELECTRON_AS_NODE_EXEC_ARGV, dshBin, ...DSH_WEB_ARGS],
+      [...ELECTRON_AS_NODE_EXEC_ARGV, dshBin, ...webArgs],
       {
         cwd: harnessDir,
         env: harnessChildEnv(bendoAppUrl, dshHomeDir, { electronAsNode: true }),
@@ -310,7 +356,7 @@ function startHarnessPackaged(
 
   trackHarnessChild(
     child,
-    `\`electron-as-node ${ELECTRON_AS_NODE_EXEC_ARGV.join(" ")} ${DSH_BIN_REL} ${DSH_WEB_ARGS.join(" ")}\` in ${harnessDir}`,
+    `\`electron-as-node ${ELECTRON_AS_NODE_EXEC_ARGV.join(" ")} ${DSH_BIN_REL} ${webArgs.join(" ")}\` in ${harnessDir}`,
     "electron",
     dshHomeDir
   );
@@ -326,10 +372,12 @@ function startHarnessDev(
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: string } {
   const pnpm = getPnpmCommand();
+  const webArgs = harnessWebArgs();
+  const pnpmArgs = ["dsh", ...webArgs];
 
   let child: ChildProcess;
   try {
-    child = spawnCommand(pnpm, DSH_PNPM_ARGS, {
+    child = spawnCommand(pnpm, pnpmArgs, {
       cwd: harnessDir,
       env: harnessChildEnv(bendoAppUrl, dshHomeDir),
       stdio: ["ignore", "pipe", "pipe"],
@@ -343,7 +391,7 @@ function startHarnessDev(
 
   trackHarnessChild(
     child,
-    `\`pnpm ${DSH_PNPM_ARGS.join(" ")}\` in ${harnessDir}`,
+    `\`pnpm ${pnpmArgs.join(" ")}\` in ${harnessDir}`,
     pnpm,
     dshHomeDir
   );
