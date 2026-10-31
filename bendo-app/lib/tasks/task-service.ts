@@ -116,29 +116,6 @@ function toPersistedTask(
   };
 }
 
-async function getOwnedCategory(
-  userId: string,
-  categoryId: string
-): Promise<ServiceResult<{ id: string }>> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("categories")
-    .select("id")
-    .eq("id", categoryId)
-    .eq("clerk_user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    return mapSupabaseError(error);
-  }
-
-  if (!data) {
-    return fail("CATEGORY_NOT_FOUND", "Category not found.");
-  }
-
-  return ok(data);
-}
-
 async function getLiveTaskRow(
   userId: string,
   taskId: string
@@ -215,13 +192,6 @@ export async function createTask(
 
   const body: CreateTaskApiInput = parsed.data;
 
-  if (body.categoryId) {
-    const category = await getOwnedCategory(userId, body.categoryId);
-    if (!category.ok) {
-      return category;
-    }
-  }
-
   const scheduledAt = scheduledAtFromDateInput(
     body.date,
     now,
@@ -273,17 +243,6 @@ export async function updateTask(
   }
 
   const patch: UpdateTaskApiInput = parsed.data;
-  const existing = await getLiveTaskRow(userId, parsedId.data);
-  if (!existing.ok) {
-    return existing;
-  }
-
-  if (patch.categoryId) {
-    const category = await getOwnedCategory(userId, patch.categoryId);
-    if (!category.ok) {
-      return category;
-    }
-  }
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.rpc("update_task_with_activity", {
