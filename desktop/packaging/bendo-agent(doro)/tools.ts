@@ -42,6 +42,12 @@ function pathId(id: string): string {
   return encodeURIComponent(id)
 }
 
+/** Local UTC offset (getTimezoneOffset) on `date`, read at local noon so DST matches that day. */
+function tzOffsetMinutesForDate(date: string): number {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year!, month! - 1, day!, 12).getTimezoneOffset()
+}
+
 const jsonOutput = {
   schema: { type: 'json' as const },
   render: renderJson,
@@ -202,7 +208,7 @@ export function apply(ctx: Context, config: Config) {
           title: args.title,
           date: args.date,
           priority: args.priority,
-          tzOffsetMinutes: new Date().getTimezoneOffset(),
+          tzOffsetMinutes: tzOffsetMinutesForDate(args.date),
           ...(args.description !== undefined ? { description: args.description } : {}),
           ...(args.categoryId !== undefined ? { categoryId: args.categoryId } : {}),
         },
@@ -243,7 +249,7 @@ export function apply(ctx: Context, config: Config) {
       if (args.title !== undefined) body.title = args.title
       if (args.date !== undefined) {
         body.date = args.date
-        body.tzOffsetMinutes = new Date().getTimezoneOffset()
+        body.tzOffsetMinutes = tzOffsetMinutesForDate(args.date)
       }
       if (args.priority !== undefined) body.priority = args.priority
       if (args.description !== undefined) body.description = args.description

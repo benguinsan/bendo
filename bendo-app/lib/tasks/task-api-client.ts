@@ -5,6 +5,7 @@ import {
 } from "@/lib/tasks/persisted-task";
 import {
   isObjectThumbnailSrc,
+  tzOffsetMinutesForDate,
   type TaskFormFieldErrors,
 } from "@/lib/tasks/task-input";
 
@@ -120,7 +121,7 @@ export async function createTaskViaApi(
         date: input.date,
         priority: input.priority,
         categoryId: input.categoryId,
-        tzOffsetMinutes: new Date().getTimezoneOffset(),
+        tzOffsetMinutes: tzOffsetMinutesForDate(input.date),
         ...(thumbnailSrc
           ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
           : {}),
@@ -173,7 +174,9 @@ export async function updateTaskViaApi(
         date: input.date,
         priority: input.priority,
         categoryId: input.categoryId,
-        tzOffsetMinutes: new Date().getTimezoneOffset(),
+        tzOffsetMinutes: input.date
+          ? tzOffsetMinutesForDate(input.date)
+          : undefined,
         ...(thumbnailSrc
           ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
           : {}),
