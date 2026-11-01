@@ -72,6 +72,8 @@ Harness chỉ phục vụ model khi route có trong **`$DSH_HOME/settings.yaml`*
 3. **Selection:** `agentDefaultModel.saveSelection({ provider, model })`.
 4. **Gate in-memory:** set `appliedModelConfig` chỉ sau khi 1–3 thành công.
 
+Trước bước 1, bridge kiểm tra lại endpoint (`https`, không userinfo, port 443, host trong allowlist theo provider), nên ai có bridge secret cũng không vượt qua Next để trỏ agent sang endpoint lạ. Allowlist có **ba bản sao**, sửa thì sửa cả ba: `MODEL_API_PROVIDER_ALLOWED_HOSTS` (`bendo-app/lib/agent/model-api-key.ts`, Next), `BENDO_PROVIDER_ALLOWED_HOSTS` (`bendo-agent(doro)/chat-bridge.ts`, bridge), `PROVIDER_ALLOWED_HOSTS` (`desktop/src/main/model-config-store.ts`, persist desktop).
+
 Không sửa `cordis.yml` để nhét key user.
 
 **Map Bendo → dsh (`BENDO_PROVIDER_ROUTE` trong `bendo-agent(doro)/chat-bridge.ts`):**
@@ -157,7 +159,7 @@ Không tự copy `~/.dsh` → `userData/dsh`; chuyển sang home do Electron qu�
 | Client persist | `bendo-app/lib/agent/model-config-desktop.ts` | `persistDesktopModelConfig`, `loadDesktopModelConfig` |
 | API route | `bendo-app/app/api/agent/model-config/route.ts` | `POST` |
 | Runtime / bridge client | `bendo-app/lib/agent/agent-runtime.ts`, `dsh-chat-adapter.ts` | `getAgentRuntime`, `applyModelConfig` |
-| Harness apply + gate | `bendo-agent(doro)/chat-bridge.ts` | `BENDO_PROVIDER_ROUTE`, `buildPiAiProviderProfile`, `writePiAiProviderSettings` |
+| Harness apply + gate | `bendo-agent(doro)/chat-bridge.ts` | `BENDO_PROVIDER_ROUTE`, `BENDO_PROVIDER_ALLOWED_HOSTS`, `isAllowedModelEndpoint`, `secretMatches`, `buildPiAiProviderProfile` |
 | Preload / main IPC | `desktop/src/preload/preload.ts`, `desktop/src/main/main.ts` | `bendo:model-config:save` / `load` |
 | Durable store | `desktop/src/main/model-config-store.ts` | `saveModelConfig`, `loadModelConfig` |
 | Startup re-apply | `desktop/src/main/apply-persisted-model-config.ts`, `runtime-manager.ts` | `reapplyPersistedModelConfig`, `postApplyOnce` |

@@ -6,3 +6,6 @@ deepseek-harness/
 
 # Personal agent-workflow notes (local only)
 docs/agent-workflow-playbook.md
+
+# macOS Finder metadata
+.DS_Store
