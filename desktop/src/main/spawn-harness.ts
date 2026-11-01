@@ -16,6 +16,7 @@ import { isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
 import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
+import { createLineBuffer } from "./line-buffer";
 import {
   HARNESS_PORT_CANDIDATES,
   pickFreePort,
@@ -137,27 +138,17 @@ export function resolveHarnessDir():
 
 /** Pipe harness child stdout/stderr lines into Electron console. */
 function pipeChildOutput(child: ChildProcess): void {
-  /** Forward one decoded chunk as `[harness]` log/error lines. */
-  const forward = (text: string, stream: "stdout" | "stderr") => {
-    for (const line of text.split(/\r?\n/)) {
-      if (!line) {
-        continue;
-      }
-      if (stream === "stderr") {
-        console.error(`[harness] ${line}`);
-      } else {
-        console.log(`[harness] ${line}`);
-      }
-    }
-  };
-
   if (child.stdout) {
     child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => forward(chunk, "stdout"));
+    const buf = createLineBuffer((line) => console.log(`[harness] ${line}`));
+    child.stdout.on("data", (chunk: string) => buf.push(chunk));
+    child.stdout.on("end", () => buf.flush());
   }
   if (child.stderr) {
     child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => forward(chunk, "stderr"));
+    const buf = createLineBuffer((line) => console.error(`[harness] ${line}`));
+    child.stderr.on("data", (chunk: string) => buf.push(chunk));
+    child.stderr.on("end", () => buf.flush());
   }
 }
 
