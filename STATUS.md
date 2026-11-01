@@ -37,7 +37,7 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 
 ## Bản build gần nhất
 
-- `0.1.0-beta.2` macOS arm64 (local `npm run dist`, 2026-11-01): harness `0.1.3-alpha.1` rev `d347e70390`, 455.6 MB; đã test trên app cài từ `.dmg` (bridge 401/400, sửa task quá hạn, Agent chat, form model config). Chi tiết: [`desktop/release-notes/0.1.0-beta.2.md`](desktop/release-notes/0.1.0-beta.2.md).
+- `0.1.0-beta.3` macOS arm64 (local `npm run dist`, 2026-11-01): harness `0.1.3-alpha.1` rev `d347e70390`, 455.6 MB; đã test trên app đóng gói (Doro tạo task đúng giờ local, log che token, bridge 401). Chi tiết: [`desktop/release-notes/0.1.0-beta.3.md`](desktop/release-notes/0.1.0-beta.3.md).
 
 ## Audit 2026-10-31 (ponytail) + bổ sung 2026-11-01
 
@@ -52,3 +52,6 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 | 7 | Nice | So sánh bridge secret bằng `!==` | Xong (`secretMatches` trong `chat-bridge.ts`, cả hai bản Doro) |
 | 8 | Nice | `@clerk/themes` không dùng | Xong (đợt dọn docs) |
 | 9 | Should | Bridge `applyModelConfig` không tự kiểm allowlist endpoint (có secret là bỏ qua được Next) | Xong (`isAllowedModelEndpoint` trong `chat-bridge.ts`) |
+| 10 | Must | `POST /api/discord-identity` ghi Discord ID bất kỳ, không kiểm OAuth | Xong (xoá POST + code cloud không dùng; có hiệu lực sau deploy Vercel) |
+| 11 | Must | Tool task của Doro không gửi `tzOffsetMinutes` → tính theo UTC | Xong (beta.3; test chat: `scheduledAt` 12:00 giờ VN) |
+| 12 | Nice | Runtime log ghi nguyên `?token=` của dsh web UI | Xong (`redact-log.ts`, chỉ che trong file log; beta.3) |

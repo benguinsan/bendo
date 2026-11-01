@@ -4,6 +4,8 @@ import { inspect } from "node:util";
 
 import { app } from "electron";
 
+import { redactSecrets } from "./redact-log";
+
 let logFilePath: string | null = null;
 let consolePatched = false;
 
@@ -182,7 +184,9 @@ function patchConsoleToFile(): void {
     console[level] = (...args: unknown[]) => {
       original(...args);
       const text = args.map(formatArg).join(" ");
-      appendLine(`${new Date().toISOString()} [${level}] ${text}`);
+      appendLine(
+        `${new Date().toISOString()} [${level}] ${redactSecrets(text)}`
+      );
     };
   }
 }
