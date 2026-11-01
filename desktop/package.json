@@ -1,6 +1,6 @@
 {
   "name": "bendo-desktop",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "private": true,
   "description": "Bendo Electron shell — loads local Bendo (Docker/Next); does not embed the web UI",
   "author": "Bendo",
@@ -21,7 +21,9 @@
     "test:trust": "npm run build && electron scripts/frame-trust-e2e/main.js",
     "test:smoke": "npm run build && node scripts/smoke.mjs",
     "smoke": "npm run test:smoke",
-    "ops:pack-ready": "node scripts/check-pack-ops.mjs",
+    "ops:pack-ready": "node scripts/doro-overlay.mjs check && node scripts/check-pack-ops.mjs",
+    "doro:check": "node scripts/doro-overlay.mjs check",
+    "doro:sync": "node scripts/doro-overlay.mjs sync",
     "pack": "npm run build:bendo && npm run build:harness && npm run build && node scripts/run-electron-builder.mjs --dir",
     "dist": "npm run build:bendo && npm run build:harness && npm run build && node scripts/run-electron-builder.mjs --mac dmg",
     "pack:win": "npm run build:bendo && npm run build:harness && npm run build && node scripts/run-electron-builder.mjs --win --dir",

@@ -13,24 +13,33 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 ## Kế tiếp (đã sắp thứ tự)
 
 1. Clerk Dashboard: allow origin + `/auth/desktop-handoff` cho cả dải `127.0.0.1:3000–3009` (`npm run ops:pack-ready` trong `desktop/` in ra đủ danh sách).
-2. Chạy workflow **Desktop Windows** (`dist:win`), tải artifact.
-3. E2E trên máy Windows thứ hai: cài, login, CRUD, Agent chat.
-4. Ghi SHA-256 + release note, bump `desktop/package.json` version.
-5. Duyệt các prompt còn mở (giữ / chuyển `done/` / xoá): `bendo-app/prompts/agent-model-config-simple-ui.md`, `agent-nontech-first-run.md`, `agent-soft-model-errors.md`, `orca-trial-code-comment.md`; `desktop/prompts/pack-windows.md`.
-6. So sánh bridge secret bằng `timingSafeEqual` thay vì `!==` (`bendo-agent(doro)/chat-bridge.ts:651`, sửa cả bản dev và `desktop/packaging/`).
+2. Đặt biến cho GitHub Actions (repo hiện chưa có): Variable `BENDO_CLOUD_API_URL`; Secrets `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — lấy từ env của project Vercel `bendo-psi` (cùng instance Clerk/Supabase). Không đặt secret server nào.
+3. Chạy workflow **Desktop Windows** (`dist:win`) với `harness_ref` = `d347e70390` (bản đã test), tải artifact.
+4. E2E trên máy Windows thứ hai: cài, login, CRUD, Agent chat.
+5. Ghi SHA-256 + release note (`desktop/release-notes/`).
+6. Agent chat UI: render markdown trong tin nhắn Doro (hiện hiện nguyên `**…**`).
+7. Doro nhầm "hôm nay" / "ngày mai" trong cùng câu trả lời (thấy khi test 2026-11-01) — kiểm tra time-context / prompt.
+8. Duyệt các prompt còn mở (giữ / chuyển `done/` / xoá): `bendo-app/prompts/agent-model-config-simple-ui.md`, `agent-nontech-first-run.md`, `agent-soft-model-errors.md`; `desktop/prompts/pack-windows.md`.
 
 ## Bị chặn / chờ quyết định
 
-- (trống)
+- Xoá 9 ảnh `bendo-app/public/dashboard/thumb-*.svg` (code không dùng)? Cần chạy trước: `select thumbnail_src, count(*) from public.tasks where thumbnail_src like '/dashboard/%' group by 1;` — chỉ xoá nếu không task nào trỏ tới.
+- Gỡ skill không khớp dự án: `desktop/.agents/skills/electron-egg`, `bendo-app/.agents/skills/clerk-billing|clerk-orgs|clerk-webhooks` (giữ `upgradelink` cho auto-update).
 
 ## Để sau
 
 - Thử các kịch bản Orca chưa kiểm chứng trước khi giao task lớn: [`docs/multi-agent-orca.md`](docs/multi-agent-orca.md) §4.
 - Chặn private IP sau DNS cho model probe; nút Clear model config ([`docs/agent-model-config.md`](docs/agent-model-config.md) §7).
 - Slim harness: `pnpm deploy` production thật, first-run download, Linux pack ([`docs/desktop-doro-minimal-components.md`](docs/desktop-doro-minimal-components.md) §7).
+- Clerk cảnh báo `createRouteMatcher` deprecated (log `next dev`): chuyển sang kiểm tra auth theo từng route trước khi lên Clerk major tiếp theo.
+- Danh sách host model allowlist nằm ở hai nơi (`bendo-app/lib/agent/model-api-key.ts`, `chat-bridge.ts`), chưa có check tự động.
 - macOS clean-machine E2E, notarize, auto-update, Discord public bot.
 
-## Audit 2026-10-31 (ponytail)
+## Bản build gần nhất
+
+- `0.1.0-beta.2` macOS arm64 (local `npm run dist`, 2026-11-01): harness `0.1.3-alpha.1` rev `d347e70390`, 455.6 MB; đã test trên app cài từ `.dmg` (bridge 401/400, sửa task quá hạn, Agent chat, form model config). Chi tiết: [`desktop/release-notes/0.1.0-beta.2.md`](desktop/release-notes/0.1.0-beta.2.md).
+
+## Audit 2026-10-31 (ponytail) + bổ sung 2026-11-01
 
 | # | Mức | Phát hiện | Trạng thái |
 | --- | --- | --- | --- |
@@ -40,5 +49,6 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 | 4 | Should | Task quá hạn không sửa được tiêu đề/priority | Xong (`d36920a`) |
 | 5 | Should | "Hôm nay" tính theo múi giờ server | Xong (`c156073`) |
 | 6 | Nice | `updateTask` đọc thừa trước khi ghi | Xong (`82dbc7b`) |
-| 7 | Nice | So sánh bridge secret bằng `!==` | Kế tiếp #6 |
+| 7 | Nice | So sánh bridge secret bằng `!==` | Xong (`secretMatches` trong `chat-bridge.ts`, cả hai bản Doro) |
 | 8 | Nice | `@clerk/themes` không dùng | Xong (đợt dọn docs) |
+| 9 | Should | Bridge `applyModelConfig` không tự kiểm allowlist endpoint (có secret là bỏ qua được Next) | Xong (`isAllowedModelEndpoint` trong `chat-bridge.ts`) |

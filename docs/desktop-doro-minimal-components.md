@@ -28,20 +28,9 @@ Bendo UI chat: Browser → Next `/api/agent/chat` → localhost bridge → Doro 
 
 ---
 
-## 2. Quy mô hiện tại (dev checkout)
+## 2. Quy mô
 
-Đo trên máy dev (tham khảo, thay đổi theo install):
-
-| Path | ~Size | Ghi chú |
-| --- | --- | --- |
-| `deepseek-harness/` (cả cây) | ~1.8 GB | **Không** ship nguyên xi vào `.dmg` |
-| `…/node_modules` | ~1.4 GB | Phần lớn bulk |
-| `…/packages` (source) | ~123 MB | Monorepo packages |
-| `…/apps` | ~16 MB | CLI + web frontend |
-| `…/bendo-agent(doro)/` | ~76 KB | Overlay Bendo — luôn giữ |
-| `desktop/resources/bendo-app` (Next standalone) | ~46 MB | Đã bundle riêng |
-
-Kết luận: tối thiểu hóa = cắt **harness runtime**, không cắt Doro overlay.
+Checkout dev `deepseek-harness/` khoảng 1.8 GB (phần lớn là `node_modules`); overlay `bendo-agent(doro)/` chỉ vài chục KB. Tối thiểu hóa = cắt **harness runtime**, không cắt Doro overlay. Kích thước sau prune: mục 7.
 
 ---
 
@@ -61,7 +50,7 @@ Electron `resolveHarnessDir` **đòi** có `bendo-agent(doro)/cordis.yml`. Toàn
 | `personality.md` | Persona text |
 | `operations.md` | Operations text |
 | `safety.md` | Safety text |
-| `tsconfig.json` | Typecheck overlay (dev); runtime load theo harness |
+| `tsconfig.json` | Typecheck overlay (dev), chỉ có ở bản harness; snapshot `desktop/packaging/` không giữ vì đường dẫn tính từ gốc harness. Runtime không cần |
 
 ### 3.2 Plugin / config mà `cordis.yml` bật
 
@@ -101,7 +90,7 @@ Không chỉ overlay: cần binary/`pnpm` entry **`dsh`** và profile **`web`** 
 
 Thực tế hôm nay (dev): cả monorepo `deepseek-harness` + `pnpm install` + `apps/cli` (`bin: dsh`).
 
-**Hướng slim:** chỉ giữ runtime đủ cho `dsh web` + Doro patch — không giữ docs/tests/snapshots/website/python gates. **v1:** denylist. **Phase 2:** hoist + prune SDK/tooling. **Phase 3:** stub dsh web UI (`apps/web/dist` chỉ `index.html`), bỏ `packages/client/**/src`, prune UI/build `.pnpm` (vite/shiki/react/esbuild/…); **giữ** native boot deps `node-pty` / `sharp` / `@vscode/ripgrep`; **rebuild `fs-ext` (node-gyp) cho Electron ABI** vì packaged spawn = Electron-as-Node (ABI ≠ system Node — smoke cũng dùng Electron); **giữ MCP trên đĩa** (cordis off). Perfect `pnpm deploy` = bước sau nếu còn cần.
+**Hướng slim:** chỉ giữ runtime đủ cho `dsh web` + Doro patch. Các phase prune đã làm: mục 7.
 
 Checklist nhóm package (tên theo monorepo; prune cụ thể = bước sau):
 
@@ -127,6 +116,8 @@ Checklist nhóm package (tên theo monorepo; prune cụ thể = bước sau):
 | User model key | `applyModelConfig` / persist `model-config.json` | Không hardcode trong cordis |
 | `DEEPSEEK_API_KEY` (optional) | User/env | Chỉ nếu giữ DeepSeek web search |
 | `BENDO_API_BASE_URL` / token | Overlay tools | Chat bridge ưu tiên `clerkToken` per-request |
+
+**Hai bản overlay:** `deepseek-harness/bendo-agent(doro)/` (dogfood, không có git) và `desktop/packaging/bendo-agent(doro)/` (snapshot có git, CI dùng). `npm run doro:check` / `doro:sync` trong `desktop/` giữ hai bản khớp nhau.
 
 **Không** đưa vào slim bundle: `CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, model API keys, bridge secret cố định trong repo.
 
@@ -197,7 +188,7 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 
 ---
 
-## 7. Đóng gói (v1 done; phase 2 còn lại)
+## 7. Đóng gói (v1 + phase 2–3 đã làm)
 
 **Đã làm (v1):**
 
@@ -212,7 +203,7 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 - Hoist `@deepseek-ai` cho Electron-as-Node; prune SDK/tooling + UI/build `.pnpm`.  
 - Stub web UI: giữ `@deepseek-ai/dsh-web-frontend` + `dist/index.html`, bỏ `dist/assets`.  
 - Exclude `packages/client/**/src`; giữ MCP trên đĩa (`mcpCordisEnabled: false`).  
-- Smoke port `13080` (skip: `BENDO_HARNESS_SKIP_SMOKE=1`). Artifact ~**377 MB** sau Phase 3.
+- Smoke port `13080` (skip: `BENDO_HARNESS_SKIP_SMOKE=1`). Kích thước thật của mỗi lần build: xem `desktop/resources/harness/MANIFEST.json` (`sizeHuman`; lần 2026-10-31, harness `0.1.3-alpha.1`: 1.4 GB → 621.5 MB sau Phase 2 → **455.6 MB** sau Phase 3).
 
 **Chưa làm (sau):**
 
@@ -222,11 +213,3 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 - Linux pack (AppImage). Windows đã có: `build:harness` copy bằng Node fs (hoist bằng copy trên `win32`), NSIS target trong `electron-builder.yml`, CI `desktop-windows.yml`.
 
 Không copy nguyên checkout (`.git` / docs / python / website / snapshots) vào installer.
-
----
-
-## 8. Tóm tắt một dòng
-
-**Must ship:** overlay `bendo-agent(doro)/` + runtime đủ chạy `dsh web` (CLI/host + Cordis + LLM/settings + agent/tools + time/web theo cordis) + Node/pnpm (hoặc binary tương đương) + secret/env inject lúc chạy.  
-**Must not ship:** full monorepo dev tree, docs/tests/python, secrets cloud, và (mục tiêu) phần lớn bulk `node_modules` không nằm trong closure runtime.
-`)

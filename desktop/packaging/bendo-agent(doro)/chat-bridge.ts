@@ -16,7 +16,7 @@
  * - route registration: packages/webhook/webhook-github
  * - agent create / whenIdle / summarize: packages/bundle/headless
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -222,6 +222,16 @@ function assertPath(path: string): void {
   }
 }
 
+/**
+ * Constant-time secret check. Hash both sides first so the buffers always have
+ * equal length (`timingSafeEqual` throws on a length mismatch, which would leak it).
+ */
+function secretMatches(provided: string | undefined, secret: string): boolean {
+  if (typeof provided !== 'string') return false
+  const digest = (value: string) => createHash('sha256').update(value).digest()
+  return timingSafeEqual(digest(provided), digest(secret))
+}
+
 function resolveSecret(configSecret: string): string {
   return (
     process.env.DSH_CHAT_BRIDGE_SECRET?.trim()
@@ -336,6 +346,28 @@ function isBendoModelProvider(value: string): value is BendoModelProvider {
     || value === 'vilao'
     || value === 'gpt'
     || value === 'gemini'
+}
+
+// Mirror of MODEL_API_PROVIDER_ALLOWED_HOSTS in bendo-app/lib/agent/model-api-key.ts
+// (the overlay cannot import bendo-app). The bridge re-checks so a caller holding the
+// bridge secret cannot bypass Next and point the agent at an arbitrary endpoint.
+const BENDO_PROVIDER_ALLOWED_HOSTS: Record<BendoModelProvider, readonly string[]> = {
+  openrouter: ['openrouter.ai'],
+  vilao: ['api.vilao.ai'],
+  gpt: ['api.openai.com'],
+  gemini: ['generativelanguage.googleapis.com'],
+}
+
+function isAllowedModelEndpoint(provider: BendoModelProvider, endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint)
+    if (url.protocol !== 'https:') return false
+    if (url.username || url.password) return false
+    if (url.port && url.port !== '443') return false
+    return BENDO_PROVIDER_ALLOWED_HOSTS[provider].includes(url.hostname.toLowerCase())
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -486,6 +518,9 @@ async function applyUserModelConfig(
   }
   if (!endpoint) {
     throw Object.assign(new Error('endpoint is required'), { status: 400 })
+  }
+  if (!isAllowedModelEndpoint(providerRaw, endpoint)) {
+    throw Object.assign(new Error('endpoint is not allowed for this provider'), { status: 400 })
   }
   if (!apiKey) {
     throw Object.assign(new Error('apiKey is required'), { status: 400 })
@@ -648,7 +683,7 @@ export function apply(ctx: Context, config: Config): void {
 
       const provided = request.headers['x-bendo-chat-secret']
       const header = Array.isArray(provided) ? provided[0] : provided
-      if (header !== secret) {
+      if (!secretMatches(header, secret)) {
         jsonResponse(response, 401, { error: 'unauthorized' })
         return
       }
