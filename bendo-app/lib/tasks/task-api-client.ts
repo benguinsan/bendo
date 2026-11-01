@@ -119,6 +119,7 @@ export async function createTaskViaApi(
         date: input.date,
         priority: input.priority,
         categoryId: input.categoryId,
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
         ...(thumbnailSrc
           ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
           : {}),
@@ -171,6 +172,7 @@ export async function updateTaskViaApi(
         date: input.date,
         priority: input.priority,
         categoryId: input.categoryId,
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
         ...(thumbnailSrc
           ? { thumbnailSrc, thumbnailAlt: "Uploaded task image" }
           : {}),

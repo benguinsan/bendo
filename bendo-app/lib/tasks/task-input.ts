@@ -60,6 +60,9 @@ export const calendarDateSchema = z
   .regex(CALENDAR_DATE_PATTERN, "Enter a valid date")
   .refine(isValidCalendarDate, "Enter a valid date");
 
+/** JS `Date#getTimezoneOffset`: UTC minus local, minutes. UTC+7 → -420. */
+const tzOffsetMinutesSchema = z.number().int().min(-840).max(840);
+
 export const createTaskApiSchema = z.object({
   title: z
     .string()
@@ -79,6 +82,7 @@ export const createTaskApiSchema = z.object({
   categoryId: resourceIdSchema.nullable().optional(),
   thumbnailSrc: thumbnailSrcSchema.optional(),
   thumbnailAlt: thumbnailAltSchema.optional(),
+  tzOffsetMinutes: tzOffsetMinutesSchema.optional(),
 });
 
 export const updateTaskApiSchema = z
@@ -106,6 +110,7 @@ export const updateTaskApiSchema = z
     categoryId: resourceIdSchema.nullable().optional(),
     thumbnailSrc: thumbnailSrcSchema.optional(),
     thumbnailAlt: thumbnailAltSchema.optional(),
+    tzOffsetMinutes: tzOffsetMinutesSchema.optional(),
   })
   .refine(
     (value) => Object.values(value).some((field) => field !== undefined),
@@ -150,33 +155,68 @@ export function parseLocalDateInput(dateStr: string): Date {
   return new Date(year, month - 1, day);
 }
 
-export function scheduledAtFromDateInput(dateStr: string, now: Date): string {
-  const date = parseLocalDateInput(dateStr);
-  const noon = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    12,
-    0,
-    0
-  );
-  const isToday = toLocalDateKey(date) === toLocalDateKey(now);
+function dateKeyFromUtcMs(ms: number): string {
+  const d = new Date(ms);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-  if (isToday && noon <= now) {
+/** User's calendar date for `utcInstant`, given JS timezone offset (UTC − local). */
+function userDateKey(utcInstant: Date, tzOffsetMinutes: number): string {
+  return dateKeyFromUtcMs(utcInstant.getTime() - tzOffsetMinutes * 60_000);
+}
+
+/** Wall-clock in the user's zone → UTC ISO. */
+function userWallClockToUtcIso(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  ms: number,
+  tzOffsetMinutes: number
+): string {
+  return new Date(
+    Date.UTC(year, monthIndex, day, hour, minute, second, ms) +
+      tzOffsetMinutes * 60_000
+  ).toISOString();
+}
+
+/**
+ * Build `scheduled_at` for a picked calendar date using the user's zone.
+ * `tzOffsetMinutes` is `Date#getTimezoneOffset()` (UTC − local). Default 0 = UTC day.
+ */
+export function scheduledAtFromDateInput(
+  dateStr: string,
+  now: Date,
+  tzOffsetMinutes = 0
+): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const monthIndex = month - 1;
+  const noon = new Date(
+    Date.UTC(year, monthIndex, day, 12, 0, 0) + tzOffsetMinutes * 60_000
+  );
+  const isToday = dateStr === userDateKey(now, tzOffsetMinutes);
+
+  if (isToday && noon.getTime() <= now.getTime()) {
     const later = new Date(now.getTime() + 60 * 60 * 1000);
-    if (toLocalDateKey(later) === toLocalDateKey(now)) {
+    if (userDateKey(later, tzOffsetMinutes) === dateStr) {
       return later.toISOString();
     }
 
-    return new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
+    return userWallClockToUtcIso(
+      year,
+      monthIndex,
+      day,
       23,
       59,
       59,
-      999
-    ).toISOString();
+      999,
+      tzOffsetMinutes
+    );
   }
 
   return noon.toISOString();
