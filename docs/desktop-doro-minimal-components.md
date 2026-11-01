@@ -2,7 +2,7 @@
 
 Inventory cho hướng **slim harness**: chỉ những gì Bendo Desktop cần để Agent chat chạy local qua Doro + chat-bridge. Không thay thế root / `desktop` / `bendo-app` `AGENTS.md`.
 
-**Liên quan:** [`desktop-electron-startup-flow.md`](./desktop-electron-startup-flow.md), [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md), [`agent-model-config-save-workflow.md`](./agent-model-config-save-workflow.md).
+**Liên quan:** [`desktop-electron-startup-flow.md`](./desktop-electron-startup-flow.md), [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md), [`agent-model-config.md`](./agent-model-config.md).
 
 Checklist “cần / không cần”. **Packaging v1 (denylist prune + embed):** `desktop/scripts/prepare-harness-resource.mjs` → `resources/harness` → electron-builder `extraResources`. Perfect production-graph closure vẫn là bước sau.
 
@@ -20,7 +20,7 @@ trong thư mục harness, với:
 
 | Mục | Giá trị điển hình |
 | --- | --- |
-| Bridge health | `GET http://127.0.0.1:3080/bendo-chat` |
+| Bridge health | `GET http://127.0.0.1:<harness port>/bendo-chat` (dev `3080`; packaged chọn trong `3080–3089`) |
 | Chat | `POST …/bendo-chat` + header `x-bendo-chat-secret` |
 | `$DSH_HOME` (khi Electron spawn) | `{userData}/dsh` (không share `~/.dsh`) |
 
@@ -95,7 +95,7 @@ Optional trong comment overlay (mặc định **không** ship / không bật):
 Không chỉ overlay: cần binary/`pnpm` entry **`dsh`** và profile **`web`** đủ để:
 
 1. Boot Cordis host
-2. Serve (hoặc gắn) HTTP server lắng nghe port bridge (default **3080**)
+2. Serve (hoặc gắn) HTTP server lắng nghe port bridge (dev **3080**; packaged chọn trong 3080–3089)
 3. Load patch `--patch './bendo-agent(doro)/cordis.yml'`
 4. Resolve workspace packages mà profile + patch import
 
@@ -219,7 +219,7 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 - Perfect production `pnpm deploy` / rewrite CLI deps.  
 - First-run download vào `userData`.  
 - Smoke mục 5 trên máy sạch chỉ có installer (manual).  
-- Windows/Linux pack: Win-safe copy/hoist (không rsync/symlink); hiện `build:harness` fail sớm trên `win32`, NSIS/AppImage target comment out.
+- Linux pack (AppImage). Windows đã có: `build:harness` copy bằng Node fs (hoist bằng copy trên `win32`), NSIS target trong `electron-builder.yml`, CI `desktop-windows.yml`.
 
 Không copy nguyên checkout (`.git` / docs / python / website / snapshots) vào installer.
 

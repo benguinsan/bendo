@@ -8,10 +8,9 @@ You are a **principal-level full-stack engineer** on **bendo** — personal todo
 | --- | --- |
 | Monorepo / desktop / Electron packaging | [`../AGENTS.md`](../AGENTS.md), [`../desktop/AGENTS.md`](../desktop/AGENTS.md) |
 | Task / category / status / calendar / activity detail | [`../docs/bendo-app-task-domain.md`](../docs/bendo-app-task-domain.md) |
-| Agent chat + model config (apply/persist/probe) | [`../docs/bendo-app-agent-chat.md`](../docs/bendo-app-agent-chat.md), [`../docs/agent-model-config-save-workflow.md`](../docs/agent-model-config-save-workflow.md) |
-| Model connection probe hardening / dynamic route | [`../docs/agent-model-connection-hardening.md`](../docs/agent-model-connection-hardening.md), [`../docs/agent-model-dynamic-route-ab.md`](../docs/agent-model-dynamic-route-ab.md) |
+| Agent chat + model config (probe/apply/persist) | [`../docs/bendo-app-agent-chat.md`](../docs/bendo-app-agent-chat.md), [`../docs/agent-model-config.md`](../docs/agent-model-config.md) |
 | Discord identity mapping | [`../docs/bendo-app-discord-identity.md`](../docs/bendo-app-discord-identity.md) |
-| Desktop → Vercel cloud cutover | [`../docs/desktop-cloud-cutover.md`](../docs/desktop-cloud-cutover.md), [`../docs/desktop-categories-cloud-proxy-session.md`](../docs/desktop-categories-cloud-proxy-session.md) (proxy/JWT debug lessons) |
+| Desktop → Vercel cloud cutover | [`../docs/desktop-cloud-cutover.md`](../docs/desktop-cloud-cutover.md) (incl. proxy/JWT pitfalls) |
 | Env var catalog | `.env.example` (keep in sync when vars change) |
 
 <!-- BEGIN:nextjs-agent-rules -->
@@ -86,13 +85,13 @@ Do not invent skill folders. Prefer small diffs; no drive-by refactors.
 - Supabase = source of truth. Core tables: `tasks`, `categories`, `task_activities`, `discord_identities`. Schema: `supabase/schema.sql` (+ Dashboard SQL Editor). **No** `supabase db push` / `migrations/`. Keep `lib/supabase/database.types.ts` aligned.
 - Every user-owned row scoped to Clerk user id.
 - RLS on all public tables; revoke `anon`/`authenticated` table access; **service_role only**. No `auth.uid()` policies (Clerk is auth).
-- Mutations that need activity → `*_with_activity` RPC (one transaction). See `bendo-app/prompts/done/shared-transactions.md`.
+- Mutations that need activity → `*_with_activity` RPC (one transaction). See `*_with_activity` in `supabase/schema.sql`.
 - Stats = derive from `tasks`; no stats tables.
 - Do not filter joined tables with `.eq('foreignTable.column', …)` in supabase-js — filter in JS after fetch.
 
 **Domain (summary — full rules in task-domain doc):**
 
-- Tasks: max **5** incomplete per calendar day; no duplicate normalized content+time; no past schedule for new/updated incomplete; overdue = derived; complete sets `completed_at`, reopen clears it.
+- Tasks: max **5** incomplete per calendar day; no duplicate normalized content+time; no past schedule for incomplete tasks when the date is set or changed; overdue = derived; complete sets `completed_at`, reopen clears it.
 - Categories: per-user case-insensitive unique name; delete **SET NULL** on tasks; activity via RPC.
 - Status stored: `pending` \| `completed` only. UI may show **expired** as derived display.
 - Calendar: incomplete tasks by local schedule day.
@@ -106,13 +105,7 @@ Do not invent skill folders. Prefer small diffs; no drive-by refactors.
 - User model config: configure → Test (optional) → **Save** before chat. Save = **apply ∧ persist** (desktop). Do **not** attach provider/key/model on chat-turn bodies.
 - Detail: [`docs/bendo-app-agent-chat.md`](../docs/bendo-app-agent-chat.md).
 
-**Credential tiers** (local `.env` may hold the full set for `next dev` — never commit secrets):
-
-| Tier | Examples | Ship / client |
-| --- | --- | --- |
-| Public | `NEXT_PUBLIC_*` | OK in browser / installer public config |
-| Cloud server-only | `CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Vercel only; never installer / lend-keys API |
-| Local machine-only | `DSH_CHAT_BRIDGE_*` | Localhost Agent; not Vercel; not installer |
+**Credential tiers:** root [`../AGENTS.md`](../AGENTS.md) → Product credentials (local `.env` may hold the full set for `next dev` — never commit secrets).
 
 Packaged desktop without secrets: `BENDO_CLOUD_API_URL` → proxy privileged APIs to Vercel with session JWT ([`desktop-cloud-cutover.md`](../docs/desktop-cloud-cutover.md)). Stay local: `/api/agent/chat`, `/api/health`, DSH bridge.
 

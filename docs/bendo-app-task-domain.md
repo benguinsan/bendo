@@ -94,4 +94,4 @@ Derive in app/view code (e.g. `getTaskDisplayStatus`). No `expired` column; no a
 - Add read routes/UI only when a feature requires them.
 - Every activity query scoped to the authenticated Clerk user.
 - Records include actor, action, operation result, timestamp.
-- Shared transaction pattern: `prompts/shared-transactions.md` in `bendo-app/`.
+- Shared transaction pattern: see the `*_with_activity` functions in `bendo-app/supabase/schema.sql`.

@@ -138,10 +138,12 @@ if (!cloudUrl) {
 console.log("");
 console.log("[ops:pack-ready] Clerk Dashboard — configure manually (not verifiable here):");
 console.log("  Allowed origins / redirect URLs should include:");
-console.log("    http://127.0.0.1:3000");
-console.log("    http://127.0.0.1:3000/auth/desktop-handoff");
-console.log("    http://localhost:3000          (if you use localhost)");
-console.log("    http://localhost:3000/auth/desktop-handoff");
+// Keep in sync with NEXT_PORT_CANDIDATES in src/main/pick-port.ts.
+for (let port = 3000; port <= 3009; port += 1) {
+  console.log(`    http://127.0.0.1:${port}`);
+  console.log(`    http://127.0.0.1:${port}/auth/desktop-handoff`);
+}
+console.log("    (plus the same localhost:<port> entries if you use localhost)");
 console.log("  Do not register bendo:// in Clerk.");
 console.log("  Docs: docs/desktop-oauth-bendo-protocol.md §2");
 warnings.push(

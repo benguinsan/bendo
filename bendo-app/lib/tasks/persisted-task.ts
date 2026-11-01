@@ -34,6 +34,7 @@ export function persistedTaskToDashboard(task: PersistedTask): DashboardTask {
     categoryName: task.categoryName,
     createdAt: task.createdAt,
     scheduledAt: task.scheduledAt,
+    scheduledDate: task.scheduledDate,
     completedAt: task.completedAt,
     thumbnailSrc: task.thumbnailSrc ?? PLACEHOLDER_THUMBNAIL_SRC,
     thumbnailAlt: task.thumbnailAlt ?? `${task.title} thumbnail`,

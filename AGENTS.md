@@ -1,9 +1,12 @@
 # AGENTS.md (monorepo)
 
+Read [`STATUS.md`](STATUS.md) first: current goal, in-progress work, next steps.
+
 You are working in the **Bendo** monorepo. This file is the **map and priority layer**: layout, product priorities, credential distribution, and desktop/harness invariants.
 
 | Concern | Where |
 | --- | --- |
+| System overview (3 run modes, which route runs where) | [`docs/architecture.md`](docs/architecture.md) |
 | Next.js UI / API / Supabase / Clerk / task domain / Agent adapter | [`bendo-app/AGENTS.md`](bendo-app/AGENTS.md) |
 | Electron shell only (IPC, packaging checks, durable model persist) | [`desktop/AGENTS.md`](desktop/AGENTS.md) |
 | Agent chat + Save/apply/persist detail | [`docs/bendo-app-agent-chat.md`](docs/bendo-app-agent-chat.md) |

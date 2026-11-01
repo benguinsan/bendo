@@ -18,6 +18,7 @@ const baseTask: DashboardTask = {
   categoryName: null,
   createdAt: "2026-08-31T08:00:00.000Z",
   scheduledAt: "2026-08-31T12:00:00.000Z",
+  scheduledDate: "2026-08-31",
   completedAt: null,
   thumbnailSrc: "/dashboard/thumb-placeholder.svg",
   thumbnailAlt: "Task image",

@@ -1,6 +1,6 @@
 # Desktop credentials & DSH bridge
 
-Tài liệu ghi lại vấn đề lộ key khi đóng gói Electron, cách xử lý, cơ chế **build inline** cho public key, và cải tiến inject **DSH chat bridge** (Next ↔ harness).
+Doc này ghi lại vấn đề lộ key khi đóng gói Electron, cách xử lý, cơ chế **build inline** cho public key, và cải tiến inject **DSH chat bridge** (Next ↔ harness).
 
 **Phạm vi:** packaging / desktop / local Agent. Không thay thế `AGENTS.md` — rule ngắn vẫn ở root / `bendo-app` / `desktop`.
 
@@ -66,7 +66,7 @@ Sau:
 
 **`BENDO_CLOUD_API_URL`:** set trong `desktop/.env`, bake `bendo-public-config.json` lúc `build:bendo`, Electron inject vào Next child và **strip** Clerk/Supabase secrets khỏi env child → cloud Clerk (`/api/me`) + cloud Supabase (proxy allowlist). Strip `.env*` khỏi standalone vẫn như trên.
 
-**Chưa xong:** cutover packaged Next sang gọi API cloud cho tasks/DB (packaged vẫn cần chiến lược runtime riêng cho `CLERK_SECRET` / service role). Strip + inject chỉ **chặn bake secret vào installer** và **làm Agent bridge local hoạt động không cần `.env` trong resources**.
+Phần cutover packaged sang gọi API cloud (tasks/DB) đã làm: [`desktop-cloud-cutover.md`](./desktop-cloud-cutover.md).
 
 ---
 
@@ -126,7 +126,7 @@ Trước đây: secret cố định trong `cordis.yml` + copy qua `.env` vào in
 
 | Trước | Sau |
 | --- | --- |
-| Hardcode URL `http://127.0.0.1:3080/bendo-chat` trong `spawn-next.ts` | `getBridgeChatUrl()` = `{BENDO_HARNESS_URL origin}/bendo-chat` |
+| Hardcode URL `http://127.0.0.1:3080/bendo-chat` trong `spawn-next.ts` | `getBridgeChatUrl()` = `{BENDO_HARNESS_URL origin}/bendo-chat` (packaged: port harness chọn trong 3080–3089, xem `pick-port.ts`) |
 | Packaged đọc `.env` từ resources | Strip `.env*`; inject từ Electron |
 | Secret cố định / bake | Generate hoặc env session; persist `userData/bridge-credentials.json` |
 | Cordis `secret: "abcdef…"` trong overlay | `secret: ""` — ưu tiên `DSH_CHAT_BRIDGE_SECRET` env |
@@ -232,8 +232,8 @@ User mở Bendo.app
         ├─ spawn Next standalone (public đã inline; DSH inject)
         ├─ spawn harness (DSH secret inject)
         │
-        ├─ UI / (tương lai) API privileged → cloud host
-        │     session → kết quả; không lend key
+        ├─ UI / API privileged → proxy lên Vercel (session JWT)
+        │     nhận kết quả; không lend key
         │
         └─ Agent chat
               Browser → local Next → localhost bridge → Doro
@@ -264,16 +264,7 @@ User mở Bendo.app
 
 ---
 
-## 6. Bước tiếp theo (ngoài phạm vi doc này)
-
-Chi tiết cutover đã làm: [`desktop-cloud-cutover.md`](./desktop-cloud-cutover.md).
-
-1. Rebuild resources / installer và smoke packaged CRUD qua Vercel.
-2. Bundle harness runtime vào Electron (sau); model API key do user cung cấp.
-
----
-
-## 7. Kiểm tra nhanh
+## 6. Kiểm tra nhanh
 
 - Sau `build:bendo`: không còn `.env*` dưới `desktop/resources/bendo-app`.
 - Trong `resources/.../.next/static/chunks`: có thể thấy `pk_…` (public inline) — bình thường.
