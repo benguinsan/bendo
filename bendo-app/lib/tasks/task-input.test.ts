@@ -7,6 +7,7 @@ import {
   createTaskApiSchema,
   scheduledAtFromDateInput,
   toLocalDateKey,
+  tzOffsetMinutesForDate,
   updateTaskApiSchema,
   validateUpdatedTask,
 } from "./task-input";
@@ -117,6 +118,33 @@ describe("scheduledAtFromDateInput", () => {
       scheduledAtFromDateInput("2026-03-15", now),
       scheduledAtFromDateInput("2026-03-15", now, 0)
     );
+  });
+});
+
+describe("tzOffsetMinutesForDate", () => {
+  it("returns the offset for the requested date under America/New_York DST", () => {
+    const previousTz = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      assert.equal(tzOffsetMinutesForDate("2026-07-01"), 240);
+      assert.equal(tzOffsetMinutesForDate("2026-12-01"), 300);
+      assert.equal(tzOffsetMinutesForDate("2026-11-01"), 300);
+      assert.equal(tzOffsetMinutesForDate("2026-03-08"), 240);
+      assert.equal(
+        scheduledAtFromDateInput(
+          "2026-12-01",
+          new Date("2026-07-01T12:00:00Z"),
+          tzOffsetMinutesForDate("2026-12-01")
+        ),
+        "2026-12-01T17:00:00.000Z"
+      );
+    } finally {
+      if (previousTz === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = previousTz;
+      }
+    }
   });
 });
 

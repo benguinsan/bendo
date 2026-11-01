@@ -4,19 +4,12 @@ import {
   type DiscordIdentityStatus,
   parseDiscordIdentityStatusBody,
 } from "@/lib/auth/discord-connection";
-import { fail, ok, type ServiceResult } from "@/lib/supabase/errors";
 import type { PersistedCategory } from "@/lib/task-categories/persisted-category";
 import type { PersistedTask } from "@/lib/tasks/persisted-task";
 
 type ApiListBody<T> = { data: T[] };
 type ApiSingleBody<T> = { data: T };
 type ApiErrorBody = { error: string; code?: string };
-
-/** Mapping row shape from POST /api/discord-identity (avoid importing service → cycle). */
-type DiscordIdentityRow = {
-  clerkUserId: string;
-  discordUserId: string;
-};
 
 async function parseJsonResponse(response: Response): Promise<unknown> {
   try {
@@ -88,43 +81,4 @@ export async function cloudGetDiscordIdentity(): Promise<DiscordIdentityStatus> 
   }
 
   return parseDiscordIdentityStatusBody(payload);
-}
-
-export async function cloudUpsertDiscordIdentity(
-  discordUserId: string
-): Promise<ServiceResult<DiscordIdentityRow>> {
-  const response = await fetchCloudApi("/api/discord-identity", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ discordUserId }),
-  });
-  const payload = await parseJsonResponse(response);
-
-  if (!response.ok) {
-    const body = payload as ApiErrorBody | null;
-    return fail("INTERNAL", body?.error ?? "Could not sync Discord identity.");
-  }
-
-  const body = payload as ApiSingleBody<DiscordIdentityRow>;
-  return ok(body.data);
-}
-
-export async function cloudDeleteDiscordIdentity(): Promise<
-  ServiceResult<{ deleted: boolean }>
-> {
-  const response = await fetchCloudApi("/api/discord-identity", {
-    method: "DELETE",
-  });
-  const payload = await parseJsonResponse(response);
-
-  if (!response.ok) {
-    const body = payload as ApiErrorBody | null;
-    return fail(
-      "INTERNAL",
-      body?.error ?? "Could not remove Discord identity."
-    );
-  }
-
-  const body = payload as ApiSingleBody<{ deleted: boolean }>;
-  return ok(body.data);
 }

@@ -118,7 +118,7 @@ Never expose to browser: service role, `CLERK_SECRET_KEY`, `DSH_CHAT_BRIDGE_SECR
 ## 7. API conventions
 
 - POST create, GET read, PATCH partial, DELETE delete — `/api/tasks`, `/api/categories` (+ ids).
-- `GET /api/me`, `GET|POST|DELETE /api/discord-identity` — see Discord doc; envelopes `{ data: … }`.
+- `GET /api/me`, `GET|DELETE /api/discord-identity` — see Discord doc; envelopes `{ data: … }`.
 - Also: `/api/notifications` (schema; header not wired), `/api/agent/{chat,status,model-config,model-connection}`, `/api/health`.
 - Prefer thin routes; list is convention, not exhaustive.
 

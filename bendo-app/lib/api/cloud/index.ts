@@ -25,10 +25,8 @@ export {
   maybeProxyPrivilegedRequest,
 } from "@/lib/api/cloud/privilege";
 export {
-  cloudDeleteDiscordIdentity,
   cloudGetDiscordIdentity,
   cloudGetTask,
   cloudListCategories,
   cloudListTasks,
-  cloudUpsertDiscordIdentity,
 } from "@/lib/api/cloud/privilege-loaders";

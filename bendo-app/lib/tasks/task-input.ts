@@ -155,6 +155,12 @@ export function parseLocalDateInput(dateStr: string): Date {
   return new Date(year, month - 1, day);
 }
 
+/** Local UTC offset (getTimezoneOffset) on `dateStr`, read at local noon so DST matches that day. */
+export function tzOffsetMinutesForDate(dateStr: string): number {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 12).getTimezoneOffset();
+}
+
 function dateKeyFromUtcMs(ms: number): string {
   const d = new Date(ms);
   const year = d.getUTCFullYear();
