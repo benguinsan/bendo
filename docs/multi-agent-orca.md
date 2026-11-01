@@ -1,6 +1,6 @@
 # Multi-agent trên Orca: Claude điều phối, Cursor thực hiện
 
-Ghi lại phiên làm việc 2026-10-30/31: dựng luồng đa agent, chạy thử, audit mã nguồn bằng ponytail và thực hiện nhóm cải thiện 1. Quy tắc ngắn gọn nằm ở [`AGENTS.md`](../AGENTS.md) mục **Multi-agent**; file này giữ phần lý do và cách chạy.
+Doc này mô tả luồng đa agent trên Orca (dựng 2026-10-30/31). Quy tắc ngắn gọn nằm ở [`AGENTS.md`](../AGENTS.md) mục **Multi-agent**; file này giữ phần lý do và cách chạy.
 
 ## 1. Mô hình
 
@@ -41,50 +41,10 @@ Quy ước đường dẫn: repo có hai thư mục prompt riêng, `bendo-app/pr
 
 Muốn song song hoặc cô lập: tạo worktree riêng (`--worktree new-top-level --base-branch development`). Worktree mới không có `<package>/prompts/`, `.env`, `node_modules` (đều bị ignore), nên cần script setup và đưa prompt qua `--spec`.
 
-## 4. Đã kiểm chứng
+## 4. Đã kiểm chứng / chưa kiểm chứng
 
-Môi trường: Orca 1.4.245, agent id `cursor` hợp lệ, hook trạng thái đã cài cho Claude và Cursor.
-
-- Task 1 (worktree riêng, thêm một dòng vào docs): Cursor làm đúng, tự gửi `worker_done`. Worktree thử đã xóa.
-- Task 2 (worktree chung, thêm một dòng vào docs): đúng phạm vi, đã hoàn tác.
-- Task 3 (worktree chung, thêm JSDoc vào `cn`, kèm `typecheck` và `lint`): Cursor chạy hai lệnh và báo đúng; kết quả khớp khi Claude chạy lại.
-- Hai task thật của nhóm cải thiện 1 (mục 6) chạy trọn vòng giao việc, review, release.
+**Đã chạy được** (Orca 1.4.245, agent id `cursor`): giao việc trên worktree riêng và worktree chung, Cursor tự gửi `worker_done`, chạy `typecheck`/`lint` và báo đúng (Claude chạy lại khớp), và trọn vòng giao việc → review → release cho task thật.
 
 **Chưa kiểm chứng:** Cursor hỏi lại giữa chừng (`ask`) hoặc làm sai để Claude yêu cầu sửa; hai phiên cùng ghi vào `development`; task lớn cần `build`; nội dung script setup của Orca (CLI không có lệnh sửa, phải đặt trong giao diện Orca); `npm run test:smoke` của desktop (cần Bendo đang chạy ở `127.0.0.1:3000`).
 
-## 5. Audit mã nguồn (ponytail)
-
-Tải giả định: ứng dụng cá nhân, vài trăm người dùng. Chưa chạy ứng dụng hay chạy gì trên cơ sở dữ liệu thật; mục 3, 4, 5 dựa trên đọc mã.
-
-| # | Mức | Phát hiện | Trạng thái |
-| --- | --- | --- | --- |
-| 1 | Must | Mọi trang trong cửa sổ Electron có thể đọc khóa API qua IPC (`desktop/src/main/main.ts`, `oauth-navigation.ts`) | **Đã sửa** (mục 6) |
-| 2 | Should | Test không chạy được và CI không chạy test | **Đã sửa** (mục 6) |
-| 3 | Should | Giới hạn 5 task/ngày có thể bị vượt khi hai yêu cầu đến cùng lúc: trigger `tasks_before_write` đếm không khóa (`supabase/schema.sql:163-208`). Sửa: `pg_advisory_xact_lock` theo user và ngày | Chưa làm |
-| 4 | Should | Task quá hạn không sửa được tiêu đề/độ ưu tiên: trigger chạy trên mọi `UPDATE` và ném `SCHEDULE_IN_PAST`. Sửa: chỉ kiểm tra khi insert hoặc khi `scheduled_at` đổi | Chưa làm |
-| 5 | Should | `scheduledAtFromDateInput` tính theo múi giờ server (Vercel = UTC); người dùng phía tây UTC tạo task "hôm nay" vào buổi tối có thể bị từ chối (`task-input.ts:153-183`) | Chưa làm |
-| 6 | Nice | `updateTask` gọi thừa `getLiveTaskRow` và `getOwnedCategory` mà RPC đã kiểm tra (`task-service.ts`) | Chưa làm |
-| 7 | Nice | So sánh secret của bridge bằng `!==`, nên dùng `timingSafeEqual` (`chat-bridge.ts:651`) | Chưa làm |
-| 8 | Nice | `@clerk/themes` không được import ở đâu | Chưa làm |
-
-**Độ hoàn thiện:** tính năng web và mô hình dữ liệu mạnh (RLS, RPC có activity, chặn SSRF ở bước kiểm tra endpoint model). Điểm yếu là kiểm thử. Desktop Windows còn dở: checklist ship ở [`desktop-ship-mvp-checklist.md`](./desktop-ship-mvp-checklist.md) có 11 mục xong, 38 mục còn mở (chạy `dist:win` trên Windows, allowlist Clerk, E2E máy thứ hai, SHA-256 và release note).
-
-## 6. Nhóm cải thiện 1 (đã thực hiện)
-
-**Bảo mật Electron.** Thêm `desktop/src/main/trusted-sender.ts`.
-- Bốn kênh IPC (`model-config:save`, `model-config:load`, `open-external`, `reload`) chỉ phục vụ trang thuộc origin Bendo. Kênh `reload` còn cho phép đúng trang `static/offline.html` vì `offline.js` gọi `reloadBendo`. Trang lạ nhận `Untrusted sender.`, không nhận dữ liệu.
-- `will-navigate` và `will-redirect` chặn trang `http(s)` không phải Bendo và không phải host danh tính (Discord, Google, Clerk), rồi mở ra trình duyệt ngoài. Host danh tính vẫn ở trong cửa sổ để các trang Clerk không phải OAuth hoàn tất được.
-- **Lưu ý:** nếu chuyển sang Clerk production dùng tên miền riêng (ví dụ `clerk.bendo.app`), phải thêm host đó vào `isIdentityOAuthHost`, nếu không điều hướng sang đó sẽ bị chặn.
-
-**Bật test trong CI.**
-- Thêm `tsx` (devDependency) và script `npm test` (`tsx --test "lib/**/*.test.ts"`) ở `bendo-app/`, kèm bước `Test` trong `.github/workflows/ci.yaml` trước `Build`.
-- Thêm `lib/agent/model-api-key.test.ts` (allowlist endpoint) và `lib/tasks/task-input.test.ts` (`scheduledAtFromDateInput`).
-- Kết quả: `npm test` 33/33 đạt, `typecheck` và `lint` đạt (đã được Claude tự chạy lại).
-- **Sửa sau khi review:** `bendo-app/tsconfig.json` từng loại `**/*.test.ts` khỏi `exclude`, nên `npm run typecheck` không kiểm tra file test và editor báo `Cannot find name 'node:test'`. Đã bỏ mục loại trừ này; `tsc --noEmit` vẫn đạt, nên các file test giờ được kiểm kiểu như mã còn lại.
-
-## 7. Việc tiếp theo
-
-1. **Nhóm 2:** mục 3, 4, 5 trong bảng audit, mỗi mục kèm một test.
-2. **Hoàn tất đợt ship Windows:** allowlist Clerk, chạy workflow `Desktop Windows`, E2E máy thứ hai, ghi SHA-256 và release note.
-3. **Dọn nhẹ:** mục 6, 7, 8.
-4. **Thử các kịch bản chưa kiểm chứng** ở mục 4 trước khi giao task lớn.
+Trạng thái việc (audit, việc tiếp theo): [`../STATUS.md`](../STATUS.md).

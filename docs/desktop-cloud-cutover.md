@@ -1,6 +1,6 @@
 # Desktop → Vercel cloud cutover (Clerk + Supabase)
 
-Tóm tắt phần vừa triển khai: packaged / Electron-spawned Next **không** giữ `CLERK_SECRET_KEY` hay `SUPABASE_SERVICE_ROLE_KEY`; công việc cần secret chạy trên **Vercel**, desktop forward **session JWT** và nhận **kết quả domain**.
+Doc này mô tả cloud cutover: packaged / Electron-spawned Next **không** giữ `CLERK_SECRET_KEY` hay `SUPABASE_SERVICE_ROLE_KEY`; công việc cần secret chạy trên **Vercel**, desktop forward **session JWT** và nhận **kết quả domain**.
 
 **Liên quan:** packaging / strip `.env` / DSH inject → [`desktop-credentials-and-dsh-bridge.md`](./desktop-credentials-and-dsh-bridge.md).  
 **Rule:** root `AGENTS.md` Product credentials; `bendo-app/AGENTS.md` §6.
@@ -165,11 +165,18 @@ Giữ `lib/api/require-api-user.ts` / `respond.ts` ngoài folder (dùng chung).
 
 ---
 
-## 5. Việc còn lại (ngoài cutover này)
+## 5. Bẫy đã gặp
 
-- Rebuild installer và smoke end-to-end trên máy sạch.
-- Bundle harness / Doro vào Electron resources (sau).
-- Discord public bot (sau).
+Từ phiên debug "Could not load categories" trên bản packaged:
+
+| Bẫy | Cách xử lý |
+| --- | --- |
+| `ERR_CONTENT_DECODING_FAILED`: `fetch` (undici) đã giải nén body từ Vercel, proxy vẫn forward `Content-Encoding` → browser giải nén lần hai | `forwardResponseHeaders` (`lib/api/cloud/privilege.ts`) bỏ `content-encoding` và `content-length` |
+| JWT hết hạn: proxy chỉ gửi Bearer, Vercel không có refresh cookie nên không refresh hộ (`session-token-expired-refresh-non-eligible-no-refresh-cookie`) | `browserApiFetch` (`lib/api/browser-api-fetch.ts`): `getToken({ skipCache: true })` → Bearer; gặp 401 thì refresh `getToken` và retry Bearer **một** lần. Không có API trả refresh token về desktop |
+| Race trong category field: cleanup `cancelled = true` bỏ mất response 200 khi dialog remount | `TaskFormCategoryField` dùng `loadId` (chỉ áp kết quả mới nhất) + đọc `getToken` qua ref |
+| Runtime log ghi `[error] [next] …` | `console.warn` của Next đi stderr, không có nghĩa request lỗi. Xem `upstream=`/status thật |
+| Copy `resources/bendo-app` vào `/Applications/Bendo.app` đã ký | Vỡ code signature, app không mở. Rebuild bằng `pack`/`dist` |
+| Test `npm start` với secret local | Không đi qua proxy, nên **không** thay được test bản packaged cloud mode |
 
 ---
 

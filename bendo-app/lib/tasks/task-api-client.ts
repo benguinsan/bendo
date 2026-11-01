@@ -42,7 +42,8 @@ export type UpdateTaskClientInput = {
   taskId: string;
   title: string;
   description: string;
-  date: string;
+  /** Omit when unchanged so the stored scheduled_date is kept (local date can drift after a timezone change). */
+  date?: string;
   priority: TaskPriority;
   categoryId: string | null;
   thumbnailSrc: string | null;

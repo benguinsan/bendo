@@ -30,6 +30,7 @@ bendo/
 └── deepseek-harness/    # Local harness checkout (gitignored); Doro overlay lives here
 ```
 
+- Architecture overview: [`docs/architecture.md`](docs/architecture.md) · current status: [`STATUS.md`](STATUS.md)
 - App: [`bendo-app/README.md`](bendo-app/README.md)
 - Desktop: [`desktop/README.md`](desktop/README.md)
 - Supabase: [`bendo-app/supabase/README.md`](bendo-app/supabase/README.md)

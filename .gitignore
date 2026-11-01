@@ -3,3 +3,6 @@ deepseek-harness/
 .pnpm-store/
 # Archify local diagram artifacts
 .archify/
+
+# Personal agent-workflow notes (local only)
+docs/agent-workflow-playbook.md

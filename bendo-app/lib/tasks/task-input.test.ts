@@ -1,11 +1,44 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { DashboardTask } from "@/lib/dashboard/task-types";
+
 import {
   createTaskApiSchema,
   scheduledAtFromDateInput,
+  toLocalDateKey,
   updateTaskApiSchema,
+  validateUpdatedTask,
 } from "./task-input";
+
+function localDateOffset(now: Date, dayOffset: number): string {
+  const d = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + dayOffset
+  );
+  return toLocalDateKey(d);
+}
+
+function baseUpdateInput(overrides: {
+  date: string;
+  originalDate: string;
+  status?: "pending" | "completed";
+  now?: Date;
+}) {
+  const now = overrides.now ?? new Date();
+  return {
+    title: "Overdue task",
+    date: overrides.date,
+    originalDate: overrides.originalDate,
+    priority: "low",
+    description: "",
+    now,
+    existingTasks: [] as DashboardTask[],
+    taskId: "task-1",
+    status: overrides.status ?? ("pending" as const),
+  };
+}
 
 describe("scheduledAtFromDateInput", () => {
   it("uses noon for a future date (offset 0)", () => {
@@ -128,5 +161,46 @@ describe("tzOffsetMinutes API schema", () => {
       tzOffsetMinutes: 1.25,
     });
     assert.equal(update.success, false);
+  });
+});
+
+describe("validateUpdatedTask past-date rule", () => {
+  it("allows incomplete task with past originalDate when date unchanged", () => {
+    const now = new Date();
+    const past = localDateOffset(now, -2);
+    const result = validateUpdatedTask(
+      baseUpdateInput({ date: past, originalDate: past, now })
+    );
+
+    assert.equal(result.success, true);
+  });
+
+  it("rejects incomplete task when date changes to another past day", () => {
+    const now = new Date();
+    const original = localDateOffset(now, -1);
+    const otherPast = localDateOffset(now, -3);
+    const result = validateUpdatedTask(
+      baseUpdateInput({ date: otherPast, originalDate: original, now })
+    );
+
+    assert.equal(result.success, false);
+    if (!result.success) {
+      assert.equal(result.errors.date, "Choose today or a future date.");
+    }
+  });
+
+  it("allows completed task with past date", () => {
+    const now = new Date();
+    const past = localDateOffset(now, -5);
+    const result = validateUpdatedTask(
+      baseUpdateInput({
+        date: past,
+        originalDate: past,
+        status: "completed",
+        now,
+      })
+    );
+
+    assert.equal(result.success, true);
   });
 });

@@ -3,7 +3,7 @@
 import { TaskFormDialog } from "@/components/tasks/task-form-dialog";
 import type { DashboardTask } from "@/lib/dashboard/task-types";
 import { updateTaskViaApi } from "@/lib/tasks/task-api-client";
-import { toLocalDateKey, validateUpdatedTask } from "@/lib/tasks/task-input";
+import { validateUpdatedTask } from "@/lib/tasks/task-input";
 
 type EditTaskDialogProps = {
   task: DashboardTask | null;
@@ -28,7 +28,7 @@ export function EditTaskDialog({
         task
           ? {
               title: task.title,
-              date: toLocalDateKey(new Date(task.scheduledAt)),
+              date: task.scheduledDate,
               priority: task.priority,
               categoryId: task.categoryId,
               description: task.description,
@@ -48,9 +48,11 @@ export function EditTaskDialog({
         }
 
         const now = new Date();
+        const originalDate = task.scheduledDate;
         const result = validateUpdatedTask({
           title: values.title,
           date: values.date,
+          originalDate,
           priority: values.priority,
           description: values.description,
           now,
@@ -67,7 +69,8 @@ export function EditTaskDialog({
           taskId: task.id,
           title: result.data.title,
           description: result.data.description,
-          date: result.data.date,
+          date:
+            result.data.date === originalDate ? undefined : result.data.date,
           priority: result.data.priority,
           categoryId: values.categoryId,
           thumbnailSrc: values.previewUrl,

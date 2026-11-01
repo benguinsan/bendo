@@ -4,9 +4,7 @@ On-demand rules for Doro / chat-bridge and the Agent model-config UI. **Always-o
 
 **Also read:**
 
-- [`agent-model-config-save-workflow.md`](./agent-model-config-save-workflow.md) — Save = apply ∧ persist
-- [`agent-model-connection-hardening.md`](./agent-model-connection-hardening.md) — Test connection / SSRF
-- [`agent-model-dynamic-route-ab.md`](./agent-model-dynamic-route-ab.md) — harness apply route
+- [`agent-model-config.md`](./agent-model-config.md) — Test connection / SSRF, harness apply route, Save = apply ∧ persist, startup re-apply
 - Desktop persist: [`../desktop/AGENTS.md`](../desktop/AGENTS.md), root [`../AGENTS.md`](../AGENTS.md)
 
 Desktop shell / Electron packaging is **out of scope** here — root / `desktop/AGENTS.md`.

@@ -33,6 +33,8 @@ export type DashboardTask = {
   categoryName: string | null;
   createdAt: string;
   scheduledAt: string;
+  /** Stored calendar day (`YYYY-MM-DD`); may differ from the local day of `scheduledAt` after a timezone change. */
+  scheduledDate: string;
   completedAt: string | null;
   thumbnailSrc: string;
   thumbnailAlt: string;

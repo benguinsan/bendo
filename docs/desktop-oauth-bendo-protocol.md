@@ -1,8 +1,8 @@
 # Desktop OAuth — `bendo://` protocol handoff
 
-Tài liệu phần vừa triển khai: OAuth (Clerk Sign-in / Discord Connect) chạy trên **browser hệ thống**, callback về **local Next**, rồi OS mở **Electron** qua custom protocol `bendo://` — tránh redirect về UI Vercel và tránh để user kẹt trên tab browser.
+Doc này mô tả luồng OAuth (Clerk Sign-in / Discord Connect) chạy trên **browser hệ thống**, callback về **local Next**, rồi OS mở **Electron** qua custom protocol `bendo://` — tránh redirect về UI Vercel và tránh để user kẹt trên tab browser.
 
-**Liên quan:** [`desktop-cloud-cutover.md`](./desktop-cloud-cutover.md) (secret → Vercel), [`desktop/prompts/bendo-protocol-oauth.md`](../desktop/prompts/bendo-protocol-oauth.md), [`bendo-app/prompts/discord-oauth-desktop-browser.md`](../bendo-app/prompts/discord-oauth-desktop-browser.md).
+**Liên quan:** [`desktop-cloud-cutover.md`](./desktop-cloud-cutover.md) (secret → Vercel).
 
 ---
 
@@ -76,6 +76,8 @@ Optional if you also use the hostname form: the same ten ports on `http://localh
 
 Không bắt buộc (và thường không được) đăng ký `bendo://` trong Clerk.
 
+**Clerk production với tên miền riêng** (vd. `clerk.bendo.app`): phải thêm host đó vào `isIdentityOAuthHost` (`desktop/src/main/oauth-navigation.ts`). Nếu không, `will-navigate`/`will-redirect` sẽ coi đó là host lạ và đẩy ra browser ngoài.
+
 ---
 
 ## 3. File đã thêm / chỉnh
@@ -87,7 +89,6 @@ Không bắt buộc (và thường không được) đăng ký `bendo://` trong 
 | `src/main/protocol.ts` | **Thêm** | Đăng ký scheme, parse/validate `bendo://`, load + focus cửa sổ |
 | `src/main/main.ts` | **Sửa** | Single-instance, `open-url`, argv protocol, gắn window + flush pending |
 | `electron-builder.yml` | **Sửa** | `protocols` + macOS `CFBundleURLTypes` cho `bendo` |
-| `prompts/bendo-protocol-oauth.md` | **Thêm** | Prompt / ghi chú ship ngắn |
 
 **Đã có từ slice OAuth browser (vẫn dùng chung):**
 
