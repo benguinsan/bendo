@@ -48,9 +48,11 @@ export function EditTaskDialog({
         }
 
         const now = new Date();
+        const originalDate = toLocalDateKey(new Date(task.scheduledAt));
         const result = validateUpdatedTask({
           title: values.title,
           date: values.date,
+          originalDate,
           priority: values.priority,
           description: values.description,
           now,

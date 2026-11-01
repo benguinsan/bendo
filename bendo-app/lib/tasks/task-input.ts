@@ -342,6 +342,7 @@ export function validateNewTask(input: {
 export function validateUpdatedTask(input: {
   title: string;
   date: string;
+  originalDate: string;
   priority: string;
   description: string;
   now: Date;
@@ -364,8 +365,13 @@ export function validateUpdatedTask(input: {
 
   const errors: TaskFormFieldErrors = {};
   const isCompleted = input.status === "completed";
+  const dateChanged = parsed.data.date !== input.originalDate;
 
-  if (!isCompleted && isPastCalendarDate(parsed.data.date, input.now)) {
+  if (
+    !isCompleted &&
+    dateChanged &&
+    isPastCalendarDate(parsed.data.date, input.now)
+  ) {
     errors.date = "Choose today or a future date.";
   } else if (
     !isCompleted &&

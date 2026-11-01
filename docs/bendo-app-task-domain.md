@@ -9,7 +9,7 @@ On-demand domain rules for the Next.js app. **Always-on summary:** [`bendo-app/A
 - Each task belongs to one authenticated Clerk user.
 - A user may have a maximum of **5** non-deleted incomplete tasks scheduled for the same calendar date. Completed tasks do not count.
 - A task must not be duplicated for the same user when normalized content and scheduled time are identical.
-- New or updated incomplete tasks must not use a scheduled time in the past.
+- Past schedule check applies only when the scheduled date is set (INSERT) or changed (UPDATE to a different date). Editing other fields, completing, reopening, or deleting never trips it; a reopened overdue task is simply overdue.
 - Completed tasks may retain a past scheduled time.
 - A task is overdue when scheduled time has passed and status is not completed.
 - Overdue is **derived**; do not store it as the primary source of truth.

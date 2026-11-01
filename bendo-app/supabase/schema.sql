@@ -181,13 +181,24 @@ begin
     new.completed_at := null;
   end if;
 
+  if tg_op = 'UPDATE'
+     and new.scheduled_date is not distinct from old.scheduled_date then
+    new.scheduled_at := old.scheduled_at;
+  end if;
+
   if new.deleted_at is null and new.status <> 'completed'
+     and (tg_op = 'INSERT'
+          or new.scheduled_date is distinct from old.scheduled_date)
      and new.scheduled_at < pg_catalog.now() then
     raise exception 'SCHEDULE_IN_PAST'
       using errcode = 'P0001';
   end if;
 
   if new.deleted_at is null and new.status <> 'completed' then
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(
+        new.clerk_user_id || '|' || new.scheduled_date::text, 0));
+
     select count(*)::integer
       into live_count
       from public.tasks as t
