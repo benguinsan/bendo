@@ -1,9 +1,5 @@
 import "server-only";
-import {
-  cloudDeleteDiscordIdentity,
-  cloudUpsertDiscordIdentity,
-  isCloudSupabaseMode,
-} from "@/lib/api/cloud";
+import { isCloudSupabaseMode } from "@/lib/api/cloud";
 import { cloudGetDiscordIdentity } from "@/lib/api/cloud/privilege-loaders";
 import {
   type DiscordConnection,
@@ -95,35 +91,13 @@ export async function deleteDiscordIdentityForClerkUser(
  * - `not_connected`: delete mapping (Clerk confirmed absent)
  * - `needs_verification` / `lookup_failed`: leave mapping unchanged
  *
- * Local secrets: writes via service role. Cloud Supabase mode: POST/DELETE via
- * `fetchCloudApi` (used only if callers still sync without GET). Prefer
- * `resolveAndSyncDiscordIdentity` / `loadDiscordIdentityForSettings` for Settings.
+ * Writes via service role (runs only where Clerk + Supabase secrets exist).
+ * Packaged desktop uses `loadDiscordIdentityForSettings` → GET proxy instead.
  */
 export function syncDiscordIdentityForSettings(
   clerkUserId: string,
   connection: DiscordConnection
 ): Promise<ServiceResult<DiscordIdentity | { deleted: boolean } | null>> {
-  if (isCloudSupabaseMode()) {
-    void clerkUserId;
-    if (connection.status === "connected") {
-      if (!connection.discordUserId) {
-        return Promise.resolve(
-          fail(
-            "VALIDATION",
-            "Connected Discord account is missing a Discord user id."
-          )
-        );
-      }
-      return cloudUpsertDiscordIdentity(connection.discordUserId);
-    }
-
-    if (connection.status === "not_connected") {
-      return cloudDeleteDiscordIdentity();
-    }
-
-    return Promise.resolve(ok(null));
-  }
-
   if (connection.status === "connected") {
     if (!connection.discordUserId) {
       return Promise.resolve(
