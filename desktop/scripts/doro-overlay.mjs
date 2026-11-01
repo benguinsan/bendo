@@ -14,6 +14,8 @@ const OVERLAY = "bendo-agent(doro)";
 // tsconfig.json only typechecks the overlay inside the harness (paths like ../vendor/cordis
 // resolve there, not under desktop/packaging), so the snapshot does not carry it.
 const IGNORED = new Set(["tsconfig.json"]);
+// Finder metadata can appear in any folder; never compare or copy it.
+const isIgnored = (rel) => IGNORED.has(rel) || path.basename(rel) === ".DS_Store";
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const harnessRoot = process.env.BENDO_HARNESS_DIR?.trim()
   ? path.resolve(process.env.BENDO_HARNESS_DIR.trim())
@@ -27,7 +29,7 @@ function listFiles(dir, prefix = "") {
     .readdirSync(path.join(dir, prefix), { withFileTypes: true })
     .flatMap((entry) => {
       const rel = path.join(prefix, entry.name);
-      if (IGNORED.has(rel)) return [];
+      if (isIgnored(rel)) return [];
       return entry.isDirectory() ? listFiles(dir, rel) : [rel];
     })
     .sort();
@@ -71,7 +73,7 @@ function sync() {
   fs.rmSync(snapshotDir, { recursive: true, force: true });
   fs.cpSync(devDir, snapshotDir, {
     recursive: true,
-    filter: (src) => !IGNORED.has(path.relative(devDir, src)),
+    filter: (src) => !isIgnored(path.relative(devDir, src)),
   });
   console.log(`[doro:sync] copied ${devDir} -> ${snapshotDir}`);
   return check();

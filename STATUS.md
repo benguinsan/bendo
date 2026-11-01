@@ -32,7 +32,7 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 - Chặn private IP sau DNS cho model probe; nút Clear model config ([`docs/agent-model-config.md`](docs/agent-model-config.md) §7).
 - Slim harness: `pnpm deploy` production thật, first-run download, Linux pack ([`docs/desktop-doro-minimal-components.md`](docs/desktop-doro-minimal-components.md) §7).
 - Clerk cảnh báo `createRouteMatcher` deprecated (log `next dev`): chuyển sang kiểm tra auth theo từng route trước khi lên Clerk major tiếp theo.
-- Danh sách host model allowlist nằm ở hai nơi (`bendo-app/lib/agent/model-api-key.ts`, `chat-bridge.ts`), chưa có check tự động.
+- Danh sách host model allowlist nằm ở ba nơi (`MODEL_API_PROVIDER_ALLOWED_HOSTS` trong `bendo-app/lib/agent/model-api-key.ts`, `BENDO_PROVIDER_ALLOWED_HOSTS` trong `bendo-agent(doro)/chat-bridge.ts`, `PROVIDER_ALLOWED_HOSTS` trong `desktop/src/main/model-config-store.ts`), chưa có check tự động.
 - macOS clean-machine E2E, notarize, auto-update, Discord public bot.
 
 ## Bản build gần nhất

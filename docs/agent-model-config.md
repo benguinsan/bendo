@@ -72,7 +72,7 @@ Harness chỉ phục vụ model khi route có trong **`$DSH_HOME/settings.yaml`*
 3. **Selection:** `agentDefaultModel.saveSelection({ provider, model })`.
 4. **Gate in-memory:** set `appliedModelConfig` chỉ sau khi 1–3 thành công.
 
-Trước bước 1, bridge kiểm tra lại endpoint (`https`, không userinfo, port 443, host trong allowlist theo provider — bản sao của `MODEL_API_PROVIDER_ALLOWED_HOSTS`), nên ai có bridge secret cũng không vượt qua Next để trỏ agent sang endpoint lạ. Sửa allowlist thì sửa cả hai nơi.
+Trước bước 1, bridge kiểm tra lại endpoint (`https`, không userinfo, port 443, host trong allowlist theo provider), nên ai có bridge secret cũng không vượt qua Next để trỏ agent sang endpoint lạ. Allowlist có **ba bản sao**, sửa thì sửa cả ba: `MODEL_API_PROVIDER_ALLOWED_HOSTS` (`bendo-app/lib/agent/model-api-key.ts`, Next), `BENDO_PROVIDER_ALLOWED_HOSTS` (`bendo-agent(doro)/chat-bridge.ts`, bridge), `PROVIDER_ALLOWED_HOSTS` (`desktop/src/main/model-config-store.ts`, persist desktop).
 
 Không sửa `cordis.yml` để nhét key user.
 
