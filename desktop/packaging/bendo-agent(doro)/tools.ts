@@ -202,6 +202,7 @@ export function apply(ctx: Context, config: Config) {
           title: args.title,
           date: args.date,
           priority: args.priority,
+          tzOffsetMinutes: new Date().getTimezoneOffset(),
           ...(args.description !== undefined ? { description: args.description } : {}),
           ...(args.categoryId !== undefined ? { categoryId: args.categoryId } : {}),
         },
@@ -237,10 +238,13 @@ export function apply(ctx: Context, config: Config) {
     output: jsonOutput,
     async execute(args, exec) {
       const body: {
-        [key: string]: string | null
+        [key: string]: string | number | null
       } = {}
       if (args.title !== undefined) body.title = args.title
-      if (args.date !== undefined) body.date = args.date
+      if (args.date !== undefined) {
+        body.date = args.date
+        body.tzOffsetMinutes = new Date().getTimezoneOffset()
+      }
       if (args.priority !== undefined) body.priority = args.priority
       if (args.description !== undefined) body.description = args.description
       if (args.status !== undefined) body.status = args.status
