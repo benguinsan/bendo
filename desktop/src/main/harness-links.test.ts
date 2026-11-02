@@ -142,6 +142,38 @@ describe("restoreHarnessLinks", () => {
     assert.match(result.reason, /escapes harnessDir/u);
   });
 
+  it("rejects a link path under a symlinked parent that points outside", () => {
+    const root = makeTemp();
+    const outside = makeTemp();
+    fs.mkdirSync(path.join(root, "pkg"));
+    fs.symlinkSync(outside, path.join(root, "escape"), "junction");
+    writeManifest(root, [{ path: "escape/evil", target: "../pkg" }]);
+
+    const result = restoreHarnessLinks(root);
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      return;
+    }
+    assert.match(result.reason, /escapes harnessDir/u);
+    assert.deepEqual(fs.readdirSync(outside), []);
+  });
+
+  it("rejects a target reached through a symlink that points outside", () => {
+    const root = makeTemp();
+    const outside = makeTemp();
+    fs.mkdirSync(path.join(outside, "secret"));
+    fs.symlinkSync(outside, path.join(root, "escape"), "junction");
+    writeManifest(root, [{ path: "node_modules/pkg", target: "../escape/secret" }]);
+
+    const result = restoreHarnessLinks(root);
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      return;
+    }
+    assert.match(result.reason, /escapes harnessDir/u);
+    assert.equal(fs.existsSync(path.join(root, "node_modules", "pkg")), false);
+  });
+
   it("returns ok:true with 0 created when no manifest", () => {
     const root = makeTemp();
     const result = restoreHarnessLinks(root);

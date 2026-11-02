@@ -11,6 +11,27 @@ function isInsideRoot(root: string, candidate: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 }
 
+/**
+ * Realpath of the deepest existing ancestor + the not-yet-existing tail, so a
+ * symlinked/junctioned parent inside harnessDir cannot redirect writes outside.
+ */
+function realPathViaExistingAncestor(candidate: string): string {
+  let current = path.resolve(candidate);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(current), ...tail);
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) {
+        return path.resolve(candidate);
+      }
+      tail.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
 /** Compare paths after realpath when both exist (macOS /var → /private/var). */
 function sameResolvedPath(a: string, b: string): boolean {
   try {
@@ -57,6 +78,13 @@ export function restoreHarnessLinks(
   }
 
   const root = path.resolve(harnessDir);
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: `Cannot resolve harnessDir: ${message}` };
+  }
   const links = (parsed as { links: unknown[] }).links;
   let created = 0;
 
@@ -76,12 +104,19 @@ export function restoreHarnessLinks(
     const relPath = (entry as { path: string }).path;
     const relTarget = (entry as { target: string }).target;
     const absLink = path.resolve(root, relPath);
-    if (!isInsideRoot(root, absLink)) {
+    // Parent dir only: the link itself may legitimately exist as a link (lstat below).
+    if (
+      !isInsideRoot(root, absLink) ||
+      !isInsideRoot(realRoot, realPathViaExistingAncestor(path.dirname(absLink)))
+    ) {
       return { ok: false, reason: `Link path escapes harnessDir: ${relPath}` };
     }
 
     const absTarget = path.resolve(path.dirname(absLink), relTarget);
-    if (!isInsideRoot(root, absTarget)) {
+    if (
+      !isInsideRoot(root, absTarget) ||
+      !isInsideRoot(realRoot, realPathViaExistingAncestor(absTarget))
+    ) {
       return {
         ok: false,
         reason: `Link target escapes harnessDir: ${relPath} → ${relTarget}`,
