@@ -233,6 +233,221 @@ function copyTreeWithExcludes(srcRoot, destRoot) {
   });
 }
 
+const HOIST_DIAG_PREFIX = "[build:harness][hoist-diag]";
+
+/**
+ * win32 only: cpSync(verbatimSymlinks) creates links with no type; Node then
+ * autodetects file vs dir from whether the target exists at create time, so
+ * early node_modules → packages links become file symlinks and break resolve.
+ * Recreate those with type "dir", keeping the same (relative) target text.
+ * No junctions (absolute paths would bake the CI path into the installer).
+ * Also rewrite absolute/junction targets that still point into harnessRoot to
+ * in-tree relative links, so the packaged tree does not depend on the source checkout.
+ * @param {string} root outDir
+ * @param {string} harnessRoot source harness checkout
+ */
+function repairWin32DirectorySymlinks(root, harnessRoot) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  /** @type {string[]} */
+  const repaired = [];
+  /** @type {string[]} */
+  const rewrittenFromSource = [];
+  /** @type {string[]} */
+  const sourceMissingInOut = [];
+
+  /** @param {string} dir */
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      const relPosix = path.relative(root, full).split(path.sep).join("/");
+      if (shouldExcludeRel(relPosix)) {
+        continue;
+      }
+      if (ent.isSymbolicLink()) {
+        let targetText;
+        try {
+          targetText = fs.readlinkSync(full);
+        } catch {
+          continue;
+        }
+        const resolved = path.resolve(dir, targetText);
+        const relToRoot = path.relative(root, resolved);
+        const insideOut =
+          !relToRoot.startsWith("..") && !path.isAbsolute(relToRoot);
+
+        if (insideOut) {
+          let targetIsDir = false;
+          try {
+            targetIsDir = fs.statSync(resolved).isDirectory();
+          } catch {
+            // Missing target (e.g. excluded test-support) — leave untouched.
+            continue;
+          }
+          if (!targetIsDir) {
+            continue;
+          }
+          try {
+            fs.unlinkSync(full);
+            fs.symlinkSync(targetText, full, "dir");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            fail(`win32 symlink repair failed for ${relPosix} → ${targetText} (${message})`);
+          }
+          repaired.push(relPosix);
+          continue;
+        }
+
+        // Absolute / escaping targets that still point into the source harness.
+        const relToHarness = path.relative(harnessRoot, resolved);
+        if (relToHarness.startsWith("..") || path.isAbsolute(relToHarness)) {
+          continue;
+        }
+        const mapped = path.join(root, relToHarness);
+        let mappedIsDir = false;
+        try {
+          mappedIsDir = fs.statSync(mapped).isDirectory();
+        } catch {
+          sourceMissingInOut.push(relPosix);
+          continue;
+        }
+        if (!mappedIsDir) {
+          continue;
+        }
+        const relativeTarget = path.relative(dir, mapped);
+        try {
+          fs.unlinkSync(full);
+          fs.symlinkSync(relativeTarget, full, "dir");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          fail(
+            `win32 symlink repair failed for ${relPosix} → ${relativeTarget} (${message})`
+          );
+        }
+        repaired.push(relPosix);
+        rewrittenFromSource.push(relPosix);
+        continue;
+      }
+      if (ent.isDirectory()) {
+        walk(full);
+      }
+    }
+  };
+
+  walk(root);
+  console.log(
+    `[build:harness] win32: repaired ${repaired.length} directory symlinks (${rewrittenFromSource.length} rewritten from source-harness targets, ${sourceMissingInOut.length} source-harness targets left: missing in out)`
+  );
+  for (const sample of repaired.slice(0, 5)) {
+    console.log(`${HOIST_DIAG_PREFIX}: win32-repair ${sample}`);
+  }
+  for (const sample of rewrittenFromSource.slice(0, 5)) {
+    console.log(`${HOIST_DIAG_PREFIX}: win32-repair-from-source ${sample}`);
+  }
+  for (const sample of sourceMissingInOut.slice(0, 5)) {
+    console.log(`${HOIST_DIAG_PREFIX}: win32-source-missing ${sample}`);
+  }
+}
+
+/**
+ * Path shape for hoist diagnostics only (no contents / env).
+ * @param {string} absPath
+ * @returns {{ lstatType: string, readlink: string | null, statOk: boolean, statCode: string | null }}
+ */
+function inspectPathForHoistDiag(absPath) {
+  let lstatType = "lstat-error";
+  /** @type {string | null} */
+  let readlink = null;
+  try {
+    const st = fs.lstatSync(absPath);
+    if (st.isSymbolicLink()) {
+      lstatType = "symlink";
+      try {
+        readlink = fs.readlinkSync(absPath);
+      } catch {
+        readlink = "(readlink-error)";
+      }
+    } else if (st.isDirectory()) {
+      lstatType = "directory";
+    } else if (st.isFile()) {
+      lstatType = "file";
+    } else {
+      lstatType = "other";
+    }
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err ? String(err.code) : "unknown";
+    lstatType = `lstat-error:${code}`;
+  }
+
+  let statOk = false;
+  /** @type {string | null} */
+  let statCode = null;
+  try {
+    fs.statSync(absPath);
+    statOk = true;
+  } catch (err) {
+    statCode =
+      err && typeof err === "object" && "code" in err ? String(err.code) : "unknown";
+  }
+  return { lstatType, readlink, statOk, statCode };
+}
+
+/**
+ * Sample copy fidelity for @deepseek-ai / a known-good .pnpm link (source vs out).
+ * @param {string} srcRoot
+ * @param {string} destRoot
+ */
+function logHoistDiagCopySample(srcRoot, destRoot) {
+  /** @type {string[]} */
+  const samples = ["apps/cli/node_modules/@deepseek-ai/dsh-app-boot"];
+
+  const pnpmDeepseekRel = "node_modules/.pnpm/node_modules/@deepseek-ai";
+  const pnpmDeepseekAbs = path.join(srcRoot, ...pnpmDeepseekRel.split("/"));
+  try {
+    const first = fs.readdirSync(pnpmDeepseekAbs)[0];
+    if (first) {
+      samples.push(`${pnpmDeepseekRel}/${first}`);
+    } else {
+      console.log(`${HOIST_DIAG_PREFIX}: copy-sample ${pnpmDeepseekRel} empty`);
+    }
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err ? String(err.code) : "unknown";
+    console.log(
+      `${HOIST_DIAG_PREFIX}: copy-sample ${pnpmDeepseekRel} missing code=${code}`
+    );
+  }
+
+  // Known-good resolving link on current harness trees (compare to broken @deepseek-ai).
+  samples.push("node_modules/.pnpm/node_modules/node-pty");
+
+  for (const relPosix of samples) {
+    for (const [label, root] of [
+      ["src", srcRoot],
+      ["out", destRoot],
+    ]) {
+      const abs = path.join(root, ...relPosix.split("/"));
+      const info = inspectPathForHoistDiag(abs);
+      const linkPart = info.readlink != null ? ` readlink=${info.readlink}` : "";
+      const statPart = info.statOk
+        ? "stat-ok=true"
+        : `stat-ok=false code=${info.statCode ?? "unknown"}`;
+      console.log(
+        `${HOIST_DIAG_PREFIX}: copy-sample ${label} rel=${relPosix} lstat=${info.lstatType}${linkPart} ${statPart}`
+      );
+    }
+  }
+}
+
 /**
  * Hoist `@deepseek-ai/*` into root `node_modules/@deepseek-ai/` so Doro overlay
  * ESM imports resolve under plain Node / Electron-as-Node (pnpm+tsx differs).
@@ -257,6 +472,8 @@ function hoistDeepseekAiPackages(root) {
 
   fs.mkdirSync(toDir, { recursive: true });
   let created = 0;
+  let skipped = 0;
+  let loggedSkips = 0;
   /** @type {Set<string>} */
   const seen = new Set();
   const useCopy = process.platform === "win32";
@@ -269,7 +486,20 @@ function hoistDeepseekAiPackages(root) {
       const src = path.join(fromDir, name);
       try {
         fs.statSync(src);
-      } catch {
+      } catch (err) {
+        skipped += 1;
+        if (loggedSkips < 20) {
+          const info = inspectPathForHoistDiag(src);
+          const code =
+            err && typeof err === "object" && "code" in err
+              ? String(err.code)
+              : "unknown";
+          const linkPart = info.readlink != null ? ` readlink=${info.readlink}` : "";
+          console.log(
+            `${HOIST_DIAG_PREFIX}: skip fromDir=${fromDir} name=${name} lstat=${info.lstatType}${linkPart} code=${code}`
+          );
+          loggedSkips += 1;
+        }
         continue;
       }
       const dest = path.join(toDir, name);
@@ -286,6 +516,9 @@ function hoistDeepseekAiPackages(root) {
       seen.add(name);
       created += 1;
     }
+  }
+  if (skipped > 0) {
+    console.log(`${HOIST_DIAG_PREFIX}: skipped total=${skipped}`);
   }
   return created;
 }
@@ -969,6 +1202,8 @@ console.log(
   `[build:harness] copy tree (${RSYNC_EXCLUDES.length} excludes, platform=${process.platform})…`
 );
 copyTreeWithExcludes(harnessRoot, outDir);
+repairWin32DirectorySymlinks(outDir, harnessRoot);
+logHoistDiagCopySample(harnessRoot, outDir);
 
 const stripped = stripEnvFiles(outDir);
 for (const rel of stripped) {
