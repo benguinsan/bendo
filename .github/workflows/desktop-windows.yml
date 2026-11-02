@@ -43,6 +43,8 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: read
+    environment:
+      name: dist-win
 
     env:
       BENDO_CLOUD_API_URL: ${{ vars.BENDO_CLOUD_API_URL }}
