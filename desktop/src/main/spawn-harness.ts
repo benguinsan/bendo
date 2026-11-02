@@ -15,6 +15,7 @@ import {
 import { isSmokeMode } from "./bendo-url";
 import { applyBridgeCredentialsToEnv } from "./bridge-credentials";
 import { isHealthy, waitForHealthy } from "./check-bendo";
+import { restoreHarnessLinks } from "./harness-links";
 import { getHarnessHealthUrl, getHarnessUrl } from "./harness-url";
 import { createLineBuffer } from "./line-buffer";
 import {
@@ -464,6 +465,17 @@ export async function ensureHarnessServer(
   const resolved = resolveHarnessDir();
   if (!resolved.ok) {
     return resolved;
+  }
+
+  if (app.isPackaged) {
+    const restored = restoreHarnessLinks(resolved.dir);
+    if (!restored.ok) {
+      console.error(`[harness] ${restored.reason}`);
+      return restored;
+    }
+    if (restored.created > 0) {
+      console.log(`[harness] Restored ${restored.created} harness junctions`);
+    }
   }
 
   const started = startHarness(resolved.dir, bendoAppUrl);

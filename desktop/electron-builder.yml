@@ -74,9 +74,13 @@ win:
   artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 nsis:
+  # Per-user only (no elevation): main recreates harness junctions in the install
+  # dir at runtime, so it must stay user-writable. The user may still pick the
+  # folder; build/installer.nsh hides the "all users" page.
   oneClick: false
   allowToChangeInstallationDirectory: true
   perMachine: false
+  include: build/installer.nsh
   shortcutName: Bendo
 
 # linux:
