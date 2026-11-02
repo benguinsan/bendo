@@ -38,8 +38,8 @@ afterEach(async () => {
 
 describe("pickFreePort", () => {
   it("returns the first free port in range", async () => {
-    // High ephemeral-ish band to avoid clashing with a real :3000 Next.
-    const base = 37_140;
+    // Below every OS ephemeral range (Linux 32768+, macOS/Windows 49152+) so outgoing connections never hold these ports.
+    const base = 27_140;
     const candidates = [base, base + 1, base + 2];
     await listen(base, "127.0.0.1");
     const port = await pickFreePort(candidates);
@@ -47,7 +47,7 @@ describe("pickFreePort", () => {
   });
 
   it("skips when 127.0.0.1 is held even if 0.0.0.0 looks free", async () => {
-    const base = 37_150;
+    const base = 27_150;
     const candidates = [base, base + 1];
     await listen(base, "127.0.0.1");
     const port = await pickFreePort(candidates);
@@ -55,7 +55,7 @@ describe("pickFreePort", () => {
   });
 
   it("skips when 0.0.0.0 is held even if 127.0.0.1 looks free", async () => {
-    const base = 37_160;
+    const base = 27_160;
     const candidates = [base, base + 1];
     await listen(base, "0.0.0.0");
     const port = await pickFreePort(candidates);
@@ -63,7 +63,7 @@ describe("pickFreePort", () => {
   });
 
   it("returns null when every candidate is busy", async () => {
-    const base = 37_170;
+    const base = 27_170;
     const candidates = [base, base + 1];
     await listen(base, "127.0.0.1");
     await listen(base + 1, "127.0.0.1");
@@ -72,7 +72,7 @@ describe("pickFreePort", () => {
   });
 
   it("never keeps more than one probe server open", async () => {
-    const base = 37_180;
+    const base = 27_180;
     const candidates = [base, base + 1, base + 2];
     let maxActive = 0;
     const original = net.createServer;
@@ -96,7 +96,7 @@ describe("pickFreePort", () => {
   });
 
   it("releases the port after a probe so a normal bind succeeds", async () => {
-    const base = 37_190;
+    const base = 27_190;
     const picked = await pickFreePort([base]);
     assert.equal(picked, base);
     assert.equal(getActiveProbeServerCount(), 0);
