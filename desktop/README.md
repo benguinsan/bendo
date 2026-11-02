@@ -150,7 +150,7 @@ Note: scripts gỡ `ELECTRON_RUN_AS_NODE` khi launch Electron.
 
 ```text
 desktop/
-├── .agents/skills/        # Electron agent skills (electron, electron-egg, upgradelink)
+├── .agents/skills/        # Electron agent skills (electron, upgradelink)
 ├── src/main/              # BrowserWindow, Runtime Manager, spawn Next/harness, smoke mode
 ├── src/platform/          # Cross-platform OS helpers (npm/pnpm binary, kill tree)
 ├── src/preload/           # Narrow bridge (platform, reload, getAppUrl)

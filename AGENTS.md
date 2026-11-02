@@ -35,7 +35,7 @@ bendo/
     └── bendo-agent(doro)/    # Doro overlay you dogfood (persona, tools, chat-bridge)
 ```
 
-There is **no** `agent/doro/` install template. Dev uses the harness-checkout overlay; CI copies `desktop/packaging/bendo-agent(doro)/` into the harness before `build:harness` — keep the two in sync before a release.
+There is **no** `agent/doro/` install template. Dev uses the harness-checkout overlay; CI copies `desktop/packaging/bendo-agent(doro)/` into the harness before `build:harness` — keep the two in sync before a release. Direction: edit the harness copy, then `npm run doro:sync` (in `desktop/`) copies harness → packaging; `npm run doro:check` fails on drift.
 
 ---
 
@@ -96,12 +96,14 @@ Detail, commands and rationale: [`docs/multi-agent-orca.md`](docs/multi-agent-or
 
 - **Claude (coordinator/reviewer):** reads context, writes the prompt, gets it approved, dispatches, reviews the diff and re-runs checks. Does not implement tasks dispatched to Cursor.
 - **Cursor (implementer):** works only inside the approved prompt scope, one task at a time. Ambiguity or needed deviation → ask, don't improvise. Leaves changes uncommitted.
-- **Owner (human):** approves prompts and final results, and does all commit/push/merge. Agents never merge into `development` or `main`.
+- **Owner (human):** approves prompts and final results, and does all commit/push/merge. Agents commit only when the owner asks in that conversation, never push, and never merge into `development` or `main`.
+- A direct owner instruction to fix a specific, already-described problem counts as prompt approval: still write the prompt (for Cursor and the record), dispatch without a separate approval round, and say so in the report.
 - Agents share the `development` worktree, so **one writer at a time**: Claude edits only before dispatch and after `worker_done`; while Cursor runs, Claude is read-only. Any other open session (idle Claude/Cursor) is read-only.
 - Dispatch only from a clean tree (`git status` empty, or baseline noted) so `git diff` = the implementer's work. Dispatch with `worker-start --worktree current --agent cursor`.
 - Never `reset`, `clean` or `checkout` over uncommitted changes you did not make.
 - A task's prompt lives in its package's gitignored dir (`bendo-app/prompts/` or `desktop/prompts/`; none at repo root). Always cite it with the repo-root path, e.g. `desktop/prompts/foo.md`.
 - Every prompt has a **Do not touch** section (approved files/behavior). Need to change it → ask, don't edit.
+- Prompts specify behavior and acceptance. Include exact code only if the author compiled/ran it in the target package (tsconfig flags differ, e.g. the harness uses `noUncheckedIndexedAccess`).
 - Report with evidence: exact commands run + real output, files changed, deviations from the prompt. No evidence = not PASS; unknown cause = write `unknown`, don't guess.
 - Reviewer verifies a check's **scope**, not just its exit code: confirm every changed/new file is actually covered (e.g. `tsc --listFiles | grep <file>`, check `tsconfig` `include`/`exclude`, test globs). A green check that skips the changed files is not a pass.
 - Need a sub-agent (to protect context or parallelize reading)? **Tell the owner first and wait for approval.** Never spawn one silently.

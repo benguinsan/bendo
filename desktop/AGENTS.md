@@ -18,7 +18,6 @@ Next.js is out of scope unless the task explicitly needs shared changes.
 Under `desktop/.agents/skills/` (do not invent new folders):
 
 - `.agents/skills/electron`
-- `.agents/skills/electron-egg` — reference only; Bendo shell is plain Electron, not Electron EGG
 - `.agents/skills/upgradelink` — when packaging / auto-update is in scope
 
 Clerk / Supabase / Next skills stay in `bendo-app/.agents/`.

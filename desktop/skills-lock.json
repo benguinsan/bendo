@@ -7,12 +7,6 @@
       "skillPath": "skills/electron/SKILL.md",
       "computedHash": "0cd54217b809ac5ba04f798ca2cc9be9d27fe1fcc108c5f5e06af91bce022de7"
     },
-    "electron-egg": {
-      "source": "full-stack-skills/electron-skills",
-      "sourceType": "github",
-      "skillPath": "skills/electron-egg/SKILL.md",
-      "computedHash": "5dd30624185ea7b5441ac16bbcde744ab1c229338c7670a26e1d69848a1b63b3"
-    },
     "upgradeLink": {
       "source": "full-stack-skills/electron-skills",
       "sourceType": "github",

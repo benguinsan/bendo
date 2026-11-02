@@ -43,8 +43,8 @@ Muốn song song hoặc cô lập: tạo worktree riêng (`--worktree new-top-le
 
 ## 4. Đã kiểm chứng / chưa kiểm chứng
 
-**Đã chạy được** (Orca 1.4.245, agent id `cursor`): giao việc trên worktree riêng và worktree chung, Cursor tự gửi `worker_done`, chạy `typecheck`/`lint` và báo đúng (Claude chạy lại khớp), và trọn vòng giao việc → review → release cho task thật.
+**Đã chạy được** (Orca 1.4.245, agent id `cursor`): giao việc trên worktree riêng và worktree chung, Cursor tự gửi `worker_done`, chạy `typecheck`/`lint` và báo đúng (Claude chạy lại khớp), và trọn vòng giao việc → review → release cho task thật. Từ 2026-11-02: Cursor hỏi lại giữa chừng bằng `ask` và Claude trả lời bằng `orchestration reply --id <msg_id> --body …` (2 lần trong task offset múi giờ); `npm run test:smoke` của desktop.
 
-**Chưa kiểm chứng:** Cursor hỏi lại giữa chừng (`ask`) hoặc làm sai để Claude yêu cầu sửa; hai phiên cùng ghi vào `development`; task lớn cần `build`; nội dung script setup của Orca (CLI không có lệnh sửa, phải đặt trong giao diện Orca); `npm run test:smoke` của desktop (cần Bendo đang chạy ở `127.0.0.1:3000`).
+**Chưa kiểm chứng:** Cursor làm sai để Claude yêu cầu sửa; hai phiên cùng ghi vào `development`; task lớn cần `build`; nội dung script setup của Orca (CLI không có lệnh sửa, phải đặt trong giao diện Orca).
 
 Trạng thái việc (audit, việc tiếp theo): [`../STATUS.md`](../STATUS.md).
