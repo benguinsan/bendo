@@ -150,6 +150,10 @@ jobs:
         working-directory: desktop
         run: npm run dist:win
 
+      - name: Verify unpacked harness (link restore + smoke)
+        working-directory: desktop
+        run: node scripts/verify-win-unpacked-harness.mjs
+
       - name: List release artifacts
         shell: bash
         run: |

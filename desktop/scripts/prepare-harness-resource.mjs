@@ -22,26 +22,24 @@
  * Copy: Node fs denylist (rsync-compatible exclude list) — works on
  * darwin / linux / win32. Hoist @deepseek-ai via symlink (posix) or copy (win32).
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import http from "node:http";
 import { createRequire } from "node:module";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import {
+  SMOKE_HEALTH_URL,
+  SMOKE_PORT,
+  smokeBoot,
+} from "./lib/harness-smoke.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopRoot = path.join(__dirname, "..");
 const defaultHarnessRoot = path.resolve(desktopRoot, "..", "deepseek-harness");
 const outDir = path.join(desktopRoot, "resources", "harness");
 const DORO_CORDIS = path.join("bendo-agent(doro)", "cordis.yml");
-const DORO_PATCH = "./bendo-agent(doro)/cordis.yml";
 const DSH_BIN_REL = path.join("apps", "cli", "lib", "bin.js");
-/** Alternate port so prepare smoke does not collide with a running :3080 harness. */
-const SMOKE_PORT = 13_080;
-const SMOKE_HEALTH_URL = `http://127.0.0.1:${SMOKE_PORT}/bendo-chat`;
-const SMOKE_TIMEOUT_MS = 90_000;
-const SMOKE_POLL_MS = 500;
 
 const ENV_NAMES = [
   ".env",
@@ -863,50 +861,6 @@ function assertMcpKept(root) {
   return findings;
 }
 
-/** Promise that resolves after `ms` milliseconds. */
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** True when `GET url` returns HTTP 2xx within a short timeout. */
-function httpGetOk(url) {
-  return new Promise((resolve) => {
-    const req = http.get(url, (res) => {
-      res.resume();
-      resolve(res.statusCode != null && res.statusCode >= 200 && res.statusCode < 300);
-    });
-    req.on("error", () => resolve(false));
-    req.setTimeout(2000, () => {
-      req.destroy();
-      resolve(false);
-    });
-  });
-}
-
-/** Best-effort terminate of a spawned child and its process group/tree. */
-function killChildTree(child) {
-  const pid = child.pid;
-  if (pid == null) {
-    return;
-  }
-  try {
-    if (process.platform === "win32") {
-      spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true,
-      });
-      return;
-    }
-    try {
-      process.kill(-pid, "SIGTERM");
-    } catch {
-      child.kill("SIGTERM");
-    }
-  } catch {
-    // already exited
-  }
-}
-
 /**
  * Packaged spawn uses Electron-as-Node (ABI ≠ system Node). Packages that
  * compile against NODE_MODULE_VERSION (not N-API prebuilds) must be rebuilt
@@ -1070,104 +1024,126 @@ function assertNativesLoadUnderElectron(harnessDir, electronBin) {
 }
 
 /**
- * Boot slim harness briefly with Electron-as-Node (same as packaged spawn);
- * require bridge health 2xx.
- * @param {string} harnessDir
- * @param {string} electronBin
+ * win32 only: after smoke, strip all symlinks into harness-links.json (dirs)
+ * and materialize file copies. Fail if any symlink remains.
+ * @param {string} root outDir
  */
-async function smokeBoot(harnessDir, electronBin) {
-  if (process.env.BENDO_HARNESS_SKIP_SMOKE?.trim() === "1") {
-    console.log("[build:harness] Smoke skipped (BENDO_HARNESS_SKIP_SMOKE=1)");
-    return { ok: true, skipped: true };
+function writeWin32LinkManifest(root) {
+  if (process.platform !== "win32") {
+    return;
   }
 
-  if (await httpGetOk(SMOKE_HEALTH_URL)) {
-    return {
-      ok: false,
-      reason: `Smoke port ${SMOKE_PORT} already in use (${SMOKE_HEALTH_URL}). Free it and re-run.`,
-    };
+  /** @type {{ path: string, target: string }[]} */
+  const links = [];
+  let filesMaterialized = 0;
+  let deadRemoved = 0;
+
+  // Pass 1 collects while every link still exists: deleting mid-walk would make
+  // later links whose target chain runs through an earlier link look dead.
+  // realpath resolves the whole chain, so manifest targets never contain links.
+  const realRoot = fs.realpathSync(root);
+  /** @type {{ full: string, dir: string, relPosix: string, real: string | null, isDir: boolean }[]} */
+  const found = [];
+
+  /** @param {string} dir */
+  const walkCollect = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isSymbolicLink()) {
+        const relPosix = path.relative(root, full).split(path.sep).join("/");
+        let real = null;
+        let isDir = false;
+        try {
+          real = fs.realpathSync(full);
+          const relToRoot = path.relative(realRoot, real);
+          const insideOut =
+            relToRoot !== "" &&
+            !relToRoot.startsWith("..") &&
+            !path.isAbsolute(relToRoot);
+          if (insideOut) {
+            isDir = fs.statSync(real).isDirectory();
+          } else {
+            real = null;
+          }
+        } catch {
+          real = null;
+        }
+        found.push({ full, dir, relPosix, real, isDir });
+        continue;
+      }
+      if (ent.isDirectory()) {
+        walkCollect(full);
+      }
+    }
+  };
+
+  walkCollect(root);
+
+  // Pass 2: strip links; record dirs, materialize files, drop dead/escaping ones.
+  for (const { full, dir, relPosix, real, isDir } of found) {
+    fs.unlinkSync(full);
+    if (real == null) {
+      deadRemoved += 1;
+    } else if (isDir) {
+      // `dir` is a real (non-link) dir under root, so map it into realRoot space.
+      const realDir = path.join(realRoot, path.relative(root, dir));
+      links.push({
+        path: relPosix,
+        target: path.relative(realDir, real).split(path.sep).join("/"),
+      });
+    } else {
+      fs.copyFileSync(real, full);
+      filesMaterialized += 1;
+    }
   }
 
-  const dshHome = fs.mkdtempSync(path.join(os.tmpdir(), "bendo-harness-smoke-"));
-  const secret = `bendo-smoke-${Date.now()}`;
-  const dshBin = path.join(harnessDir, DSH_BIN_REL);
-  // Match packaged spawn: HMR requires --expose-internals (see vendor/hmr).
-  const args = [
-    "--expose-internals",
-    dshBin,
-    "web",
-    "--patch",
-    DORO_PATCH,
-    "--no-open",
-    "--port",
-    String(SMOKE_PORT),
-  ];
-
-  console.log(
-    `[build:harness] Smoke: Electron-as-Node ${path.basename(electronBin)} ${args.join(" ")}`
+  links.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  fs.writeFileSync(
+    path.join(root, "harness-links.json"),
+    `${JSON.stringify({ version: 1, links }, null, 2)}\n`
   );
-  const child = spawn(electronBin, args, {
-    cwd: harnessDir,
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
-      DSH_HOME: dshHome,
-      DSH_CHAT_BRIDGE_SECRET: secret,
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: process.platform !== "win32",
-  });
 
-  let stderrTail = "";
-  child.stderr?.setEncoding("utf8");
-  child.stderr?.on("data", (chunk) => {
-    stderrTail = `${stderrTail}${chunk}`.slice(-4000);
-  });
-  child.stdout?.setEncoding("utf8");
-  child.stdout?.on("data", (chunk) => {
-    stderrTail = `${stderrTail}${chunk}`.slice(-4000);
-  });
-
-  const started = Date.now();
-  let healthy = false;
-  let earlyExit = null;
-
-  child.once("exit", (code, signal) => {
-    earlyExit =
-      signal != null ? `signal ${signal}` : `code ${code ?? "unknown"}`;
-  });
-
-  while (Date.now() - started < SMOKE_TIMEOUT_MS) {
-    if (earlyExit) {
-      break;
+  /** @type {string[]} */
+  const remaining = [];
+  /** @param {string} dir */
+  const walkGuard = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
     }
-    if (await httpGetOk(SMOKE_HEALTH_URL)) {
-      healthy = true;
-      break;
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isSymbolicLink()) {
+        remaining.push(path.relative(root, full).split(path.sep).join("/"));
+        continue;
+      }
+      if (ent.isDirectory()) {
+        walkGuard(full);
+      }
     }
-    await sleep(SMOKE_POLL_MS);
+  };
+  walkGuard(root);
+  if (remaining.length > 0) {
+    fail(
+      `win32 link strip left ${remaining.length} symlinks (sample: ${remaining.slice(0, 5).join(", ")})`
+    );
   }
 
-  killChildTree(child);
-  await sleep(300);
-  try {
-    fs.rmSync(dshHome, { recursive: true, force: true });
-  } catch {
-    // best effort
-  }
-
-  if (!healthy) {
-    const detail = earlyExit
-      ? `process exited (${earlyExit})`
-      : `timeout after ${SMOKE_TIMEOUT_MS}ms`;
-    return {
-      ok: false,
-      reason: `${detail}\n--- harness output (tail) ---\n${stderrTail}`,
-    };
-  }
-
-  console.log(`[build:harness] Smoke OK — ${SMOKE_HEALTH_URL}`);
-  return { ok: true, skipped: false };
+  const sizeAfter = dirSizeBytes(root);
+  console.log(
+    `[build:harness] win32: link manifest ${links.length} dirs, ${filesMaterialized} files materialized, ${deadRemoved} dead removed`
+  );
+  console.log(
+    `[build:harness] Size after link strip: ${sizeAfter == null ? "unknown" : formatBytes(sizeAfter)}`
+  );
 }
 
 const harnessRoot = resolveHarnessSource();
@@ -1352,6 +1328,8 @@ const smoke = await smokeBoot(outDir, electronBin);
 if (!smoke.ok) {
   fail(`Smoke boot failed: ${smoke.reason}`);
 }
+
+writeWin32LinkManifest(outDir);
 
 manifest.smoke = {
   ok: true,
