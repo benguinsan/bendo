@@ -241,15 +241,22 @@ const HOIST_DIAG_PREFIX = "[build:harness][hoist-diag]";
  * early node_modules → packages links become file symlinks and break resolve.
  * Recreate those with type "dir", keeping the same (relative) target text.
  * No junctions (absolute paths would bake the CI path into the installer).
- * @param {string} root
+ * Also rewrite absolute/junction targets that still point into harnessRoot to
+ * in-tree relative links, so the packaged tree does not depend on the source checkout.
+ * @param {string} root outDir
+ * @param {string} harnessRoot source harness checkout
  */
-function repairWin32DirectorySymlinks(root) {
+function repairWin32DirectorySymlinks(root, harnessRoot) {
   if (process.platform !== "win32") {
     return;
   }
 
   /** @type {string[]} */
   const repaired = [];
+  /** @type {string[]} */
+  const rewrittenFromSource = [];
+  /** @type {string[]} */
+  const sourceMissingInOut = [];
 
   /** @param {string} dir */
   const walk = (dir) => {
@@ -274,27 +281,59 @@ function repairWin32DirectorySymlinks(root) {
         }
         const resolved = path.resolve(dir, targetText);
         const relToRoot = path.relative(root, resolved);
-        if (relToRoot.startsWith("..") || path.isAbsolute(relToRoot)) {
+        const insideOut =
+          !relToRoot.startsWith("..") && !path.isAbsolute(relToRoot);
+
+        if (insideOut) {
+          let targetIsDir = false;
+          try {
+            targetIsDir = fs.statSync(resolved).isDirectory();
+          } catch {
+            // Missing target (e.g. excluded test-support) — leave untouched.
+            continue;
+          }
+          if (!targetIsDir) {
+            continue;
+          }
+          try {
+            fs.unlinkSync(full);
+            fs.symlinkSync(targetText, full, "dir");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            fail(`win32 symlink repair failed for ${relPosix} → ${targetText} (${message})`);
+          }
+          repaired.push(relPosix);
           continue;
         }
-        let targetIsDir = false;
+
+        // Absolute / escaping targets that still point into the source harness.
+        const relToHarness = path.relative(harnessRoot, resolved);
+        if (relToHarness.startsWith("..") || path.isAbsolute(relToHarness)) {
+          continue;
+        }
+        const mapped = path.join(root, relToHarness);
+        let mappedIsDir = false;
         try {
-          targetIsDir = fs.statSync(resolved).isDirectory();
+          mappedIsDir = fs.statSync(mapped).isDirectory();
         } catch {
-          // Missing target (e.g. excluded test-support) — leave untouched.
+          sourceMissingInOut.push(relPosix);
           continue;
         }
-        if (!targetIsDir) {
+        if (!mappedIsDir) {
           continue;
         }
+        const relativeTarget = path.relative(dir, mapped);
         try {
           fs.unlinkSync(full);
-          fs.symlinkSync(targetText, full, "dir");
+          fs.symlinkSync(relativeTarget, full, "dir");
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          fail(`win32 symlink repair failed for ${relPosix} → ${targetText} (${message})`);
+          fail(
+            `win32 symlink repair failed for ${relPosix} → ${relativeTarget} (${message})`
+          );
         }
         repaired.push(relPosix);
+        rewrittenFromSource.push(relPosix);
         continue;
       }
       if (ent.isDirectory()) {
@@ -305,10 +344,16 @@ function repairWin32DirectorySymlinks(root) {
 
   walk(root);
   console.log(
-    `[build:harness] win32: repaired ${repaired.length} directory symlinks`
+    `[build:harness] win32: repaired ${repaired.length} directory symlinks (${rewrittenFromSource.length} rewritten from source-harness targets, ${sourceMissingInOut.length} source-harness targets left: missing in out)`
   );
   for (const sample of repaired.slice(0, 5)) {
     console.log(`${HOIST_DIAG_PREFIX}: win32-repair ${sample}`);
+  }
+  for (const sample of rewrittenFromSource.slice(0, 5)) {
+    console.log(`${HOIST_DIAG_PREFIX}: win32-repair-from-source ${sample}`);
+  }
+  for (const sample of sourceMissingInOut.slice(0, 5)) {
+    console.log(`${HOIST_DIAG_PREFIX}: win32-source-missing ${sample}`);
   }
 }
 
@@ -1157,7 +1202,7 @@ console.log(
   `[build:harness] copy tree (${RSYNC_EXCLUDES.length} excludes, platform=${process.platform})…`
 );
 copyTreeWithExcludes(harnessRoot, outDir);
-repairWin32DirectorySymlinks(outDir);
+repairWin32DirectorySymlinks(outDir, harnessRoot);
 logHoistDiagCopySample(harnessRoot, outDir);
 
 const stripped = stripEnvFiles(outDir);
