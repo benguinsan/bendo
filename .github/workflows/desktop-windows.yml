@@ -20,6 +20,8 @@ on:
         description: Git ref for the DeepSeek Harness checkout
         required: true
         # Pinned to the harness tag the Doro overlay is tested against; bumping is a separate task. master is 0.2.x (Node ≥ 24) and was never tested.
+        # With an alternate HARNESS_REPOSITORY, provide a compatible harness_ref
+        # or ensure that repository contains the tested dsh-v0.1.3-alpha.1 tag.
         default: dsh-v0.1.3-alpha.1
       publish_release:
         description: Attach .exe to a GitHub Release (creates tag if missing)

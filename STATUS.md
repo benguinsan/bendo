@@ -12,8 +12,8 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 
 ## Kế tiếp (đã sắp thứ tự)
 
-1. **E2E trên máy Windows thật** (owner; chưa có kết quả xác nhận): cài `.exe` từ CI run 41508035268 (artifact `bendo-desktop-win-x64`, hết hạn 2026-11-16), chạy §C.1 trong [`docs/desktop-ship-mvp-checklist.md`](docs/desktop-ship-mvp-checklist.md): installer chỉ per-user + chọn thư mục, lần mở đầu tạo junction (ghi thời gian), login Clerk, CRUD, Agent chat, cài đè, gỡ cài.
-2. Deploy `bendo-app` lên Vercel (owner duyệt): bỏ `POST /api/discord-identity` (`be4e48e`, audit #10) và offset múi giờ theo ngày cho web (`376cdc4`, audit #13) chỉ có hiệu lực sau deploy; desktop cũng proxy lên Vercel.
+1. Deploy `bendo-app` lên Vercel (owner duyệt): bỏ `POST /api/discord-identity` (`be4e48e`, audit #10) và offset múi giờ theo ngày cho web (`376cdc4`, audit #13) chỉ có hiệu lực sau deploy; desktop cũng proxy lên Vercel.
+2. **E2E trên máy Windows thật** (owner; chưa có kết quả xác nhận): cài `.exe` từ CI run 41508035268 (artifact `bendo-desktop-win-x64`, hết hạn 2026-11-16), chạy §C.1 trong [`docs/desktop-ship-mvp-checklist.md`](docs/desktop-ship-mvp-checklist.md): installer chỉ per-user + chọn thư mục, lần mở đầu tạo junction (ghi thời gian), login Clerk, CRUD, Agent chat, cài đè, gỡ cài.
 3. Ghi release note Windows (`desktop/release-notes/`) + SHA-256 `.exe` (đã có trong mục Bản build gần nhất).
 4. Agent chat UI: render markdown trong tin nhắn Doro (hiện hiện nguyên `**…**`).
 5. Doro nhầm "hôm nay" / "ngày mai" trong cùng câu trả lời (thấy khi test 2026-11-01) — kiểm tra time-context / prompt.
