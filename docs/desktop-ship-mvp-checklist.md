@@ -5,6 +5,8 @@ Checklist xuất MVP nội bộ. **Hướng hiện tại: Windows-first** (máy 
 
 **Không** gồm (sau): Apple notarize, auto-update, Discord bot, Gmail.
 
+**Tiến độ đối chiếu [STATUS.md](../STATUS.md) ngày 2026-11-08:** Windows `0.1.0-beta.4` đã build bằng CI run `41508035268`; chưa có kết quả E2E máy thật. Artifact `bendo-desktop-win-x64` hết hạn 2026-11-16. Các ô hoàn tất bên dưới ghi nhận lần kiểm tra đã có, không thay cho việc kiểm tra lại mỗi bản phát hành.
+
 **Liên quan:** [`desktop-cloud-cutover.md`](./desktop-cloud-cutover.md), [`desktop-oauth-bendo-protocol.md`](./desktop-oauth-bendo-protocol.md), [`desktop-doro-minimal-components.md`](./desktop-doro-minimal-components.md), `desktop/README.md`, root `AGENTS.md`.
 
 ---
@@ -24,7 +26,7 @@ Checklist xuất MVP nội bộ. **Hướng hiện tại: Windows-first** (máy 
 - [x] `prepare-harness-resource.mjs` — Node copy + hoist copy trên win32 (không rsync / không fail sớm win32).
 - [x] `electron-builder.yml` — `win` NSIS + dir (x64).
 - [x] `npm run pack:win` / `dist:win`.
-- [ ] **Chạy** `dist:win` **trên máy Windows** (khuyến nghị) — native rebuild `fs-ext` đúng ABI win32.
+- [x] `dist:win` trên Windows runner — CI run 41508035268; bước verify `win-unpacked` restore junction + smoke `/bendo-chat` thành công.
 - [ ] E2E máy 2 (mục C).
 
 **Lưu ý:** Cross-pack từ Mac (`electron-builder --win`) có thể tạo installer nhưng **natives** trong harness nên rebuild trên Windows (`build:harness` trên Win) trước khi tin Agent chat.
@@ -35,10 +37,10 @@ Checklist xuất MVP nội bộ. **Hướng hiện tại: Windows-first** (máy 
 
 ### A.1–A.3 Pack (code)
 
-Đã triển khai trong desktop/. Việc còn lại = **chạy trên máy Windows có checkout** (hoặc sync `resources/` sau `build:harness` trên Win):
+Đã triển khai trong desktop/ và build trên Windows CI. Còn kiểm tra lifecycle trên máy sạch:
 
-- [ ] Trên Win: `cd desktop && npm install && npm run build:bendo && npm run build:harness && npm run dist:win`
-- [ ] Xác nhận `release/` có `.exe` NSIS và/hoặc `win-unpacked/Bendo.exe`
+- [x] Build Windows qua CI run 41508035268 (`npm ci` + `npm run dist:win`, gồm `build:bendo` và `build:harness`).
+- [x] Xác nhận `release/` có `.exe` NSIS và/hoặc `win-unpacked/Bendo.exe` — CI run 41508035268
 - [ ] Spawn / kill-tree / log: `%APPDATA%\\bendo-desktop\\logs\\` (hoặc path log thực tế khi chạy) — verify trên máy 2
 
 ### A.4 Cloud & Clerk (ops pack — bước 1)
@@ -56,28 +58,28 @@ cd desktop && npm run ops:pack-ready
 
 ### A.5 Version
 
-- [x] Bump `desktop/package.json` → **`0.1.0-beta.1`**.
-- [x] Stub release note: [`desktop/release-notes/0.1.0-beta.1.md`](../desktop/release-notes/0.1.0-beta.1.md) (điền SHA + MANIFEST lúc pack).
+- [x] `desktop/package.json` hiện là **`0.1.0-beta.4`**.
+- [ ] Hoàn thiện release note Windows trong `desktop/release-notes/` (bản hiện có [`0.1.0-beta.4.md`](../desktop/release-notes/0.1.0-beta.4.md) ghi build macOS); SHA-256 Windows đã có trong `STATUS.md`.
 
 ---
 
 ## B. Build artifact Windows
 
 ```bash
-# Mục tiêu sau khi A xong — chính xác lệnh sẽ cập nhật khi script sẵn sàng
+# Build lại trên Windows khi cần artifact mới
 cd desktop
 npm install
 npm run build:bendo
 npm run build:harness
-npm run dist:win   # hoặc electron-builder --win (khi đã wire)
+npm run dist:win
 ```
 
 ### B.1 Kiểm tra artifact
 
 - [ ] `resources/bendo-app` không còn `.env*` / cloud secrets.
 - [ ] Public config có `BENDO_CLOUD_API_URL`.
-- [ ] `resources/harness` + MANIFEST; natives win hợp lệ.
-- [ ] Có `.exe` installer (NSIS) hoặc unpacked `win-unpacked/Bendo.exe`.
+- [x] Harness đóng gói đã qua CI verify `win-unpacked`: restore junction + smoke bridge (run 41508035268); Agent chat trên máy thật còn ở mục C.
+- [x] Có `.exe` installer (NSIS) hoặc unpacked `win-unpacked/Bendo.exe` — CI run 41508035268.
 
 ---
 
@@ -92,6 +94,14 @@ Máy Windows **không** cần checkout monorepo.
 5. **CRUD:** tạo / sửa / xóa task.
 6. **Agent:** Save provider+key → một tin chat.
 7. Quit — không orphan process nặng; mở lại ổn.
+
+### C.1 Checklist máy thật (owner)
+
+- [ ] Installer không hiện trang "all users"; có trang chọn thư mục.
+- [ ] Lần đầu mở: Agent chat chạy (junction restore); ghi thời gian first-start.
+- [ ] Clerk sign-in handoff về Electron OK.
+- [ ] Cài bản mới đè lên bản cũ OK.
+- [ ] Gỡ cài xoá sạch thư mục install.
 
 ### Pass / fail (Win)
 
@@ -121,27 +131,30 @@ Thứ tự: **E.0 → E.1 → E.2 → E.3 → E.4**. C (E2E máy 2) nên pass tr
 
 ### E.0 Điều kiện trước
 
-- [x] A.4 cloud URL + version gate (`npm run ops:pack-ready`) — **trừ** Clerk Dashboard (owner).
-- [x] A.5 Version `0.1.0-beta.1` + stub release note.
-- [ ] Clerk allowlist (A.4 còn lại) trước login E2E.
-- [ ] Harness sẵn trên máy build (`deepseek-harness` + `pnpm` deps) — hoặc CI có quyền clone harness.
+- [x] A.4 cloud URL + version gate (`npm run ops:pack-ready`) — CI run 41508035268.
+- [x] A.5 Version `0.1.0-beta.4`; release note Windows còn chờ.
+- [x] Clerk allowlist trên **development instance** đã đặt 2026-11-02 (A.4); login E2E chưa xác nhận.
+- [x] CI đã checkout và build harness `dsh-v0.1.3-alpha.1`.
+- [ ] Trước phát hành rộng: tạo Clerk production instance, đặt lại allowlist và cập nhật key trong `dist-win` + Vercel.
+- [ ] Deploy Vercel để áp dụng việc bỏ `POST /api/discord-identity` và sửa offset múi giờ theo ngày (audit #10, #13 trong `STATUS.md`).
 - [ ] (Khuyến nghị) C pass trên máy 2 với cùng artifact sẽ upload.
 
 ### E.1 Build artifact (một lần — bạn / CI, không phải người tải)
 
-**Cách A — máy Windows (đơn giản nhất lúc này)**
+**Cách A — máy Windows local (tuỳ chọn thay cho CI đã chạy)**
 
 - [ ] Checkout monorepo + harness cạnh repo (hoặc `BENDO_HARNESS_DIR=…`).
 - [ ] `cd desktop && npm install`
 - [ ] `npm run dist:win`
 - [ ] Lấy file trong `desktop/release/` — tên kiểu `Bendo-<version>-win-x64.exe` (NSIS).
 
-**Cách B — GitHub Actions (khi muốn lặp lại không cần máy Win)**
+**Cách B — GitHub Actions (đã có artifact)**
 
 - [x] Workflow `windows-latest`: [`.github/workflows/desktop-windows.yml`](../.github/workflows/desktop-windows.yml) — checkout app + harness + Doro packaging overlay → `npm run dist:win`.
 - [x] Upload Actions artifact; optional GitHub Release khi `publish_release` + `release_tag`.
-- [ ] Secrets/vars trên GitHub (xem root `README.md` § Desktop Windows): `BENDO_CLOUD_API_URL`, `NEXT_PUBLIC_*` — public bake only; không nhét cloud secrets vào installer.
-- [ ] Chạy workflow một lần → tải `.exe` → E2E máy 2 (§C / §E.4).
+- [x] Environment GitHub `dist-win` đã có `BENDO_CLOUD_API_URL`, `NEXT_PUBLIC_*`; bước kiểm tra public env và build đã pass ở run 41508035268.
+- [x] Workflow run 41508035268 thành công, đã upload artifact `bendo-desktop-win-x64` (hết hạn 2026-11-16); chưa publish GitHub Release.
+- [ ] Tải `.exe` từ artifact → E2E máy 2 (§C / §E.4).
 
 
 ### E.2 Host + tạo link tải
@@ -157,9 +170,9 @@ Chọn **một** kênh:
 Checklist chung:
 
 - [ ] Upload đúng file đã E2E (cùng SHA với máy 2 nếu đã test).
-- [ ] Ghi **SHA-256** của `.exe` (PowerShell: `Get-FileHash … -Algorithm SHA256`).
+- [x] SHA-256 `.exe` của run 41508035268 đã ghi trong `STATUS.md`: `4e1274507d642e2bdf02084306e2004c6b9725c27e275ca8571e4b907ac21a12`.
 - [ ] Ghi **Release note** ngắn: version, win32-x64, Vercel URL (public), harness MANIFEST/commit, “unsigned”.
-- [ ] Có **URL HTTPS** copy được (vd. `…/Bendo-0.1.0-beta.1-win-x64.exe`).
+- [ ] Có **URL HTTPS** copy được (vd. `…/Bendo-0.1.0-beta.4-win-x64.exe`).
 
 ### E.3 Gói gửi cho người tải (copy-paste)
 
@@ -195,7 +208,7 @@ Trên máy **không** có monorepo (máy 2 hoặc máy khác):
 2. Quay lại mac clean E2E + (sau) signing.
 3. Gmail reminders.
 4. Discord bot.
-5. CI Windows → GitHub Release (E.1 cách B) — workflow đã có; còn set secrets + chạy + E2E máy 2.
+5. GitHub Release: workflow Windows đã chạy và có Actions artifact; còn E2E máy 2 rồi publish link tải ổn định.
 
 ---
 
@@ -204,7 +217,7 @@ Trên máy **không** có monorepo (máy 2 hoặc máy khác):
 | Việc | Owner |
 | --- | --- |
 | Win-safe harness prepare + builder `win` | Dev (đã wire trong repo) |
-| Vercel secrets / Clerk allowlist | Người có dashboard (A.4 còn lại) |
+| Deploy Vercel / Clerk production | Owner; dev allowlist đã đặt, production còn chờ |
 | `ops:pack-ready` + version bump | Dev (bước 1 — đã wire) |
 | `dist:win` + upload link (E.1–E.2) | Bạn (máy Win) hoặc Dev+CI |
 | E2E máy 2 / verify link (C + E.4) | Bạn |
