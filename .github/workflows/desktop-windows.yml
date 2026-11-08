@@ -1,13 +1,14 @@
 # Build Windows NSIS installer: npm run dist:win on windows-latest.
 # Does not replace clean-machine E2E — download the .exe and test on a Win PC.
 #
-# Required repository Variables / Secrets (Settings → Secrets and variables):
+# Required vars/secrets come from the GitHub environment `dist-win` (job uses
+# environment: name: dist-win):
 #   vars.BENDO_CLOUD_API_URL                          e.g. https://bendo-psi.vercel.app
 #   secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 #   secrets.NEXT_PUBLIC_SUPABASE_URL
 #   secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY
 #
-# Optional:
+# Optional (same environment):
 #   vars.HARNESS_REPOSITORY   default deepseek-ai/deepseek-harness
 #   secrets.HARNESS_TOKEN     only if HARNESS_REPOSITORY is private
 name: Desktop Windows
@@ -18,7 +19,8 @@ on:
       harness_ref:
         description: Git ref for the DeepSeek Harness checkout
         required: true
-        default: master
+        # Pinned to the harness tag the Doro overlay is tested against; bumping is a separate task. master is 0.2.x (Node ≥ 24) and was never tested.
+        default: dsh-v0.1.3-alpha.1
       publish_release:
         description: Attach .exe to a GitHub Release (creates tag if missing)
         type: boolean

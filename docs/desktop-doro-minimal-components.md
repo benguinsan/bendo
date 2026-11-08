@@ -205,11 +205,21 @@ Bendo Next local (hoặc cloud-forward cho data) vẫn cần cho UI + `/api/agen
 - Exclude `packages/client/**/src`; giữ MCP trên đĩa (`mcpCordisEnabled: false`).  
 - Smoke port `13080` (skip: `BENDO_HARNESS_SKIP_SMOKE=1`). Kích thước thật của mỗi lần build: xem `desktop/resources/harness/MANIFEST.json` (`sizeHuman`; lần 2026-10-31, harness `0.1.3-alpha.1`: 1.4 GB → 621.5 MB sau Phase 2 → **455.6 MB** sau Phase 3).
 
+**Đã làm — Windows (NSIS):**
+
+- NSIS không lưu được symlink.
+- `build:harness` trên win32: sửa dir symlink mà `cpSync` tạo thành file link → smoke → strip mọi link vào `resources/harness/harness-links.json` (sau đó 0 symlink trong tree).
+- Mỗi lần app đóng gói start: Electron main (`src/main/harness-links.ts`, `restoreHarnessLinks`) tạo lại thành NTFS **junction** trong thư mục cài.
+- Manifest được validate: realpath phải nằm trong `harnessDir`; không xoá nội dung thật.
+- CI verify trên `win-unpacked` (`scripts/verify-win-unpacked-harness.mjs`).
+- macOS/Linux giữ symlink, không có manifest.
+- Ràng buộc cài: NSIS chỉ per-user (`build/installer.nsh` ép current user; user vẫn chọn được thư mục) vì thư mục cài phải ghi được để tạo junction.
+
 **Chưa làm (sau):**
 
 - Perfect production `pnpm deploy` / rewrite CLI deps.  
 - First-run download vào `userData`.  
 - Smoke mục 5 trên máy sạch chỉ có installer (manual).  
-- Linux pack (AppImage). Windows đã có: `build:harness` copy bằng Node fs (hoist bằng copy trên `win32`), NSIS target trong `electron-builder.yml`, CI `desktop-windows.yml`.
+- Linux pack (AppImage). Windows NSIS + CI `desktop-windows.yml` đã có (symlink → junction: mục Windows ở trên).
 
 Không copy nguyên checkout (`.git` / docs / python / website / snapshots) vào installer.
