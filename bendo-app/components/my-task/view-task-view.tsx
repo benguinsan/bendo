@@ -34,6 +34,7 @@ import {
   type TaskStatus,
 } from "@/lib/dashboard/task-types";
 import { useNow } from "@/lib/dashboard/use-now";
+import { selectCommittedTaskSnapshot } from "@/lib/tasks/select-committed-task-snapshot";
 import {
   deleteTaskViaApi,
   updateTaskPriorityViaApi,
@@ -48,6 +49,7 @@ type ViewTaskViewProps = {
 export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   const router = useRouter();
   const [task, setTask] = useState(initialTask);
+  const [seenInitialTask, setSeenInitialTask] = useState(initialTask);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -56,11 +58,22 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [vitalError, setVitalError] = useState<string | null>(null);
+
+  // router.refresh() keeps client state; reconcile when RSC props change.
+  if (initialTask !== seenInitialTask) {
+    setSeenInitialTask(initialTask);
+    setTask(selectCommittedTaskSnapshot(task, initialTask));
+  }
+
   const now = useNow(nowIso);
   const view = toTaskView(task, now);
   const isVital = task.priority === "extreme";
   const checklist = view.checklist ?? [];
   const optionalItems = view.optionalItems ?? [];
+
+  function applyCommittedTask(incoming: DashboardTask) {
+    setTask((current) => selectCommittedTaskSnapshot(current, incoming));
+  }
 
   async function handleDeleteTask() {
     if (deleting) {
@@ -102,7 +115,7 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
       const result = await updateTaskStatusViaApi(task.id, status);
 
       if (result.ok) {
-        setTask(result.task);
+        applyCommittedTask(result.task);
       } else {
         setStatusError(result.error);
       }
@@ -125,7 +138,7 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
       const result = await updateTaskPriorityViaApi(task.id, "extreme");
 
       if (result.ok) {
-        setTask(result.task);
+        applyCommittedTask(result.task);
         router.refresh();
       } else {
         setVitalError(result.error);
@@ -282,7 +295,7 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
           open={editOpen}
           existingTasks={[task]}
           onOpenChange={setEditOpen}
-          onUpdate={setTask}
+          onUpdate={applyCommittedTask}
         />
       ) : null}
       {confirmOpen ? (

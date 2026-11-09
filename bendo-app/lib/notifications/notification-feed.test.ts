@@ -18,6 +18,7 @@ const baseTask: DashboardTask = {
   categoryId: null,
   categoryName: null,
   createdAt: "2026-03-15T08:00:00.000Z",
+  updatedAt: "2026-03-15T08:00:00.000Z",
   scheduledAt: "2026-03-15T12:00:00.000Z",
   scheduledDate: "2026-03-15",
   completedAt: null,

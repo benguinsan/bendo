@@ -32,6 +32,8 @@ export type DashboardTask = {
   categoryId: string | null;
   categoryName: string | null;
   createdAt: string;
+  /** Server revision stamp from PersistedTask.updatedAt; used to reconcile overlapping snapshots. */
+  updatedAt: string;
   scheduledAt: string;
   /** Stored calendar day (`YYYY-MM-DD`); may differ from the local day of `scheduledAt` after a timezone change. */
   scheduledDate: string;

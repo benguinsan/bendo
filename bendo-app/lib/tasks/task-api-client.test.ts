@@ -44,11 +44,13 @@ const persistedTask = {
   categoryId: null,
   categoryName: null,
   createdAt: "2026-11-09T08:00:00.000Z",
+  updatedAt: "2026-11-09T09:00:00.000Z",
   scheduledAt: "2026-11-10T12:00:00.000Z",
   scheduledDate: "2026-11-10",
   completedAt: null,
   thumbnailSrc: "/dashboard/thumb-placeholder.svg",
   thumbnailAlt: "Task image",
+  isOverdue: false,
 };
 
 describe("updateTaskPriorityViaApi", () => {
@@ -65,6 +67,7 @@ describe("updateTaskPriorityViaApi", () => {
     }
     assert.equal(result.task.priority, "extreme");
     assert.equal(result.task.id, "task-1");
+    assert.equal(result.task.updatedAt, "2026-11-09T09:00:00.000Z");
     assert.equal(calls.length, 1);
     assert.equal(calls[0]?.url, "/api/tasks/task-1");
     assert.equal(calls[0]?.init?.method, "PATCH");
