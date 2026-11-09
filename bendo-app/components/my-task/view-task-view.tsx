@@ -34,8 +34,10 @@ import {
   type TaskStatus,
 } from "@/lib/dashboard/task-types";
 import { useNow } from "@/lib/dashboard/use-now";
+import { selectCommittedTaskSnapshot } from "@/lib/tasks/select-committed-task-snapshot";
 import {
   deleteTaskViaApi,
+  updateTaskPriorityViaApi,
   updateTaskStatusViaApi,
 } from "@/lib/tasks/task-api-client";
 
@@ -47,16 +49,31 @@ type ViewTaskViewProps = {
 export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   const router = useRouter();
   const [task, setTask] = useState(initialTask);
+  const [seenInitialTask, setSeenInitialTask] = useState(initialTask);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusTransitioning, setStatusTransitioning] = useState(false);
+  const [vitalTransitioning, setVitalTransitioning] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [vitalError, setVitalError] = useState<string | null>(null);
+
+  // router.refresh() keeps client state; reconcile when RSC props change.
+  if (initialTask !== seenInitialTask) {
+    setSeenInitialTask(initialTask);
+    setTask(selectCommittedTaskSnapshot(task, initialTask));
+  }
+
   const now = useNow(nowIso);
   const view = toTaskView(task, now);
+  const isVital = task.priority === "extreme";
   const checklist = view.checklist ?? [];
   const optionalItems = view.optionalItems ?? [];
+
+  function applyCommittedTask(incoming: DashboardTask) {
+    setTask((current) => selectCommittedTaskSnapshot(current, incoming));
+  }
 
   async function handleDeleteTask() {
     if (deleting) {
@@ -98,7 +115,7 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
       const result = await updateTaskStatusViaApi(task.id, status);
 
       if (result.ok) {
-        setTask(result.task);
+        applyCommittedTask(result.task);
       } else {
         setStatusError(result.error);
       }
@@ -107,6 +124,30 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
     }
 
     setStatusTransitioning(false);
+  }
+
+  async function handleMarkVital() {
+    if (vitalTransitioning || isVital) {
+      return;
+    }
+
+    setVitalTransitioning(true);
+    setVitalError(null);
+
+    try {
+      const result = await updateTaskPriorityViaApi(task.id, "extreme");
+
+      if (result.ok) {
+        applyCommittedTask(result.task);
+        router.refresh();
+      } else {
+        setVitalError(result.error);
+      }
+    } catch {
+      setVitalError("Could not mark task as vital.");
+    }
+
+    setVitalTransitioning(false);
   }
 
   return (
@@ -119,6 +160,11 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
       {statusError ? (
         <p className="text-destructive mb-4 text-sm" role="alert">
           {statusError}
+        </p>
+      ) : null}
+      {vitalError ? (
+        <p className="text-destructive mb-4 text-sm" role="alert">
+          {vitalError}
         </p>
       ) : null}
       <Card className="rounded-card shadow-panel flex min-h-0 flex-1 flex-col py-6 ring-0 lg:h-full">
@@ -228,7 +274,16 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
             >
               <SquarePenIcon />
             </Button>
-            <Button type="button" size="icon-lg" aria-label="Mark vital">
+            <Button
+              type="button"
+              size="icon-lg"
+              aria-label={isVital ? "Already vital" : "Mark vital"}
+              disabled={vitalTransitioning || isVital}
+              aria-pressed={isVital}
+              onClick={() => {
+                void handleMarkVital();
+              }}
+            >
               <CircleAlertIcon />
             </Button>
           </div>
@@ -240,7 +295,7 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
           open={editOpen}
           existingTasks={[task]}
           onOpenChange={setEditOpen}
-          onUpdate={setTask}
+          onUpdate={applyCommittedTask}
         />
       ) : null}
       {confirmOpen ? (

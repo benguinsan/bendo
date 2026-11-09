@@ -33,6 +33,7 @@ export function persistedTaskToDashboard(task: PersistedTask): DashboardTask {
     categoryId: task.categoryId,
     categoryName: task.categoryName,
     createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
     scheduledAt: task.scheduledAt,
     scheduledDate: task.scheduledDate,
     completedAt: task.completedAt,

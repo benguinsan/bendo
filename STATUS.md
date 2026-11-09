@@ -1,4 +1,4 @@
-# Status: cập nhật 2026-11-08
+# Status: cập nhật 2026-11-09
 
 Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng việc cập nhật file này trong cùng commit. Luật chơi: [`AGENTS.md`](AGENTS.md). Tổng quan hệ thống: [`docs/architecture.md`](docs/architecture.md).
 
@@ -15,9 +15,8 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 1. Deploy `bendo-app` lên Vercel (owner duyệt): bỏ `POST /api/discord-identity` (`be4e48e`, audit #10) và offset múi giờ theo ngày cho web (`376cdc4`, audit #13) chỉ có hiệu lực sau deploy; desktop cũng proxy lên Vercel.
 2. **E2E trên máy Windows thật** (owner; chưa có kết quả xác nhận): cài `.exe` từ CI run 41508035268 (artifact `bendo-desktop-win-x64`, hết hạn 2026-11-16), chạy §C.1 trong [`docs/desktop-ship-mvp-checklist.md`](docs/desktop-ship-mvp-checklist.md): installer chỉ per-user + chọn thư mục, lần mở đầu tạo junction (ghi thời gian), login Clerk, CRUD, Agent chat, cài đè, gỡ cài.
 3. Ghi release note Windows (`desktop/release-notes/`) + SHA-256 `.exe` (đã có trong mục Bản build gần nhất).
-4. Agent chat UI: render markdown trong tin nhắn Doro (hiện hiện nguyên `**…**`).
-5. Doro nhầm "hôm nay" / "ngày mai" trong cùng câu trả lời (thấy khi test 2026-11-01) — kiểm tra time-context / prompt.
-6. Duyệt các prompt còn mở (giữ / chuyển `done/` / xoá): `bendo-app/prompts/agent-model-config-simple-ui.md`, `agent-nontech-first-run.md`, `agent-soft-model-errors.md`; `desktop/prompts/pack-windows.md`, `win-harness-hoist.md`, `win-harness-hoisted-linker.md` (bỏ hướng hoisted), `win-harness-link-manifest.md`, `win-harness-cleanup.md`.
+4. Doro nhầm "hôm nay" / "ngày mai" trong cùng câu trả lời (thấy khi test 2026-11-01) — kiểm tra time-context / prompt.
+5. Duyệt các prompt còn mở (giữ / chuyển `done/` / xoá): `bendo-app/prompts/agent-model-config-simple-ui.md`, `agent-nontech-first-run.md`, `agent-soft-model-errors.md`; `desktop/prompts/pack-windows.md`, `win-harness-hoist.md`, `win-harness-hoisted-linker.md` (bỏ hướng hoisted), `win-harness-link-manifest.md`, `win-harness-cleanup.md`.
 
 ## Bị chặn / chờ quyết định
 
@@ -25,6 +24,7 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 
 ## Để sau
 
+- Kiểm thử chat 2026-11-09: một yêu cầu nhiều định dạng bị timeout; các yêu cầu ngắn, bảng/code và code dài sau đó trả lời bình thường. Nguyên nhân chưa xác định; chưa sửa timeout.
 - Audit 2026-11-01, chưa sửa (mỗi mục đã có case cụ thể khi audit):
   - Client lấy ngày local của `scheduledAt` ở một số chỗ, server dùng `scheduled_date` → có thể lệch ngày sau khi đổi múi giờ.
   - `bodySchema` trùng giữa `app/api/agent/model-config` và `model-connection`.
@@ -43,6 +43,9 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 
 ## Bản build gần nhất
 
+- **macOS arm64 `0.1.0-beta.8` local (2026-11-09):** sửa ViewTaskView nhận dữ liệu sau `router.refresh()` và chọn snapshot theo `DashboardTask.updatedAt` từ server (mới hơn thắng, bằng nhau giữ local). Edit/status/vital dùng chung helper; page dùng `key={task.id}`. Trước lượt đóng gói, reviewer đã chạy typecheck/lint/**71 tests** và production build đạt; test bao gồm refresh mới/cũ, mutation lệch thứ tự, timestamp bằng nhau và converter giữ `updatedAt`. `cd desktop && npm run pack` exit 0; artifact `desktop/release/mac-arm64/Bendo.app` xác nhận version beta.8. Không chạy lại bộ test riêng hoặc GUI theo yêu cầu owner; chưa build/test Windows, deploy hoặc publish. Release note: [`desktop/release-notes/0.1.0-beta.8.md`](desktop/release-notes/0.1.0-beta.8.md).
+- **macOS arm64 `0.1.0-beta.7` local (2026-11-09, commit `f38b778`):** đã sửa 3 lỗi UI: Doro render Markdown an toàn (bold/list/table/code, user text literal; code dài cuộn ngang trong bubble), Dashboard status/completed dùng chung state task, Mark vital lưu priority Extreme. Reviewer chạy lại typecheck/lint/**64 tests** đạt; production `build:bendo` → desktop `build` → `run-electron-builder.mjs --dir` exit 0; `ops:pack-ready` đạt. UI đã xác nhận Dashboard đổi % ngay sau tạo/xoá, sửa title đồng bộ, Mark vital giữ sau reload và xuất hiện ở Vital Tasks; task QA đã xoá. Beta.7 xác nhận code 220 ký tự cuộn tới `END`; không tràn khung. Reuse harness không đổi từ beta.6 (`0.1.3-alpha.1`, rev `d347e70390`, smoke đạt; MANIFEST giữ version chuẩn bị beta.6). Báo cáo + ảnh local: `desktop/release/ui-regression-beta7-2026-11-09/REPORT.md`. Chưa build/test Windows hoặc deploy/publish bản này.
+- macOS arm64 rebuild local `0.1.0-beta.4` (2026-11-09, commit `5411d51`, `cd desktop && npm run pack` exit 0): đã mở `desktop/release/mac-arm64/Bendo.app` và test qua UI: Google login/handoff, tạo/tìm/sửa/calendar/complete/reopen/delete task, Test connection + Save cấu hình model hiện có, thoát/mở lại giữ login + task + chat hoạt động không nhập lại key. Doro trả lời đúng 09/11 và 10/11. Đã xoá task QA; 3 vấn đề UI phát hiện trong lượt này đã được sửa ở beta.7. Báo cáo + ảnh local (gitignored): `desktop/release/user-test-2026-11-09.md`. Không thay thế Windows hoặc macOS clean-machine E2E.
 - `0.1.0-beta.4` Windows x64 (CI run 41508035268, commit `01fd15d`, 2026-11-02): harness `dsh-v0.1.3-alpha.1`, 413 MB, 5759 junction tạo lại lúc chạy; NSIS 4m38s; `.exe` 187 MB, SHA-256 `4e1274507d642e2bdf02084306e2004c6b9725c27e275ca8571e4b907ac21a12`. CI đã verify `win-unpacked` (restore junction + smoke `/bendo-chat`); **chưa** cài thử trên máy thật.
 - `0.1.0-beta.4` macOS arm64 (local `npm run dist`, 2026-11-02): harness `0.1.3-alpha.1` rev `d347e70390`, 455.6 MB; đã test trên app đóng gói (boot OK, log che token, bridge 401). Thêm so với beta.3: offset múi giờ theo ngày của task (DST), buffer log harness theo dòng. Chi tiết: [`desktop/release-notes/0.1.0-beta.4.md`](desktop/release-notes/0.1.0-beta.4.md).
 

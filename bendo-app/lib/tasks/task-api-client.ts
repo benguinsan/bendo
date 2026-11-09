@@ -244,6 +244,42 @@ export async function updateTaskStatusViaApi(
   }
 }
 
+export async function updateTaskPriorityViaApi(
+  taskId: string,
+  priority: TaskPriority
+): Promise<
+  | { ok: true; task: ReturnType<typeof persistedTaskToDashboard> }
+  | { ok: false; error: string }
+> {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ priority }),
+    });
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, error: "Could not update task priority." };
+    }
+
+    if (!response.ok) {
+      const body = payload as ApiErrorBody;
+      return {
+        ok: false,
+        error: body.error ?? "Could not update task priority.",
+      };
+    }
+
+    const body = payload as ApiSuccessBody;
+    return { ok: true, task: persistedTaskToDashboard(body.data) };
+  } catch {
+    return { ok: false, error: "Could not update task priority." };
+  }
+}
+
 export async function deleteTaskViaApi(
   taskId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

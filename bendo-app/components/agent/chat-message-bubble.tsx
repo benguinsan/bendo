@@ -1,3 +1,4 @@
+import { ChatMarkdownBody } from "@/components/agent/chat-markdown-body";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DORO_AVATAR_SRC,
@@ -24,7 +25,7 @@ export function ChatMessageBubble({
   return (
     <div
       className={cn(
-        "flex w-full gap-3",
+        "flex w-full min-w-0 gap-3",
         isAgent ? "flex-row" : "flex-row-reverse"
       )}
     >
@@ -45,20 +46,26 @@ export function ChatMessageBubble({
       </Avatar>
       <div
         className={cn(
-          "flex max-w-[75%] flex-col gap-1.5",
+          "flex max-w-[75%] min-w-0 flex-col gap-1.5",
           isAgent ? "items-start" : "items-end"
         )}
       >
         <div
           className={cn(
-            "text-body rounded-xl px-3.5 py-3 text-sm leading-normal",
+            "text-body max-w-full min-w-0 rounded-xl px-3.5 py-3 text-sm leading-normal",
             isAgent
               ? "border-priority-moderate bg-card border"
               : "bg-date-accent/15"
           )}
         >
           <span className="sr-only">{senderLabel}</span>
-          {message.body}
+          {isAgent ? (
+            <ChatMarkdownBody body={message.body} />
+          ) : (
+            <span className="block break-all whitespace-pre-wrap">
+              {message.body}
+            </span>
+          )}
         </div>
         <p className="text-muted-foreground text-xs">{timeLabel}</p>
       </div>

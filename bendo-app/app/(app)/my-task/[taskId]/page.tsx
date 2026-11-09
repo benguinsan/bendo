@@ -34,7 +34,11 @@ export default async function ViewTaskPage({ params }: ViewTaskPageProps) {
 
   return (
     <PageFrame variant="fill">
-      <ViewTaskView initialTask={task} nowIso={now.toISOString()} />
+      <ViewTaskView
+        key={task.id}
+        initialTask={task}
+        nowIso={now.toISOString()}
+      />
     </PageFrame>
   );
 }
