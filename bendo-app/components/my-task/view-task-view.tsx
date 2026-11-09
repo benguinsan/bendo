@@ -36,6 +36,7 @@ import {
 import { useNow } from "@/lib/dashboard/use-now";
 import {
   deleteTaskViaApi,
+  updateTaskPriorityViaApi,
   updateTaskStatusViaApi,
 } from "@/lib/tasks/task-api-client";
 
@@ -51,10 +52,13 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusTransitioning, setStatusTransitioning] = useState(false);
+  const [vitalTransitioning, setVitalTransitioning] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [vitalError, setVitalError] = useState<string | null>(null);
   const now = useNow(nowIso);
   const view = toTaskView(task, now);
+  const isVital = task.priority === "extreme";
   const checklist = view.checklist ?? [];
   const optionalItems = view.optionalItems ?? [];
 
@@ -109,6 +113,30 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
     setStatusTransitioning(false);
   }
 
+  async function handleMarkVital() {
+    if (vitalTransitioning || isVital) {
+      return;
+    }
+
+    setVitalTransitioning(true);
+    setVitalError(null);
+
+    try {
+      const result = await updateTaskPriorityViaApi(task.id, "extreme");
+
+      if (result.ok) {
+        setTask(result.task);
+        router.refresh();
+      } else {
+        setVitalError(result.error);
+      }
+    } catch {
+      setVitalError("Could not mark task as vital.");
+    }
+
+    setVitalTransitioning(false);
+  }
+
   return (
     <>
       {deleteError ? (
@@ -119,6 +147,11 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
       {statusError ? (
         <p className="text-destructive mb-4 text-sm" role="alert">
           {statusError}
+        </p>
+      ) : null}
+      {vitalError ? (
+        <p className="text-destructive mb-4 text-sm" role="alert">
+          {vitalError}
         </p>
       ) : null}
       <Card className="rounded-card shadow-panel flex min-h-0 flex-1 flex-col py-6 ring-0 lg:h-full">
@@ -228,7 +261,16 @@ export function ViewTaskView({ initialTask, nowIso }: ViewTaskViewProps) {
             >
               <SquarePenIcon />
             </Button>
-            <Button type="button" size="icon-lg" aria-label="Mark vital">
+            <Button
+              type="button"
+              size="icon-lg"
+              aria-label={isVital ? "Already vital" : "Mark vital"}
+              disabled={vitalTransitioning || isVital}
+              aria-pressed={isVital}
+              onClick={() => {
+                void handleMarkVital();
+              }}
+            >
               <CircleAlertIcon />
             </Button>
           </div>

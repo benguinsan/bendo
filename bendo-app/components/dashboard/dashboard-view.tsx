@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { AddTaskDialog } from "@/components/dashboard/add-task-dialog";
+import { DashboardStaticPanels } from "@/components/dashboard/dashboard-static-panels";
 import { TodoColumn } from "@/components/dashboard/todo-column";
 import {
   LazyConfirmDeleteTaskDialog,
@@ -52,7 +53,7 @@ export function DashboardView({
   const pendingDeleteTask =
     tasks.find((task) => task.id === pendingDeleteTaskId) ?? null;
 
-  function refreshStaticPanels() {
+  function refreshServerSlots() {
     router.refresh();
   }
 
@@ -79,7 +80,7 @@ export function DashboardView({
         setEditingTaskId(null);
       }
       setPendingDeleteTaskId(null);
-      refreshStaticPanels();
+      refreshServerSlots();
     } catch {
       setDeleteError("Could not delete task.");
       setPendingDeleteTaskId(null);
@@ -95,23 +96,28 @@ export function DashboardView({
           {deleteError}
         </p>
       ) : null}
-      <TodoColumn
-        dateLine={dateLine}
-        categoryTextByTaskId={categoryTextByTaskId}
-        tasks={openTasks}
-        onEditTask={setEditingTaskId}
-        onDeleteTask={setPendingDeleteTaskId}
-        deletingTaskId={deletingTaskId}
-        addTaskTrigger={
-          <AddTaskDialog
-            existingTasks={tasks}
-            onCreate={(task) => {
-              setTasks((current) => [task, ...current]);
-              refreshStaticPanels();
-            }}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[7fr_5fr]">
+        <div className="min-w-0">
+          <TodoColumn
+            dateLine={dateLine}
+            categoryTextByTaskId={categoryTextByTaskId}
+            tasks={openTasks}
+            onEditTask={setEditingTaskId}
+            onDeleteTask={setPendingDeleteTaskId}
+            deletingTaskId={deletingTaskId}
+            addTaskTrigger={
+              <AddTaskDialog
+                existingTasks={tasks}
+                onCreate={(task) => {
+                  setTasks((current) => [task, ...current]);
+                  refreshServerSlots();
+                }}
+              />
+            }
           />
-        }
-      />
+        </div>
+        <DashboardStaticPanels tasks={tasks} now={now} />
+      </div>
       {editingTask ? (
         <LazyEditTaskDialog
           task={editingTask}
@@ -126,7 +132,7 @@ export function DashboardView({
             setTasks((current) =>
               current.map((task) => (task.id === updated.id ? updated : task))
             );
-            refreshStaticPanels();
+            refreshServerSlots();
           }}
         />
       ) : null}
