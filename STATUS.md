@@ -4,7 +4,7 @@ Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng vi�
 
 ## Mục tiêu hiện tại
 
-1. **Web local qua Docker:** README gốc và `bendo-app/README.md` lấy Docker Compose làm luồng chạy chính; Clerk/Supabase vẫn là dịch vụ bên ngoài, Doro cần harness chạy riêng. Lượt này chỉ cập nhật tài liệu, không đổi runtime.
+1. **Clone và chạy local:** hướng dẫn cấu hình chung Clerk/Supabase, web qua Docker và Electron tự khởi động Next.js. Đã bổ sung clone harness đúng tag + chép Doro overlay và các bước chạy riêng theo chế độ. Lượt này chỉ cập nhật tài liệu; chưa kiểm thử máy sạch/đăng nhập/chat.
 
 ## Đang làm
 

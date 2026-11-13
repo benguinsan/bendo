@@ -1,25 +1,46 @@
 # Bendo Desktop
 
-Electron **shell** for Bendo. Loads the existing Next.js app over HTTP — it does **not** embed a second UI.
+Electron shell for Bendo. It opens the same Next.js product as the web app. For a fresh clone, follow the [shared setup](../README.md#1-clone-and-configure-once) first: Clerk/Supabase credentials and database setup are required in either interface.
 
-Per repo [`AGENTS.md`](../AGENTS.md): `main` + `preload`; may spawn local Next and DeepSeek Harness (Doro + chat-bridge). Startup goes through **Runtime Manager**; quit teardown through **Runtime Shutdown**.
+## Start from a fresh clone
 
-## Prerequisites
+Use Node.js 22.19+ within 22.x (or Node.js 24.x) and npm. Docker is not required for this source-development workflow.
 
-- Node.js `>= 22`
-- Sibling `bendo-app/` with dependencies installed (for auto-spawn), **or** Bendo already running (Docker / Next) on the URL below
-- Optional for Agent chat: sibling `deepseek-harness/` with Doro overlay + `pnpm` on PATH (or harness already on `:3080`)
-
-## Chạy app (cửa sổ giữ mở)
+1. Configure `bendo-app/.env.local` using the [root guide](../README.md#1-clone-and-configure-once).
+2. Stop any existing Docker/Next server on port 3000. If Doro was started manually, stop that process too.
+3. For chat, complete [one-time harness preparation](../docs/bendo-app-agent-chat.md#prepare-the-harness-once). Skip this for task management alone.
+4. From the Bendo repository root:
 
 ```bash
-# from desktop/
-npm install
-# if electron binary missing:
+cd bendo-app
+npm ci
+cd ../desktop
+npm ci
+npm start
+```
+
+Electron builds its shell, starts Next.js from the sibling `bendo-app/`, then opens `http://127.0.0.1:3000`. If the harness is prepared, Electron starts it in the background. It injects the shared session and bridge credentials into processes it starts.
+
+After launch, sign in and create a task. For Doro, open Agent → configure provider/endpoint/API key/model → Save → chat. Configure desktop OAuth origins/redirects as described in the [shared setup](../README.md#1-clone-and-configure-once). Subsequent launches use `npm start` from `desktop/`.
+
+You do not need `desktop/.env` or `BENDO_CLOUD_API_URL` for this local source workflow. The packaging scripts read `desktop/.env` for release configuration; the development launcher uses shell environment variables and starts Next.js with its `bendo-app/.env.local`.
+
+If installation did not download the Electron binary, retry from `desktop/`:
+
+```bash
 node node_modules/electron/install.js
 npm start
-# aliases: npm run app   |   npm run dev
 ```
+
+## Attaching to an existing Docker server
+
+The default instructions above let Electron start its own runtimes. If a server is already healthy at the configured URL, the development shell attaches instead, and cannot inject configuration into that running server.
+
+For that advanced workflow, set the same private `BENDO_DESKTOP_SESSION_SECRET` in the Next.js server environment and the Electron shell environment before starting them. Privileged IPC, including encrypted model-config persistence, is denied without a matching session proof. For Agent chat, also share `DSH_CHAT_BRIDGE_SECRET` with the web server, Electron, and harness. Docker's bridge URL uses `host.docker.internal`; host Electron/harness connections use `127.0.0.1`. Restart the affected processes after changing configuration.
+
+Do not assume `npm start` reads `desktop/.env` for development. Use actual shell environment variables for attachment overrides. See [runtime startup](../docs/desktop-electron-startup-flow.md) for the contract.
+
+## Runtime behavior
 
 - Checks health `http://127.0.0.1:3000/api/health` (or `BENDO_HEALTH_URL`)
 - If already healthy (Docker / existing Next): **attaches** — does not start a second server

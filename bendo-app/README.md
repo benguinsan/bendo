@@ -6,6 +6,8 @@ Clerk handles authentication and Supabase stores application data. These service
 
 ## Local Docker setup
 
+For a new clone, first complete the [shared clone, credentials, database, and Clerk setup](../README.md#1-clone-and-configure-once). The commands below start inside `bendo-app/`.
+
 Run these commands from `bendo-app/`:
 
 ```bash
@@ -53,9 +55,11 @@ Set `DSH_CHAT_BRIDGE_URL` and `DSH_CHAT_BRIDGE_SECRET` in `.env.local`, and conf
 
 Compose does not start or configure the harness. In Agent, configure your provider, endpoint, API key, and model, then save before chatting. Browser mode uses a same-tab session cache; Electron's encrypted model-config persistence does not apply to the browser.
 
-Without a reachable bridge, task management still works and chat stays offline. See the [root setup guide](../README.md#optional-doro-chat) and [Agent configuration contract](../docs/bendo-app-agent-chat.md).
+Without a reachable bridge, task management still works and chat stays offline. See the [fresh-clone Doro setup](../docs/bendo-app-agent-chat.md#local-setup-from-a-fresh-clone) and [Agent configuration contract](../docs/bendo-app-agent-chat.md).
 
 ## Run without Docker
+
+For the Electron interface, use the [desktop source workflow](../README.md#2b-run-the-desktop-app-from-source). The commands here run only the web server on the host.
 
 Requires Node.js 22+ and the same environment configuration:
 
