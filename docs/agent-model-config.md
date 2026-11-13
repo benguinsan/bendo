@@ -72,6 +72,10 @@ Harness chỉ phục vụ model khi route có trong **`$DSH_HOME/settings.yaml`*
 3. **Selection:** `agentDefaultModel.saveSelection({ provider, model })`.
 4. **Gate in-memory:** set `appliedModelConfig` chỉ sau khi 1–3 thành công.
 
+Agent đang sống cũng đọc lựa chọn mới ở lần assemble prompt tiếp theo, kể cả khi giữ nguyên sessionId. Model được chốt từ đầu mỗi bước đến khi route request của bước đó; Save giữa hai thời điểm không làm prompt và request dùng hai model khác nhau. Không xoá phiên hoặc lịch sử để đổi model. API key tiếp tục được resolve qua credentials service khi gọi provider.
+
+Kiểm tra hồi quy (harness đã chuẩn bị theo hướng dẫn local): `cd desktop && npm run test:doro`. Test gọi ingress Save/chat thật cùng hooks model-selection, dùng agent/services trong bộ nhớ và key giả; không gọi provider hoặc ghi userData. Nó kiểm tra đổi model/provider trong cùng phiên, giữ lựa chọn của bước đã assemble, và cập nhật credentials. Đây không phải kiểm thử chat với provider thực tế.
+
 Trước bước 1, bridge kiểm tra lại endpoint (`https`, không userinfo, port 443, host trong allowlist theo provider), nên ai có bridge secret cũng không vượt qua Next để trỏ agent sang endpoint lạ. Allowlist có **ba bản sao**, sửa thì sửa cả ba: `MODEL_API_PROVIDER_ALLOWED_HOSTS` (`bendo-app/lib/agent/model-api-key.ts`, Next), `BENDO_PROVIDER_ALLOWED_HOSTS` (`bendo-agent(doro)/chat-bridge.ts`, bridge), `PROVIDER_ALLOWED_HOSTS` (`desktop/src/main/model-config-store.ts`, persist desktop).
 
 Không sửa `cordis.yml` để nhét key user.

@@ -390,8 +390,11 @@ function requireAppliedModelSelection(): ModelSelection {
 }
 
 function installAppliedModel(agentCtx: Context): void {
-  const selection = requireAppliedModelSelection()
-  const selected: ModelSelectionRef = { current: selection, assembled: undefined }
+  const selected: ModelSelectionRef = {
+    // Reused agents read the latest Save; installModelSelection snapshots each step.
+    get current() { return requireAppliedModelSelection() },
+    assembled: undefined,
+  }
   installModelSelection(agentCtx, selected)
 }
 
