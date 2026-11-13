@@ -1,16 +1,18 @@
-# Status: cập nhật 2026-11-09
+# Status: cập nhật 2026-11-13
 
 Nơi duy nhất ghi "đang làm / còn lại". Mỗi task kết thúc bằng việc cập nhật file này trong cùng commit. Luật chơi: [`AGENTS.md`](AGENTS.md). Tổng quan hệ thống: [`docs/architecture.md`](docs/architecture.md).
 
 ## Mục tiêu hiện tại
 
-1. **Ship Windows MVP:** installer NSIS chạy được trên máy Windows sạch (login, CRUD, Agent chat). Chi tiết: [`docs/desktop-ship-mvp-checklist.md`](docs/desktop-ship-mvp-checklist.md).
+1. **Web local qua Docker:** README gốc và `bendo-app/README.md` lấy Docker Compose làm luồng chạy chính; Clerk/Supabase vẫn là dịch vụ bên ngoài, Doro cần harness chạy riêng. Lượt này chỉ cập nhật tài liệu, không đổi runtime.
 
 ## Đang làm
 
 - (trống)
 
 ## Kế tiếp (đã sắp thứ tự)
+
+Danh sách dưới đây là backlog desktop/cloud trước khi chuyển trọng tâm sang web local; chưa sắp lại ưu tiên. Hướng dẫn và mã Electron hiện có vẫn được giữ lại.
 
 1. Deploy `bendo-app` lên Vercel (owner duyệt): bỏ `POST /api/discord-identity` (`be4e48e`, audit #10) và offset múi giờ theo ngày cho web (`376cdc4`, audit #13) chỉ có hiệu lực sau deploy; desktop cũng proxy lên Vercel.
 2. **E2E trên máy Windows thật** (owner; chưa có kết quả xác nhận): cài `.exe` từ CI run 41508035268 (artifact `bendo-desktop-win-x64`, hết hạn 2026-11-16), chạy §C.1 trong [`docs/desktop-ship-mvp-checklist.md`](docs/desktop-ship-mvp-checklist.md): installer chỉ per-user + chọn thư mục, lần mở đầu tạo junction (ghi thời gian), login Clerk, CRUD, Agent chat, cài đè, gỡ cài.

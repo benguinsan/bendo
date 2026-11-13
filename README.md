@@ -1,124 +1,114 @@
-# 📋 Bendo
+# Bendo
 
-Personal-first todo app with an optional AI assistant (**Doro**).
+A personal task-management web app, run locally in your browser through Docker Compose, with an optional AI assistant (**Doro**).
 
-**Stack:** Next.js · Clerk · Supabase · Tailwind / shadcn · DeepSeek Harness (optional)
+**Stack:** Next.js · React.js · TypeScript · Tailwind CSS / shadcn · Clerk · Supabase · Docker
 
----
+## Features
 
-## ✨ Key Features
+- Dashboard, quick add, search, and task status overview
+- Task CRUD, priorities, personal categories, and calendar views
+- Incomplete-task reminders
+- Clerk authentication and user-scoped task data in Supabase
+- Optional Doro chat with task-management tools through a local DeepSeek Harness bridge
 
-- 📊 **Dashboard** — overview, status, quick add
-- ✅ **My Task / Vital Task** — browse, edit, complete (including high-priority)
-- 🏷️ **Task Categories** — personal categories
-- 📅 **Calendar** — pending tasks by date
-- 🔔 **Notifications** — in-app feed
-- 🤖 **Agent (Doro)** — chat backed by a self-hosted DeepSeek Harness overlay
-- 🔐 **Auth** — Clerk; data scoped per user
-- 🗄️ **Persistence** — Supabase
+## What runs locally
 
----
+Docker Compose runs the Next.js web app at **http://localhost:3000**. It uses the development server with source mounts for live reload.
 
-## 📁 Project Structure
+Clerk authentication and the Supabase database remain external services. Running the web app locally does not make the whole application offline or start those services in Docker. Doro also needs a separately running harness; Compose does not start it.
 
-```text
-bendo/
-├── AGENTS.md            # Agent monorepo map
-├── bendo-app/           # Next.js UI + API
-│   └── supabase/        # schema.sql + DB docs
-├── desktop/             # Electron shell (loads local Bendo URL)
-└── deepseek-harness/    # Local harness checkout (gitignored); Doro overlay lives here
-```
+## Run with Docker
 
-- Architecture overview: [`docs/architecture.md`](docs/architecture.md) · current status: [`STATUS.md`](STATUS.md)
-- App: [`bendo-app/README.md`](bendo-app/README.md)
-- Desktop: [`desktop/README.md`](desktop/README.md)
-- Supabase: [`bendo-app/supabase/README.md`](bendo-app/supabase/README.md)
-- Agents: [`AGENTS.md`](AGENTS.md) (repo map) · [`bendo-app/AGENTS.md`](bendo-app/AGENTS.md) (app rules)
+### 1. Prepare services and environment
 
----
+You need Docker Desktop with Compose, a Clerk application, and a Supabase project.
 
-## ✅ Prerequisites
-
-- Node.js `>= 22`
-- [Clerk](https://dashboard.clerk.com) keys
-- [Supabase](https://supabase.com/dashboard) project — apply schema (see below)
-- Docker Desktop (optional)
-- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (optional — Agent chat only)
-
----
-
-## 🗄️ Supabase
-
-Bendo stores tasks, categories, notifications, and activity in Supabase. Auth is Clerk; the server uses the **service role** key only.
-
-1. Create a Supabase project.
-2. Paste and run `bendo-app/supabase/schema.sql` in the [SQL Editor](https://supabase.com/dashboard/project/_/sql/new).
-3. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`.
-
-Full details (tables, RPCs, RLS, one-off scripts): [`bendo-app/supabase/README.md`](bendo-app/supabase/README.md)
-
----
-
-## 💻 Run Locally
+From the repository root:
 
 ```bash
 cd bendo-app
-cp .env.example .env.local   # fill Clerk + Supabase
-npm install
-npm run dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Fill in these values in `bendo-app/.env.local`:
 
----
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Clerk server key |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase server access |
 
-## 🐳 Run with Docker
+Use the local Clerk/Supabase configuration above; `BENDO_CLOUD_API_URL` is not needed for this workflow. Keep server keys out of `NEXT_PUBLIC_*` variables and never commit `.env.local`.
+
+For a new database, apply `bendo-app/supabase/schema.sql` using the Supabase SQL Editor, following the [database setup guide](bendo-app/supabase/README.md).
+
+### 2. Start the web app
+
+From `bendo-app/`:
 
 ```bash
-cd bendo-app
-cp .env.example .env.local   # fill Clerk + Supabase
 docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Stop with `docker compose down`.
+Open [http://localhost:3000](http://localhost:3000), then sign up or sign in. The source mount makes `.env.local` available to Next.js at runtime; dependencies and the Next.js cache stay in container volumes.
 
----
+Useful commands from the same directory:
 
-## 🤖 Agent chat
+```bash
+docker compose logs -f web-app
+docker compose restart web-app
+docker compose down
+```
 
-Optional. Without a harness bridge, Agent UI works but chat stays offline.
+Restart `web-app` after changing `.env.local`. The current Docker setup is for local development, not a production image.
 
-Doro runs as an overlay inside the local DeepSeek Harness checkout (for example `deepseek-harness/bendo-agent(doro)/`). Point `bendo-app` at the chat bridge with `DSH_CHAT_BRIDGE_URL` and `DSH_CHAT_BRIDGE_SECRET` — see `bendo-app/.env.example`.
+## Optional: Doro chat
 
----
+Core task features work without Doro. Live chat requires a separate DeepSeek Harness checkout with the Bendo Doro overlay. That gitignored checkout is not included when cloning this repository.
 
-## 🪟 Desktop Windows installer (GitHub Actions)
+For Docker Desktop, set these server-only values in `bendo-app/.env.local`:
 
-Build the unsigned NSIS `.exe` on a Windows runner, then **E2E on a clean Windows PC** (Actions ≠ E2E).
+```dotenv
+DSH_CHAT_BRIDGE_URL=http://host.docker.internal:3080/bendo-chat
+DSH_CHAT_BRIDGE_SECRET=replace_with_a_shared_secret
+```
 
-Workflow: [`.github/workflows/desktop-windows.yml`](.github/workflows/desktop-windows.yml)
+The harness process must use the same `DSH_CHAT_BRIDGE_SECRET`. In an existing configured harness checkout, start Doro separately:
 
-1. **CI** (`windows-latest`) → `npm run dist:win` → `Bendo-<version>-win-x64.exe`
-2. **Clean Win machine** → download → install → login / CRUD / Agent chat
+```bash
+cd deepseek-harness
+pnpm dsh web --patch './bendo-agent(doro)/cordis.yml' --no-open
+```
 
-### Run the workflow
+The `cd` above starts from the repository root. Configure the shared secret in the harness environment before launching it. Then open Agent in Bendo, configure your model, and save before chatting. Without a reachable bridge, chat stays offline.
 
-1. Repo **Settings → Secrets and variables → Actions** — set:
+See [Agent chat and model configuration](docs/bendo-app-agent-chat.md) for the bridge contract and browser configuration behavior.
 
-   | Kind | Name | Example |
-   | --- | --- | --- |
-   | Variable | `BENDO_CLOUD_API_URL` | `https://bendo-psi.vercel.app` |
-   | Secret | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_…` |
-   | Secret | `NEXT_PUBLIC_SUPABASE_URL` | `https://….supabase.co` |
-   | Secret | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ…` |
+## Run without Docker
 
-   Optional: `HARNESS_REPOSITORY` (default `deepseek-ai/deepseek-harness`), `HARNESS_TOKEN` if that repo is private.
+With Node.js 22+ and the same `.env.local` setup, run from `bendo-app/`:
 
-2. **Actions → Desktop Windows → Run workflow**
-   - Optional: `publish_release` + `release_tag` (e.g. `v0.1.0-beta.1`) to attach the `.exe` to a GitHub Release
-   - Otherwise download the Actions artifact `bendo-desktop-win-x64`
+```bash
+npm ci
+npm run dev
+```
 
-CI injects the ship Doro overlay from [`desktop/packaging/bendo-agent(doro)/`](desktop/packaging/bendo-agent(doro)/) into the harness checkout before pack. Keep that folder in sync with the overlay you dogfood locally.
+If the harness runs on the same host, use `http://127.0.0.1:3080/bendo-chat` for `DSH_CHAT_BRIDGE_URL` instead of the Docker Desktop host address.
 
-Details: [`desktop/README.md`](desktop/README.md) · ship checklist [`docs/desktop-ship-mvp-checklist.md`](docs/desktop-ship-mvp-checklist.md) §E.
+## Repository and documentation
+
+```text
+bendo/
+├── bendo-app/           # Next.js web app, Docker configuration, and database schema
+├── docs/               # Architecture and feature contracts
+├── desktop/            # Existing Electron shell and packaging
+└── deepseek-harness/    # Separate local harness checkout (gitignored)
+```
+
+- [Web app setup and commands](bendo-app/README.md)
+- [Database setup](bendo-app/supabase/README.md)
+- [Architecture](docs/architecture.md) · [Current status](STATUS.md)
+- [Existing desktop setup and packaging](desktop/README.md)
